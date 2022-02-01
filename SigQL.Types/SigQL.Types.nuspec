@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>SigQL.Types</id>
-    <version>0.0.1</version>
+    <version>0.0.74</version>
     <authors>Matt Clifton</authors>
     <description>Types and annotations for SigQL signatures</description>
     <license type="file">LICENSE.txt</license>

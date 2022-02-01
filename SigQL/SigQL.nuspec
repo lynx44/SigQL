@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>SigQL</id>
-    <version>0.0.1</version>
+    <version>0.0.74</version>
     <description>SigQL is a .NET ORM that uses code signatures as the query language.</description>
     <authors>Matt Clifton</authors>
     <license type="file">LICENSE.txt</license>

@@ -3,7 +3,7 @@
   <metadata>
     <id>SigQL.Schema</id>
     <description>SQL schema abstractions for SigQL</description>
-    <version>0.0.1</version>
+    <version>0.0.74</version>
     <authors>Matt Clifton</authors>
     <license type="file">LICENSE.txt</license>
     <requireLicenseAcceptance>true</requireLicenseAcceptance>
