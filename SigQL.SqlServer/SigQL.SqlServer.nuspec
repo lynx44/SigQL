@@ -11,20 +11,20 @@
       <group targetFramework=".NETFramework4.6.1">
         <dependency id="Microsoft.SqlServer.SqlManagementObjects" version="161.46041.41" />
         <dependency id="System.Data.SqlClient" version="4.8.2" />
-        <dependency id="SigQL" version="0.0.68" />
-        <dependency id="SigQL.Schema" version="0.0.68" />
+        <dependency id="SigQL" version="0.0.74" />
+        <dependency id="SigQL.Schema" version="0.0.74" />
       </group>
       <group targetFramework=".NETFramework4.7.2">
         <dependency id="Microsoft.SqlServer.SqlManagementObjects" version="161.46041.41" />
         <dependency id="System.Data.SqlClient" version="4.8.2" />
-        <dependency id="SigQL" version="0.0.68" />
-        <dependency id="SigQL.Schema" version="0.0.68" />
+        <dependency id="SigQL" version="0.0.74" />
+        <dependency id="SigQL.Schema" version="0.0.74" />
       </group>
       <group targetFramework=".NETStandard2">
         <dependency id="Microsoft.SqlServer.SqlManagementObjects" version="161.46041.41" />
         <dependency id="System.Data.SqlClient" version="4.8.2" />
-        <dependency id="SigQL" version="0.0.68" />
-        <dependency id="SigQL.Schema" version="0.0.68" />
+        <dependency id="SigQL" version="0.0.74" />
+        <dependency id="SigQL.Schema" version="0.0.74" />
       </group>
     </dependencies>
   </metadata>

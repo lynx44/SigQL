@@ -10,18 +10,18 @@
     <dependencies>
       <group targetFramework=".NETFramework4.6.1">
         <dependency id="Castle.Core" version="4.4.1" />
-        <dependency id="SigQL.Schema" version="0.0.68" />
-        <dependency id="SigQL.Types" version="0.0.68" />
+        <dependency id="SigQL.Schema" version="0.0.74" />
+        <dependency id="SigQL.Types" version="0.0.74" />
       </group>
       <group targetFramework=".NETFramework4.7.2">
         <dependency id="Castle.Core" version="4.4.1" />
-        <dependency id="SigQL.Schema" version="0.0.68" />
-        <dependency id="SigQL.Types" version="0.0.68" />
+        <dependency id="SigQL.Schema" version="0.0.74" />
+        <dependency id="SigQL.Types" version="0.0.74" />
       </group>
       <group targetFramework=".NETStandard2">
         <dependency id="Castle.Core" version="4.4.1" />
-        <dependency id="SigQL.Schema" version="0.0.68" />
-        <dependency id="SigQL.Types" version="0.0.68" />
+        <dependency id="SigQL.Schema" version="0.0.74" />
+        <dependency id="SigQL.Types" version="0.0.74" />
       </group>
     </dependencies>
   </metadata>
