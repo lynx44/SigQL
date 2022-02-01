@@ -3,7 +3,7 @@
   <metadata>
     <id>SigQL</id>
     <version>0.0.1</version>
-    <description>An interface based ORM that uses method signatures as the query language</description>
+    <description>SigQL is a .NET ORM that uses code signatures as the query language.</description>
     <authors>Matt Clifton</authors>
     <license type="file">LICENSE.txt</license>
     <requireLicenseAcceptance>true</requireLicenseAcceptance>
