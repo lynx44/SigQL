@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>SigQL</id>
+    <version>0.0.1</version>
+    <description>An interface based ORM that uses method signatures as the query language</description>
+    <authors>Matt Clifton</authors>
+    <license type="file">LICENSE.txt</license>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <dependencies>
+      <group targetFramework=".NETFramework4.6.1">
+        <dependency id="Castle.Core" version="4.4.1" />
+        <dependency id="SigQL.Schema" version="0.0.68" />
+        <dependency id="SigQL.Types" version="0.0.68" />
+      </group>
+      <group targetFramework=".NETFramework4.7.2">
+        <dependency id="Castle.Core" version="4.4.1" />
+        <dependency id="SigQL.Schema" version="0.0.68" />
+        <dependency id="SigQL.Types" version="0.0.68" />
+      </group>
+      <group targetFramework=".NETStandard2">
+        <dependency id="Castle.Core" version="4.4.1" />
+        <dependency id="SigQL.Schema" version="0.0.68" />
+        <dependency id="SigQL.Types" version="0.0.68" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="bin\$configuration$\**\SigQL.dll" target="lib" />
+    <file src="bin\$configuration$\**\SigQL.pdb" target="lib" />
+    <file src="..\LICENSE.txt" target="" />
+  </files>
+</package>

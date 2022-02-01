@@ -1,0 +1,6 @@
+{
+    "ConnectionStrings": {
+        "LaborConnection": "Server=localhost;Database=SigQL_Labor_Tests;Trusted_Connection=True;MultipleActiveResultSets=true",
+        "LaborConnectionWithUserCredentials": "Server=localhost;Database=SigQL_Labor_Tests;User ID=sigqltestuser;Password=7NG3xn7xy5X3iTmZjSXUsK9uEdoSDLBB;MultipleActiveResultSets=true"
+    }
+}
