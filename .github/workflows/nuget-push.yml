@@ -16,6 +16,7 @@ jobs:
     env:
       PACKAGE_BASE_VERSION: 0.0.1
       VERSIONDATE: $(date +'%Y%m%d')
+      Configuration: Release
       
     steps:
     - uses: actions/checkout@v2
