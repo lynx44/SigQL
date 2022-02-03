@@ -24,9 +24,9 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Show version
-      run: echo "$VERSION"
+      run: echo "${{ env.VERSION }}"
     - name: Pack
-      run: dotnet pack /p:Version=${{ env.$VERSION }}
+      run: dotnet pack /p:Version=${{ env.VERSION }}
     - name: Push
       run: dotnet nuget push "**/SigQL.nupkg" -k ${{ secrets.NUGET_ORG_KEY }} -s https://api.nuget.org/v3/index.json
       
