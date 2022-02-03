@@ -1,4 +1,4 @@
-name: .NET
+name: Push Nuget Packages
 
 on:
   push:
@@ -15,7 +15,6 @@ jobs:
 
     env:
       PACKAGE_BASE_VERSION: 0.0.1
-      GIT_HASH: $(git rev-parse --short "$GITHUB_SHA")
       VERSIONDATE: $(date +'%Y%m%d')
       
     steps:
@@ -32,6 +31,7 @@ jobs:
       run: dotnet build --no-restore
     - name: Pack
       env:
+        GIT_HASH: '${GITHUB_SHA::7}'
         PACKAGE_VERSION: '${{ env.PACKAGE_BASE_VERSION}}-CI-${{ env.VERSIONDATE }}-${{ env.GIT_HASH }}'
       run: dotnet pack /p:Version=${{ env.PACKAGE_VERSION }}
     - name: Push
