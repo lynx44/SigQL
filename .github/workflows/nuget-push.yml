@@ -32,7 +32,7 @@ jobs:
       run: dotnet build --no-restore
     - name: Pack
       env:
-        PACKAGE_VERSION: '${{ PACKAGE_BASE_VERSION}}-CI-${{ VERSIONDATE}}-${{ GIT_HASH}}'
+        PACKAGE_VERSION: '${{ env.PACKAGE_BASE_VERSION}}-CI-${{ env.VERSIONDATE }}-${{ env.GIT_HASH }}'
       run: dotnet pack /p:Version=${{ env.PACKAGE_VERSION }}
     - name: Push
       run: dotnet nuget push "**/SigQL.nupkg" -k ${{ secrets.NUGET_ORG_KEY }} -s https://api.nuget.org/v3/index.json
