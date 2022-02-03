@@ -1,14 +1,28 @@
-name: .NET
+name: Push Nuget Packages
 
-on: workflow_dispatch
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+# on: workflow_dispatch
 
 jobs:
   build:
 
     runs-on: windows-latest
 
+    env:
+      PACKAGE_BASE_VERSION: 0.0.1
+      VERSIONDATE: $(date +'%Y%m%d')
+      Configuration: Release
+      
     steps:
     - uses: actions/checkout@v2
+    - name: Set outputs
+      id: vars
+      run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
@@ -17,47 +31,10 @@ jobs:
       run: dotnet restore
     - name: Build
       run: dotnet build --no-restore
-    - name: Publish NuGet - SigQL
-      # You may pin to the exact commit or the version.
-      # uses: brandedoutcast/publish-nuget@c12b8546b67672ee38ac87bea491ac94a587f7cc
-      uses: brandedoutcast/publish-nuget@v2.5.5
-      with:
-        # Filepath of the project to be packaged, relative to root of repository
-        PROJECT_FILE_PATH: SigQL.nuspec
-        # API key to authenticate with NuGet server
-        NUGET_KEY: ${{ secrets.NUGET_ORG_KEY }}
-        # Flag to toggle pushing symbols along with nuget package to the server, disabled by default
-        INCLUDE_SYMBOLS: true
-    - name: Publish Nuget - SigQL.Schema
-      # You may pin to the exact commit or the version.
-      # uses: brandedoutcast/publish-nuget@c12b8546b67672ee38ac87bea491ac94a587f7cc
-      uses: brandedoutcast/publish-nuget@v2.5.5
-      with:
-        # Filepath of the project to be packaged, relative to root of repository
-        PROJECT_FILE_PATH: SigQL.Schema.nuspec
-        # API key to authenticate with NuGet server
-        NUGET_KEY: ${{ secrets.NUGET_ORG_KEY }}
-        # Flag to toggle pushing symbols along with nuget package to the server, disabled by default
-        INCLUDE_SYMBOLS: true
-    - name: Publish Nuget - SigQL.Types
-      # You may pin to the exact commit or the version.
-      # uses: brandedoutcast/publish-nuget@c12b8546b67672ee38ac87bea491ac94a587f7cc
-      uses: brandedoutcast/publish-nuget@v2.5.5
-      with:
-        # Filepath of the project to be packaged, relative to root of repository
-        PROJECT_FILE_PATH: SigQL.Types.nuspec
-        # API key to authenticate with NuGet server
-        NUGET_KEY: ${{ secrets.NUGET_ORG_KEY }}
-        # Flag to toggle pushing symbols along with nuget package to the server, disabled by default
-        INCLUDE_SYMBOLS: true
-    - name: Publish Nuget - SigQL.SqlServer
-      # You may pin to the exact commit or the version.
-      # uses: brandedoutcast/publish-nuget@c12b8546b67672ee38ac87bea491ac94a587f7cc
-      uses: brandedoutcast/publish-nuget@v2.5.5
-      with:
-        # Filepath of the project to be packaged, relative to root of repository
-        PROJECT_FILE_PATH: SigQL.SqlServer.nuspec
-        # API key to authenticate with NuGet server
-        NUGET_KEY: ${{ secrets.NUGET_ORG_KEY }}
-        # Flag to toggle pushing symbols along with nuget package to the server, disabled by default
-        INCLUDE_SYMBOLS: true
+    - name: Pack
+      env:
+        PACKAGE_VERSION: '${{ env.PACKAGE_BASE_VERSION }}-CI-${{ env.VERSIONDATE }}-${{ steps.vars.outputs.sha_short }}'
+      run: dotnet pack /p:Version=${{ env.PACKAGE_VERSION }}
+    - name: Push
+      run: dotnet nuget push "**/SigQL.nupkg" -k ${{ secrets.NUGET_ORG_KEY }} -s https://api.nuget.org/v3/index.json
+      
