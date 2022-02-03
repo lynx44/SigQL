@@ -11,10 +11,12 @@ jobs:
       PACKAGE_BASE_VERSION: 0.0.1
       GIT_HASH: $(git rev-parse --short "$GITHUB_SHA")
       VERSIONDATE: $(date +'%Y%m%d')
-      VERSION: $PACKAGE_BASE_VERSION-CI-$VERSIONDATE-$GIT_HASH
+      PACKAGE_VERSION: $PACKAGE_BASE_VERSION-CI-$VERSIONDATE-$GIT_HASH
       
     steps:
     - uses: actions/checkout@v2
+    - name: Show version
+      run: echo "${{ env.VERSION }}"
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
@@ -23,10 +25,8 @@ jobs:
       run: dotnet restore
     - name: Build
       run: dotnet build --no-restore
-    - name: Show version
-      run: echo "${{ env.VERSION }}"
     - name: Pack
-      run: dotnet pack /p:Version=${{ env.VERSION }}
+      run: dotnet pack /p:Version=${{ env.PACKAGE_VERSION }}
     - name: Push
       run: dotnet nuget push "**/SigQL.nupkg" -k ${{ secrets.NUGET_ORG_KEY }} -s https://api.nuget.org/v3/index.json
       
