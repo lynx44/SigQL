@@ -36,5 +36,5 @@ jobs:
         PACKAGE_VERSION: '${{ env.PACKAGE_BASE_VERSION }}-CI-${{ env.VERSIONDATE }}-${{ steps.vars.outputs.sha_short }}'
       run: dotnet pack /p:Version=${{ env.PACKAGE_VERSION }}
     - name: Push
-      run: dotnet nuget push "**/SigQL.nupkg" -k ${{ secrets.NUGET_ORG_KEY }} -s https://api.nuget.org/v3/index.json
+      run: dotnet nuget push "**/SigQL*.nupkg" -k ${{ secrets.NUGET_ORG_KEY }} -s https://api.nuget.org/v3/index.json
       
