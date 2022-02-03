@@ -11,7 +11,7 @@ jobs:
       PACKAGE_BASE_VERSION: 0.0.1
       GIT_HASH: $(git rev-parse --short "$GITHUB_SHA")
       VERSIONDATE: $(date +'%Y%m%d')
-      PACKAGE_VERSION: '${{ env.PACKAGE_BASE_VERSION}}-CI-${{ env.VERSIONDATE}}-${{ env.GIT_HASH}}'
+      PACKAGE_VERSION: '${{ PACKAGE_BASE_VERSION}}-CI-${{ VERSIONDATE}}-${{ GIT_HASH}}'
       
     steps:
     - uses: actions/checkout@v2
