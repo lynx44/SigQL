@@ -32,10 +32,6 @@ namespace SigQL
         public object Materialize(SqlMethodInvocation methodInvocation,
             IEnumerable<ParameterArg> methodArgs)
         {
-            
-            
-            RowValueCollection rowValueCollection = null;
-
             var statement = methodInvocation.SqlStatement.GetPreparedStatement(methodArgs);
 
             var targetTablePrimaryKey = methodInvocation.SqlStatement.TargetTablePrimaryKey;
