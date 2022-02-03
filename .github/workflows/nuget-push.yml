@@ -11,12 +11,12 @@ jobs:
       PACKAGE_BASE_VERSION: 0.0.1
       GIT_HASH: $(git rev-parse --short "$GITHUB_SHA")
       VERSIONDATE: $(date +'%Y%m%d')
-      PACKAGE_VERSION: $PACKAGE_BASE_VERSION-CI-$VERSIONDATE-$GIT_HASH
+      PACKAGE_VERSION: '${{ env.PACKAGE_BASE_VERSION}}-CI-${{ env.VERSIONDATE}}-${{ env.GIT_HASH}}'
       
     steps:
     - uses: actions/checkout@v2
     - name: Show version
-      run: echo "${{ env.VERSION }}"
+      run: echo "${{ env.PACKAGE_VERSION }}"
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
