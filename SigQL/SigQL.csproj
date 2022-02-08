@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net461;net472</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net462;net472</TargetFrameworks>
     <LangVersion>8</LangVersion>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
@@ -12,9 +12,9 @@
     <PackageProjectUrl>https://github.com/lynx44/SigQL</PackageProjectUrl>
     <Description>SigQL is a .NET ORM that uses code signatures as the query language.</Description>
     <Company>Matt Clifton</Company>
-    <RepositoryUrl>https://github.com/lynx44/SigQL</RepositoryUrl>
+    <!--<RepositoryUrl>https://github.com/lynx44/SigQL</RepositoryUrl>-->
     <PackageTags>Data;O/RM;ORM;SQL;Server</PackageTags>
-    <IncludeSymbols>true</IncludeSymbols>
+    <!--<IncludeSymbols>true</IncludeSymbols>-->
     <!--<SymbolPackageFormat>snupkg</SymbolPackageFormat>-->
   </PropertyGroup>
 

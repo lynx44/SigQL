@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net461;net472</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net462;net472</TargetFrameworks>
     <LangVersion>8</LangVersion>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
@@ -9,12 +9,12 @@
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageProjectUrl>https://github.com/lynx44/SigQL</PackageProjectUrl>
+    <!--<PackageProjectUrl>https://github.com/lynx44/SigQL</PackageProjectUrl>-->
     <Description>SQL Server implementation of SigQL.</Description>
     <Company>Matt Clifton</Company>
     <RepositoryUrl>https://github.com/lynx44/SigQL</RepositoryUrl>
     <PackageTags>Data;O/RM;ORM;SQL;Server</PackageTags>
-    <IncludeSymbols>true</IncludeSymbols>
+    <!--<IncludeSymbols>true</IncludeSymbols>-->
     <!--<SymbolPackageFormat>snupkg</SymbolPackageFormat>-->
   </PropertyGroup>
 
