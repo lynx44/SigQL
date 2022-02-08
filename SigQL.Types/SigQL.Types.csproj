@@ -14,9 +14,10 @@
     <Company>Matt Clifton</Company>
     <RepositoryUrl>https://github.com/lynx44/SigQL</RepositoryUrl>
     <PackageTags>Data;O/RM;ORM;SQL;Server</PackageTags>
+    <IncludeSymbols>true</IncludeSymbols>
     <!--removing this resolves nuget pack error:
     error NU5017: Cannot create a package that has no dependencies nor content. -->
-    <!--<IncludeSymbols>true</IncludeSymbols>
+    <!--
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>-->
   </PropertyGroup>
 

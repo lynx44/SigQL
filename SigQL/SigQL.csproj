@@ -15,7 +15,7 @@
     <RepositoryUrl>https://github.com/lynx44/SigQL</RepositoryUrl>
     <PackageTags>Data;O/RM;ORM;SQL;Server</PackageTags>
     <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!--<SymbolPackageFormat>snupkg</SymbolPackageFormat>-->
   </PropertyGroup>
 
   <ItemGroup>
