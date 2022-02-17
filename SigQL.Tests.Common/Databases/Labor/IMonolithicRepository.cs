@@ -62,9 +62,13 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesWithIn(WorkLog.GetEmployeeNamesInFilter filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsGreaterThanStartDate([GreaterThan] DateTime startDate);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsGreaterThanOrEqualToStartDate([GreaterThanOrEqual] DateTime startDate);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsGreaterThanStartDateClassFilter(WorkLog.StartDateGreaterThanFilter filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsGreaterThanOrEqualToStartDateClassFilter(WorkLog.StartDateGreaterThanOrEqualFilter filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsBetweenDatesViaAlias([Column(nameof(WorkLog.StartDate)), GreaterThanOrEqual] DateTime startDate, [Column(nameof(WorkLog.StartDate)), LessThanOrEqual] DateTime endDate);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsLessThanStartDate([LessThan] DateTime startDate);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsLessThanOrEqualToStartDate([LessThanOrEqual] DateTime startDate);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsLessThanStartDateClassFilter(WorkLog.StartDateLessThanFilter filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsLessThanOrEqualToStartDateClassFilter(WorkLog.StartDateLessThanOrEqualFilter filter);
         IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForWorkLogLocationId([ViaRelation(nameof(Employee) + "->" + nameof(WorkLog) + "." + nameof(WorkLog.LocationId))] int locationId);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeName([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))] string name);
         IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddress([ViaRelation(nameof(Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address) + "." + nameof(Address.StreetAddress))] string streetAddress);
@@ -116,10 +120,13 @@ namespace SigQL.Tests.Common.Databases.Labor
         // functions
         IEnumerable<itvf_GetWorkLogsByEmployeeId.IId> itvf_GetWorkLogsByEmployeeId([Parameter] int empId);
         IEnumerable<itvf_GetWorkLogsByEmployeeId.IId> itvf_GetWorkLogsByEmployeeId([Parameter] int empId, [GreaterThan] DateTime startDate);
+        // not yet supported
+        //IEnumerable<itvf_GetWorkLogsByEmployeeId.IId> itvf_GetWorkLogsByEmployeeIdWithClassParameters(itvf_GetWorkLogsByEmployeeId.Parameters parameters);
 
         // poco
         IEnumerable<WorkLog.WorkLogWithEmployeeWithAddressPoco> GetWorkLogsOrderedByAddressIdPocoReturn([OrderBy(nameof(Address), nameof(WorkLog.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
         IEnumerable<WorkLog.WorkLogIdPocoWithClrOnlyProperty> GetWorkLogsWithClrOnlyProperty();
+        IEnumerable<WorkLog.WorkLogIdPocoWithNestedClrOnlyProperty> GetWorkLogsWithNestedClrOnlyProperty();
 
         // insert
         [Insert(TableName = nameof(Employee))]

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Xml.Linq;
+using SigQL.Types.Attributes;
 
 namespace SigQL.Tests.Common.Databases.Labor
 {
@@ -22,5 +24,12 @@ namespace SigQL.Tests.Common.Databases.Labor
         public DateTime? EndDate { get; set; }
         public int? EmployeeId { get; set; }
         public int? LocationId { get; set; }
+
+        // not yet supported
+        //public class Parameters
+        //{
+        //    [Parameter]
+        //    public int EmpId { get; set; }
+        //}
     }
 }

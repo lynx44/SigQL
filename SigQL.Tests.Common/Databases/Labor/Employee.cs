@@ -88,6 +88,13 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             public Address.StreetAddressFilterWithAlias Address { get; set; }
         }
+
+        public class EmployeeWithClrOnlyProperty
+        {
+            public int Id { get; set; }
+            [ClrOnly]
+            public string ClrOnlyProperty => $"example{Id}";
+        }
     }
 
     // not yet used/supported

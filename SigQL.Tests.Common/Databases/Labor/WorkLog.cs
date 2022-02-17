@@ -198,5 +198,35 @@ namespace SigQL.Tests.Common.Databases.Labor
             [ClrOnly]
             public string ClrOnlyProperty => $"example{Id}";
         }
+
+        public class WorkLogIdPocoWithNestedClrOnlyProperty
+        {
+            public int Id { get; set; }
+            public Employee.EmployeeWithClrOnlyProperty Employee { get; set; }
+        }
+
+        public class StartDateGreaterThanFilter
+        {
+            [GreaterThan]
+            public DateTime StartDate { get; set; }
+        }
+
+        public class StartDateGreaterThanOrEqualFilter
+        {
+            [GreaterThanOrEqual]
+            public DateTime StartDate { get; set; }
+        }
+
+        public class StartDateLessThanFilter
+        {
+            [LessThan]
+            public DateTime StartDate { get; set; }
+        }
+
+        public class StartDateLessThanOrEqualFilter
+        {
+            [LessThanOrEqual]
+            public DateTime StartDate { get; set; }
+        }
     }
 }

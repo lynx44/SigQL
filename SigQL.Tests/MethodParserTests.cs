@@ -284,6 +284,14 @@ namespace SigQL.Tests
 
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\"", sql);
         }
+        
+        [TestMethod]
+        public void GetPocoWithNestedClrOnlyProperty_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithNestedClrOnlyProperty());
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
+        }
 
         [TestMethod]
         public void Where_MultipleParameters_ReturnsExpectedSql()
@@ -423,6 +431,24 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Where_GreaterThanWithClassFilter_ReturnsExpectedSql()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsGreaterThanStartDateClassFilter));
+            var sql = GetSqlFor(methodInfo);
+        
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" > @StartDate))", sql);
+        }
+
+        [TestMethod]
+        public void Where_GreaterThanEqualToWithClassFilter_ReturnsExpectedSql()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsGreaterThanOrEqualToStartDateClassFilter));
+            var sql = GetSqlFor(methodInfo);
+        
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" >= @StartDate))", sql);
+        }
+
+        [TestMethod]
         public void Where_BetweenDatesViaAlias_ReturnsExpectedSql()
         {
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsBetweenDatesViaAlias));
@@ -447,6 +473,24 @@ namespace SigQL.Tests
             var sql = GetSqlFor(methodInfo);
         
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" <= @startDate))", sql);
+        }
+
+        [TestMethod]
+        public void Where_LessThanWithClassFilter_ReturnsExpectedSql()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsLessThanStartDateClassFilter));
+            var sql = GetSqlFor(methodInfo);
+        
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" < @StartDate))", sql);
+        }
+
+        [TestMethod]
+        public void Where_LessThanEqualToWithClassFilter_ReturnsExpectedSql()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsLessThanOrEqualToStartDateClassFilter));
+            var sql = GetSqlFor(methodInfo);
+        
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" <= @StartDate))", sql);
         }
 
         [TestMethod]
@@ -688,6 +732,14 @@ namespace SigQL.Tests
 
             Assert.AreEqual("select \"itvf_GetWorkLogsByEmployeeId\".\"Id\" \"Id\" from itvf_GetWorkLogsByEmployeeId(@empId)", sql);
         }
+        
+        //[TestMethod]
+        //public void TableValuedFunctionWithClassParameters_ReturnsExpectedSql()
+        //{
+        //    var sql = GetSqlForCall(() => this.monolithicRepository.itvf_GetWorkLogsByEmployeeIdWithClassParameters(new itvf_GetWorkLogsByEmployeeId.Parameters()));
+
+        //    Assert.AreEqual("select \"itvf_GetWorkLogsByEmployeeId\".\"Id\" \"Id\" from itvf_GetWorkLogsByEmployeeId(@EmpId)", sql);
+        //}
         
         [TestMethod]
         public void TableValuedFunction_WithFilterParams_ReturnsExpectedSql()

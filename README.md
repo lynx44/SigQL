@@ -27,6 +27,9 @@ The goal of SigQL is to enable developers quick and concise access to data by me
  - [Perspective](#perspective)
  - [Views](#views)
  - [Inline Table-valued Functions](#inline-table-valued-functions)
+ - [Feature Matrix](#feature-matrix)
+   - [Input Matrix](#input-parameter-matrix)
+   - [Output Matrix](#output-matrix)
 
 **Insert, Update, and Delete**
 
@@ -44,6 +47,9 @@ The goal of SigQL is to enable developers quick and concise access to data by me
   
  - [Installation](#installation)
  - [Logging](#logging)
+
+**More Information**
+ - [Examples](#examples)
  - [FAQs](#faqs)
 
 ## Basic Usage
@@ -419,6 +425,106 @@ And can be filtered:
 
     IEnumerable<itvf_EmployeesThatWorkedOnDate> GetEmployees([Parameter] DateTime startDate, IEnumerable<int> id);
 
+### Feature Matrix
+
+Since SigQL is still in active development, supported feature use can cause confusion. The below matrix defines three levels. The sections below details these levels.
+
+**Parameters - (Level 0)**
+
+The first place filter parameters can be defined are in arguments to a method. 
+
+Using the Offset/Fetch feature as an example, this syntax is currently only supported as an input parameter:
+
+	IEnumerable<Employee.IId> GetPage(IEnumerable<int> id, [Offset] int offset, [Fetch] int fetch);
+
+**Primary Class - (Level 1)**
+
+The next level is specifying a class filter. The below class represents the same parameters, but with parameter values organized into class properties instead of individual method arguments.
+
+Moving the Id filter (IN clause) into a class filter is valid. However, moving Offset/Fetch into a class filter is not currently supported:
+
+	public class Employee {
+		public class PageFilter {
+			public IEnumerable<int> Id { get; set; }
+			[Offset]
+			public int INVALID_Offset { get; set; }
+			[Fetch]
+			public int INVALID_Fetch { get; set; }
+		}
+	}
+	...
+	public interface IEmployeeRepository {
+		IEnumerable<Employee.IFields> INVALID_GetPage(PageFilter filter);
+	}
+
+**Level 2 - Class Properties**
+
+The final level is specifying class filters for tables related to the primary table.
+
+Similar to a primary class filter (Level 1), the StartDate filter property is valid.
+
+However, while it may seem as if Offset/Fetch could limit the number of Employee records retrieved on a WorkLog, use of this feature at this level is invalid:
+
+	public class Employee {
+		public class PageFilter {
+			public IEnumerable<int> Id { get; set; }
+			public WorkLog.PageFilter WorkLogPageFilter { get; set; }
+		}
+	}
+	public class WorkLog {
+		public class PageFilter {
+			[GreaterThan]
+			public DateTime StartDate { get; set; }
+			[Fetch]
+			public int INVALID_Fetch { get; set; }
+		}
+	}
+	...
+	IEnumerable<Employee.IEmployeeWithWorkLogs> GetPage(Employee.PageFilter filter);
+	...
+	var invalid_employeesWith10WorkLogs = 
+		employeeRepository.GetPage(
+			new Employee.PageFilter() { 
+				WorkLogPageFilter = new WorkLog.PageFilter() 
+				{ 
+					INVALID_Fetch = 10 
+				} 
+			};
+
+#### Input Parameter Matrix
+
+The below list documents all features applicable to input parameters (WHERE clause filters).
+
+| Feature | Parameter (L0) | Class (L1) | Class Property (L2) |
+|--|--|--|--|
+| [ClrOnly]  | No | No (planned) | No (planned) |
+| [Column] | Yes | Yes | Yes |
+| [Fetch] | Yes | No (planned) | No |
+| [GreaterThan] | Yes | Yes | Yes |
+| [GreaterThanOrEqual] | Yes | Yes | Yes |
+| [LessThan] | Yes | Yes | Yes |
+| [LessThanOrEqual] | Yes | Yes | Yes |
+| [IgnoreIfNull] | Yes | Yes | Yes |
+| [IgnoreIfNullOrEmpty] | Yes | Yes | Yes |
+| [StartsWith] | Yes | Yes | Yes |
+| [Contains] | Yes | Yes | Yes |
+| [EndsWith] | Yes | Yes | Yes |
+| [Not] | Yes | Yes | Yes |
+| [Offset] | No | No (planned) | No |
+| [Parameter] | Yes| No (planned) | No |
+| [Set] | Yes| Yes (cannot mix with filter properties) | No |
+| [ViaRelation] | Yes| No (planned) | No |
+| SortByDirection | Yes | No (planned) | No |
+| IEnumerable<> (IN clause) | Yes | Yes | Yes |
+
+#### Output Matrix
+
+The below list documents all features applicable to return types. All other features are unsupported.
+
+| Feature | Class (L1) | Class Property (L2) |
+|--|--|--|--|
+| [ClrOnly]  | Yes | Yes |
+
 ### Insert, Update, and Delete
 
 Modifying data in SigQL currently supports basic functionality.
@@ -678,6 +784,10 @@ A logging method can log the command text, parameters, or both:
     sqlDatabaseConfiguration, 
     statement => Log(statement) /* Log() is a method for you to define */);
 
+### Examples
+
+See the [SigQLExamples](https://github.com/lynx44/SigQLExamples) repository for example usage.
+
 ### FAQS
 
 **Is SigQL complete?**
@@ -712,3 +822,6 @@ No. However, it can be run in tandem with your preferred migration technology. S
 
 **Are enums supported?**
 Yes, they are supported in return types, parameters and filter classes.
+
+**What versions of .NET are targeted?**
+.NET Standard 2 (Core) and .NET Framework 4.6.2/4.7.2
