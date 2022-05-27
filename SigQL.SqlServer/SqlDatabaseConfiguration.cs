@@ -47,7 +47,7 @@ namespace SigQL.SqlServer
                         this.tables.FindByName(fk.ReferencedTable),
                         fk.Columns.Cast<ForeignKeyColumn>().Select(c =>
                             new ForeignKeyPair(tableDefinition.Columns.FindByName(c.Name),
-                                this.tables.FindByName(fk.ReferencedTable).Columns.FindByName(c.ReferencedColumn))))).ToList();
+                                this.tables.FindByName(fk.ReferencedTable).Columns.FindByName(c.ReferencedColumn))).ToList())).ToList();
 
                 tableDefinition.ForeignKeyCollection =
                     new ForeignKeyDefinitionCollection().AddForeignKeys(foreignKeyDefinitions.Cast<IForeignKeyDefinition>()
