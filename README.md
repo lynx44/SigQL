@@ -66,7 +66,8 @@ Assume table Employee exists in the database. This is modeled by a data class:
 
 To retrieve all Employees, interface IEmployeeRepository is defined with the following method:
 
-    public interface IEmployeeRepository {
+    public interface IEmployeeRepository 
+    {
 	    IEnumerable<Employee> GetAll();
     }
 
@@ -115,9 +116,11 @@ Contrast this with other frameworks, such as Entity Framework:
 
     public class EmployeeRepository {
 	    ...
-	    public IEnumerable<Employee> GetAllNames() {
+	    public IEnumerable<Employee> GetAllNames() 
+	    {
 		    return dbContext.Employees.Select(e => new Employee() { Name = e.Name }).ToList();
 	    }
+	    ...
     }
 
 While this achieves the goal of only selecting the Name column, it is not clear to the caller that the Id column was omitted, since the property still exists on the data class Employee. If a caller attempted to use the Id column returned, they would receive invalid data.
@@ -125,25 +128,36 @@ While this achieves the goal of only selecting the Name column, it is not clear 
 This can be solved in EF with a similar strategy of returning an interface, however, that can lead to further inconsistencies. For example, assuming Employee implements Employee.IName, there is nothing stopping the implementation from selecting all columns:
 
     public class EmployeeRepository {
+	    
 	    ...
-	    public IEnumerable<Employee.IName> GetAllNames() {
+	    
+	    public IEnumerable<Employee.IName> GetAllNames() 
+	    {
 		    return dbContext.Employees.ToList();
 	    }
+	    
     }
 
 Or worse, all relations:
 
     public class EmployeeRepository {
+	    
 	    ...
-	    public IEnumerable<Employee.IName> GetAllNames() {
+	    
+	    public IEnumerable<Employee.IName> GetAllNames() 
+	    {
 		    return GetAll().ToList();
 	    }
+	    
 	    ...
+	    
 	    // after a long development process, it's not uncommon
 	    // to centralize retrieval
-	    private IQueryable<Employee> GetAll() {
+	    private IQueryable<Employee> GetAll() 
+	    {
 		    return dbContext.Employees.Include(e => e.WorkLogs);
 	    }
+	    
     }
 
 One major problem with this code is that the method signature is lying to the caller. Imagine being tasked with a performance issue and examining the above signature while reviewing the code. Depending on how many Employees are in the database, it may not be obvious that there could be a performance issue with this particular method. 
@@ -154,11 +168,14 @@ While a projection-based approach can be achieved in other ORMs, the effort of d
 
 Plain Old CLR Objects (POCOs) are supported as projections:
 
-    public class Employee {
+    public class Employee 
+    {
+    
 	    public class NameProjection 
 	    {
 		    public string Name { get; set; }
 	    }
+	    
     }
 
 *Note that get and set properties need to be public*
@@ -167,7 +184,9 @@ Plain Old CLR Objects (POCOs) are supported as projections:
 
 If a projection property should be ignored by SigQL, use the ClrOnly attribute:
 
-    public class Employee {
+    public class Employee 
+    {
+    
 	    public class NameProjection 
 	    {
 		    public int Id { get; set; }
@@ -175,6 +194,7 @@ If a projection property should be ignored by SigQL, use the ClrOnly attribute:
 		    [ClrOnly]
 		    public string SerializedId => $"{Id}|{Name}";
 	    }
+	    
     }
 
 #### WHERE Clause
@@ -191,16 +211,20 @@ Specifying multiple parameters concatenates AND operators between each condition
 
 Similarly, a class can be passed as filter parameters. This is functionally equivalent to the above example:
 
-    public class Employee {
+    public class Employee 
+    {
 	    // ... Optional: Employee columns can be defined here
 	    // ... Optional: Employee projections can be defined here
 	    
-	    public class IdAndNameFilter {
+	    public class IdAndNameFilter 
+	    {
 		    public int Id { get; set; }
 		    public int Name { get; set; }
 	    }
     }
+    
     ...
+    
     IEnumerable<Employee.IName> GetByIdAndName(Employee.IdAndNameFilter filter);
 
 ##### Parameter Alias
@@ -239,9 +263,12 @@ When building search interfaces, it can be useful to omit a parameter from the W
     IEnumerable<Employee.IName> Search(
 	    [IgnoreIfNullOrEmpty] IEnumerable<int> id, 
 	    [IgnoreIfNull, StartsWith] name);
+    
     ...
+    
     // ASP.NET MVC example call site
-    public IActionResult Index(EmployeeModel model) {
+    public IActionResult Index(EmployeeModel model) 
+    {
 		// if the user does not select any IDs or specify a name filter in the UI,
 		// these parameters will be ignored
 		var searchResult = employeeRepository.Search(model.IdFilter, model.NameFilter);
@@ -287,7 +314,8 @@ It's often useful to retrieve items based on a condition in a related table.
 
 Assume we have a related table, WorkLog, which stores shift information about Employees:
 
-    public class WorkLog {
+    public class WorkLog 
+    {
 	    public int Id { get; set; }
 	    public DateTime StartDate { get; set; }
 	    public IEnumerable<Employee> Employees { get; set; }
@@ -306,12 +334,15 @@ To retrieve all employees that started their shift on a specific day, the ViaRel
 
 Relational filters can also be defined by inner classes:
 
-    public class Employee {
-	    public class EmployeeStartDateFilter {
+    public class Employee 
+    {
+	    public class EmployeeStartDateFilter 
+	    {
 		    public WorkLog.StartDateFilter StartDateFilter { get; set; }
 	    }
     }
-    public class WorkLog {
+    public class WorkLog 
+    {
        ...
        public class StartDateFilter {
 	       public DateTime StartDate { get; set; }
@@ -336,14 +367,18 @@ This is functionally equivalent to the less verbose signature above, but has som
 
 Returning related tables is supported:
 
-    public class Employee {
-	    public interface IWithWorkLogs {
+    public class Employee 
+    {
+	    public interface IWithWorkLogs 
+	    {
 		    int Id { get; }
 		    IEnumerable<WorkLog.IWorkLogWithStartDate> WorkLogs { get; }
 	    }
     }
-    public class WorkLog {
-	    public interface IWorkLogWithStartDate {
+    public class WorkLog 
+    {
+	    public interface IWorkLogWithStartDate 
+	    {
 		    DateTime StartDate { get; set; }
 	    }
     }
@@ -358,12 +393,14 @@ Returning related tables is supported:
 
 Data classes are often written with circular references. In a traditional ORM, the preceding example data classes are commonly defined as:
 
-    public class Employee {
+    public class Employee 
+    {
 	    public int Id { get; set;}
 	    public string Name { get; set;}
 	    public List<WorkLog> WorkLogs { get; set; }
     }
-    public class WorkLog {
+    public class WorkLog 
+    {
 	    public int Id { get; set; }
 	    public DateTime StartDate { get; set; }
 	    public Employee Employee { get; set; }
@@ -381,8 +418,10 @@ For example, the same results can be retrieved from two different perspectives w
  
 If a WorkLog centered approach is desired:
 
-    public class WorkLog {
-	    public interface IWithStartDateAndEmployees {
+    public class WorkLog 
+    {
+	    public interface IWithStartDateAndEmployees 
+	    {
 		    public DateTime StartDate { get; }
 		    public IEnumerable<Employee.IName> Employees { get; }
 	    }
@@ -397,7 +436,8 @@ Both of these result in similar data being retrieved, but the orientation of the
 Views are supported:
 
     // assuming the view in the database is named "vw_EmployeesWithWorkLogCount"
-    public class vw_EmployeesWithWorkLogCount {
+    public class vw_EmployeesWithWorkLogCount 
+    {
 	    public int EmployeeId { get; set; }
 	    public int WorkLogCount { get; set; }
     }
@@ -414,7 +454,8 @@ However, because the database does have knowledge about the relationship between
 
 Inline Table-valued Functions are supported:
 
-    public class itvf_EmployeesThatWorkedOnDate {
+    public class itvf_EmployeesThatWorkedOnDate 
+    {
 	    public int EmployeeId { get; set; }
     }
     ...
@@ -443,8 +484,10 @@ The next level is specifying a class filter. The below class represents the same
 
 Moving the Id filter (IN clause) into a class filter is valid. However, moving Offset/Fetch into a class filter is not currently supported:
 
-	public class Employee {
-		public class PageFilter {
+	public class Employee 
+	{
+		public class PageFilter 
+		{
 			public IEnumerable<int> Id { get; set; }
 			[Offset]
 			public int INVALID_Offset { get; set; }
@@ -453,7 +496,8 @@ Moving the Id filter (IN clause) into a class filter is valid. However, moving O
 		}
 	}
 	...
-	public interface IEmployeeRepository {
+	public interface IEmployeeRepository 
+	{
 		IEnumerable<Employee.IFields> INVALID_GetPage(PageFilter filter);
 	}
 
@@ -465,14 +509,18 @@ Similar to a primary class filter (Level 1), the StartDate filter property is va
 
 However, while it may seem as if Offset/Fetch could limit the number of Employee records retrieved on a WorkLog, use of this feature at this level is invalid:
 
-	public class Employee {
-		public class PageFilter {
+	public class Employee 
+	{
+		public class PageFilter 
+		{
 			public IEnumerable<int> Id { get; set; }
 			public WorkLog.PageFilter WorkLogPageFilter { get; set; }
 		}
 	}
-	public class WorkLog {
-		public class PageFilter {
+	public class WorkLog 
+	{
+		public class PageFilter 
+		{
 			[GreaterThan]
 			public DateTime StartDate { get; set; }
 			[Fetch]
@@ -538,9 +586,11 @@ To insert an Employee by parameters only:
 
 By class:
 
-    public class Employee {
+    public class Employee 
+    {
 	    ...
-	    public class Insert {
+	    public class Insert 
+	    {
 		    public string Name { get; set; }
 	    }
     }
@@ -550,8 +600,10 @@ By class:
 
 To return the inserted value:
 
-    public class Employee {
-	    public interface IId {
+    public class Employee 
+    {
+	    public interface IId 
+	    {
 		    int Id { get; }
 	    }
     }
@@ -584,8 +636,10 @@ Filters work the same as queries:
 
 Complex objects can be passed:
 
-		public class Employee{
-			public class UpdateName {
+		public class Employee
+		{
+			public class UpdateName 
+			{
 				public string Name { get; set; }
 			}
 		}
@@ -598,8 +652,10 @@ Complex objects can be passed:
     
 However, Set and and query filters currently cannot be combined in the same class (although this feature is planned):
 
-    public class Employee{
-			public class INVALID_UpdateName {
+    public class Employee
+    {
+			public class INVALID_UpdateName 
+			{
 				[Set] public string Name { get; set; }
 				public int Id { get; set; }
 			}
@@ -645,21 +701,25 @@ Note that the materializer expects each column to follow the naming convention o
     from WorkLog
     inner join WorkLog on WorkLog.EmployeeId = Employee.Id
 
-Note that the WorkLog column names (Id, StartDate) are not qualified, because they are the target table (determined by the output type IEnumerable<**WorkLog**.IWorkLogId>). 
+Note that the WorkLog column names (Id, StartDate) are not qualified, because they are the primary table (determined by the output type IEnumerable<**WorkLog**.IWorkLogId>). 
 
 However, Employee columns (Id, Name) are qualified because they tell the materializer that the joined table should be assigned to the property Employee.
 
 This is also true of collection properties. Assume we have the following projection:
 
-    public class Employee {
-	    public interface IEmployeeWithWorkLogs {
+    public class Employee 
+    {
+	    public interface IEmployeeWithWorkLogs 
+	    {
 		    int Id { get; }
 		    int Name { get; }
 		    IEnumerable<WorkLog.IIdAndStartDate> AllWorkLogs { get; }
 	    }
     }
-    public class WorkLog {
-	    public interface IIdAndStartDate {
+    public class WorkLog 
+    {
+	    public interface IIdAndStartDate 
+	    {
 		    int Id { get; }
 		    DateTime StartDate { get; }
 	    }
@@ -694,12 +754,14 @@ Column selection ergonomics are a core principle of SigQL. When writing a custom
 
 When mixing custom SQL with SigQL method signatures, the simplest implementation is to place all code in an abstract class:
 
-    public abstract class WorkLogRepository {
+    public abstract class WorkLogRepository 
+    {
 	    private SelectClauseBuider selectClauseBuilder;
 	    private IQueryMaterializer queryMaterializer;
 	    
-	    // DI is supported
-	    public WorkLogRepository(SelectClauseBuilder selectClauseBuilder, IQueryMaterializer queryMaterializer) {
+	    // Dependency Injection is supported
+	    public WorkLogRepository(SelectClauseBuilder selectClauseBuilder, IQueryMaterializer queryMaterializer) 
+	    {
 		    this.selectClauseBuilder = selectClauseBuilder;
 		    this.queryMaterializer = queryMaterializer;
 	    }
@@ -707,7 +769,8 @@ When mixing custom SQL with SigQL method signatures, the simplest implementation
 	    // this will be constructed by SigQL 
 	    public abstract IEnumerable<WorkLog.IIdAndStartDate> GetAllWithStartDate();
  	    
- 	    public IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithIds(int id1, int id2) {
+ 	    public IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithIds(int id1, int id2) 
+ 	    {
 	 	    return this.queryMaterializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
 		    $"{this.selectClauseBuilder.Build<IEnumerable<WorkLog.IWorkLogId>>().AsText} from WorkLog where Id in (@id1, @id2)",
 		    new
@@ -727,6 +790,8 @@ SigQL can be found on NuGet:
 Install the corresponding database package (currently only SQL server is supported):
 
     install-package SigQL.SqlServer
+
+***IMPORTANT:** Note that the SQL User you define in your connection string must have LOGIN privileges on master. This is currently limitation based on the choice to use SQL Management Objects to retrieve schema information, and likely will be replaced at some point in the future.*
 
 Create an interface or abstract class to define a SigQL data access method:
 
@@ -795,6 +860,19 @@ No, in fact, it is experimental software. There are numerous features, optimizat
 
 **Which SQL databases is SigQL compatible with?**
 Currently, only SQL Server is supported. It is designed to be extensible, however.
+
+**My application throws a ConnectionFailureException when configuring SigQL.**
+
+Your SQL user must have LOGIN privileges on master.
+
+    -- on azure, do not use this first line. select the database from the drop down in SSMS instead
+    USE master 
+    CREATE USER [youruser]
+    	FOR LOGIN [youruser]
+    	WITH DEFAULT_SCHEMA = dbo
+    GO
+
+
 
 **In a one to many relationship, will the collection return null if no values are found?**
 No, if no matching rows are found, the collection returned will be empty.
