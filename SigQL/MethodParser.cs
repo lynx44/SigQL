@@ -48,6 +48,27 @@ namespace SigQL
             return BuildSelectStatement(methodInfo);
         }
 
+        public MethodSqlStatement DynamicViewFor(MethodInfo methodInfo, IDynamicView dynamicView)
+        {
+            var viewSql = dynamicView.Sql;
+
+            var selectStatement = new Select();
+            selectStatement.SelectClause = new SelectClause();
+            selectStatement.SelectClause.SetArgs(new Literal() {Value = "*"});
+            selectStatement.FromClause = new FromClause();
+            selectStatement.FromClause.SetArgs(new Alias() { Label = "DynamicView" }.SetArgs(new LogicalGrouping().SetArgs(new Literal() { Value = viewSql })));
+            
+            return new MethodSqlStatement()
+            {
+                CommandAst = selectStatement.AsEnumerable(),
+                ReturnType = methodInfo.ReturnType,
+                SqlBuilder = this.builder,
+                TablePrimaryKeyDefinitions = new Dictionary<string, ITableKeyDefinition>(),
+                TargetTablePrimaryKey = new TableKeyDefinition(),
+                UnwrappedReturnType = OutputFactory.UnwrapType(methodInfo.ReturnType)
+        };
+        }
+
         private MethodSqlStatement BuildSelectStatement(MethodInfo methodInfo)
         {
             var projectionType = OutputFactory.UnwrapType(methodInfo.ReturnType);

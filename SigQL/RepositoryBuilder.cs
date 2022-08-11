@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Net;
 using Castle.DynamicProxy;
 using SigQL.Schema;
 
@@ -43,7 +44,7 @@ namespace SigQL
 
         private object CreateProxy(Type tProxy)
         {
-            if (tProxy.IsClass && tProxy.IsAbstract)
+            if (tProxy.IsClass)
             {
                 return new Castle.DynamicProxy.ProxyGenerator().CreateClassProxy(
                     tProxy,
@@ -113,21 +114,36 @@ namespace SigQL
 
             public void Intercept(IInvocation invocation)
             {
+                invocation.Proceed();
+                var returnValue = invocation.ReturnValue;
+                var dynamicView = returnValue as IDynamicView;
                 var methodParser = new MethodParser(new SqlStatementBuilder(), databaseConfiguration);
-                var sqlStatement = methodParser.SqlFor(invocation.Method);
-                var methodArgs = invocation.Method.GetParameters().Select((p, i) => new ParameterArg() { Parameter = p, Value = invocation.Arguments[i] });
-                if (sqlStatement.ReturnType != typeof(void))
+                if (dynamicView == null)
                 {
-                    invocation.ReturnValue = this.materializer.Materialize(
+                    var sqlStatement = methodParser.SqlFor(invocation.Method);
+                    var methodArgs = invocation.Method.GetParameters().Select((p, i) => new ParameterArg() { Parameter = p, Value = invocation.Arguments[i] });
+                    if (sqlStatement.ReturnType != typeof(void))
+                    {
+                        invocation.ReturnValue = this.materializer.Materialize(
                             new SqlMethodInvocation() { SqlStatement = sqlStatement },
                             methodArgs);
+                    }
+                    else
+                    {
+                        var statement = sqlStatement.GetPreparedStatement(methodArgs);
+                        this.sqlLogger?.Invoke(statement);
+                        this.queryExecutor.ExecuteNonQuery(statement.CommandText, statement.Parameters);
+                    }
                 }
                 else
                 {
-                    var statement = sqlStatement.GetPreparedStatement(methodArgs);
-                    this.sqlLogger?.Invoke(statement);
-                    this.queryExecutor.ExecuteNonQuery(statement.CommandText, statement.Parameters);
+                    var sqlStatement = methodParser.DynamicViewFor(invocation.Method, dynamicView);
+                    var methodArgs = invocation.Method.GetParameters().Select((p, i) => new ParameterArg() { Parameter = p, Value = invocation.Arguments[i] });
+                    invocation.ReturnValue = invocation.ReturnValue = this.materializer.Materialize(
+                        new SqlMethodInvocation() { SqlStatement = sqlStatement },
+                        methodArgs);
                 }
+                
             }
         }
     }
