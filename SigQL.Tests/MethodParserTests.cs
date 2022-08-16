@@ -749,6 +749,14 @@ namespace SigQL.Tests
             Assert.AreEqual("select \"itvf_GetWorkLogsByEmployeeId\".\"Id\" \"Id\" from itvf_GetWorkLogsByEmployeeId(@empId) where ((\"itvf_GetWorkLogsByEmployeeId\".\"StartDate\" > @startDate))", sql);
         }
 
+        [TestMethod]
+        public void Count_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.CountWorkLogs());
+
+            Assert.AreEqual("select count(1) \"Count\" from (select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\") Subquery", sql);
+        }
+
         #endregion Queries
 
         #region Insert 

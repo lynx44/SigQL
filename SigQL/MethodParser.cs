@@ -50,10 +50,18 @@ namespace SigQL
 
         private MethodSqlStatement BuildSelectStatement(MethodInfo methodInfo)
         {
-            var projectionType = OutputFactory.UnwrapType(methodInfo.ReturnType);
+            Type projectionType;
+            var returnType = methodInfo.ReturnType;
+            var isCountResult = returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ICountResult<>);
+            if (isCountResult)
+            {
+                returnType = methodInfo.ReturnType.GetGenericArguments().First();
+            }
+            
+            projectionType = OutputFactory.UnwrapType(returnType);
 
             var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
-            var resolvedSelectClause = selectClauseBuilder.Build(methodInfo.ReturnType);
+            var resolvedSelectClause = selectClauseBuilder.Build(returnType);
             var fromClauseRelations = resolvedSelectClause.FromClauseRelations;
             
             var tablePrimaryKeyDefinitions = resolvedSelectClause.TableKeyDefinitions;
@@ -192,6 +200,18 @@ namespace SigQL
                     ? p.Properties.Select(pp => pp.PropertyType).Last().IsCollectionType()
                     : p.Parameter.ParameterType.IsCollectionType());
 
+            if (isCountResult)
+            {
+                var countStatement = new Select();
+                countStatement.SelectClause = new SelectClause();
+                countStatement.SelectClause.SetArgs(
+                    new Alias() {Label = "Count"}.SetArgs(new Count().SetArgs(new Literal() {Value = "1"})));
+                countStatement.FromClause = new FromClause();
+                countStatement.FromClause.SetArgs(new SubqueryAlias() {Alias = "Subquery"}.SetArgs(statement));
+
+                statement = countStatement;
+            }
+
             var sqlStatement = new MethodSqlStatement()
             {
                 CommandAst = statement.AsEnumerable(),
@@ -201,8 +221,8 @@ namespace SigQL
                 Parameters = parameterPaths,
                 Tokens = tokens,
                 // ColumnAliasRelations = columnAliasForeignKeyDefinitions,
-                TargetTablePrimaryKey = fromClauseRelations.TargetTable.PrimaryKey,
-                TablePrimaryKeyDefinitions = tablePrimaryKeyDefinitions
+                TargetTablePrimaryKey = !isCountResult ? fromClauseRelations.TargetTable.PrimaryKey : new TableKeyDefinition(),
+                TablePrimaryKeyDefinitions = !isCountResult ? tablePrimaryKeyDefinitions : new Dictionary<string, ITableKeyDefinition>()
             };
             return sqlStatement;
         }

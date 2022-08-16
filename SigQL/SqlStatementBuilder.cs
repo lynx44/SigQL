@@ -43,6 +43,9 @@ namespace SigQL
                         case TableAliasDefinition a: 
                             sql.Add($"{a.Alias} ({string.Join(",", a.Args.Select(a => Walk(a)))})".Trim());
                             break;
+                        case SubqueryAlias a: 
+                            sql.Add($"({string.Join(",", a.Args.Select(a => Walk(a)))}) {a.Alias}".Trim());
+                            break;
                         case ObjectIdentifier a:
                             sql.Add(string.Join(".", a.Args.Select(a => Walk(a))));
                             break;

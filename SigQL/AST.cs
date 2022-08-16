@@ -180,6 +180,11 @@ namespace SigQL
         public string Alias { get; set; }
     }
 
+    public class SubqueryAlias : AstNode
+    {
+        public string Alias { get; set; }
+    }
+
     public class AstNode
     {
         public IEnumerable<AstNode> Args { get; set; }

@@ -808,6 +808,25 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void SubqueryAlias()
+        {
+            var countStatement = new Select();
+            countStatement.SelectClause = new SelectClause();
+            countStatement.SelectClause.SetArgs(
+                new Alias() { Label = "Count" }.SetArgs(new Count().SetArgs(new Literal() { Value = "1" })));
+            countStatement.FromClause = new FromClause();
+            var baseSelectStatement = new Select();
+            baseSelectStatement.SelectClause = new SelectClause();
+            baseSelectStatement.SelectClause.SetArgs(new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = "id" }));
+            baseSelectStatement.FromClause = new FromClause();
+            baseSelectStatement.FromClause.SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = "WorkLog" }));
+            countStatement.FromClause.SetArgs(new SubqueryAlias() { Alias = "Subquery" }.SetArgs(baseSelectStatement));
+
+            var statement = Build(countStatement);
+            Assert.AreEqual("select count(1) \"Count\" from (select \"id\" from \"WorkLog\") Subquery", statement);
+        }
+
+        [TestMethod]
         public void JoinWithMultipleConditions()
         {
             var selectStatement = new Select()

@@ -60,6 +60,17 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void CountWorkLogs()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.CountWorkLogs();
+
+            Assert.AreEqual(expected.Count, actual.Count);
+        }
+
+        [TestMethod]
         public void GetAllIds_ViaInnerProjection()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
