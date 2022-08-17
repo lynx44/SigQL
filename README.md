@@ -21,10 +21,12 @@ The goal of SigQL is to enable developers quick and concise access to data by me
  - [Offset and Fetch](#offset-and-fetch)
  - [Order By](#order-by)
  - [Single Result](#single-result)
+ - [Collection Results](#collection-results)
  - [Filtering by related tables](#filtering-by-related-tables)
  - [Returning Relations](#returning-relations)
    - [Recursive relationships are not supported](#recursive-relationships-are-not-supported)
  - [Perspective](#perspective)
+ - [Count](#count)
  - [Views](#views)
  - [Inline Table-valued Functions](#inline-table-valued-functions)
  - [Feature Matrix](#feature-matrix)
@@ -308,6 +310,17 @@ Offset does not need to be specified to use Fetch. The following example is the 
 
 *Note that passing a value greater than the non-default value for fetch (1) will throw an exception, since the return type is not a collection*
 
+#### Collection Results
+
+The following collection return types are supported:
+
+ - IEnumerable\<T\>
+ - IList\<T\>
+ - List\<T\>
+ - T[]
+ - IReadOnlyCollection\<T\>
+ - ReadOnlyCollection\<T\>
+
 #### Filtering by related tables
 
 It's often useful to retrieve items based on a condition in a related table.
@@ -430,6 +443,12 @@ If a WorkLog centered approach is desired:
     public IEnumerable<WorkLog.IWithStartDateAndEmployees> Get([ViaRelation("WorkLog->Employee.Name")] employeeName);
 
 Both of these result in similar data being retrieved, but the orientation of the data is switched.
+
+#### Count
+
+Counting the total number of rows in a result set can be achieved by using the ICountResult\<T\> interface:
+
+    ICountResult<WorkLog.IWorkLogId> CountWorkLogs(int employeeId);
 
 #### Views
 
@@ -872,16 +891,11 @@ Your SQL user must have LOGIN privileges on master.
     	WITH DEFAULT_SCHEMA = dbo
     GO
 
-
-
 **In a one to many relationship, will the collection return null if no values are found?**
 No, if no matching rows are found, the collection returned will be empty.
 
 **Is SigQL performant?**
 SigQL is designed to increase developer productivity by making it simple to select the exact set of data needed for the functionality being developed, which results in smaller and more precise result sets. However, because it is still in an experimental phase, no benchmarks have currently been run, and no specific performance goals are being targeted.
-
-**Can I return a list, array, or other collection type?**
-Currently, only IEnumerable is supported.
 
 **Are schemas supported?**
 Currently SigQL does not explicitly support schemas. It does not qualify objects with schema names. 

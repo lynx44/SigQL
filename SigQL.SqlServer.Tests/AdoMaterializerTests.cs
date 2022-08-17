@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Data;
 using System.Linq;
 using Microsoft.Data.SqlClient;
@@ -126,6 +127,96 @@ namespace SigQL.SqlServer.Tests
             
             Assert.AreEqual(2, result.Count());
             CollectionAssert.AreEqual(new[] { 1, 4 }, result.Select(wl => wl.Id).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_IList()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize(typeof(IList<WorkLog.IWorkLogId>), new PreparedSqlStatement()
+            {
+                CommandText = "select Id from WorkLog"
+            });
+            
+            Assert.IsTrue(result is IList<WorkLog.IWorkLogId>);
+            var typedResult = result as IList<WorkLog.IWorkLogId>;
+            Assert.AreEqual(5, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, typedResult.Select(wl => wl.Id).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_List()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize(typeof(List<WorkLog.IWorkLogId>), new PreparedSqlStatement()
+            {
+                CommandText = "select Id from WorkLog"
+            });
+            
+            Assert.IsTrue(result is List<WorkLog.IWorkLogId>);
+            var typedResult = result as List<WorkLog.IWorkLogId>;
+            Assert.AreEqual(5, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, typedResult.Select(wl => wl.Id).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_Array()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize(typeof(WorkLog.IWorkLogId[]), new PreparedSqlStatement()
+            {
+                CommandText = "select Id from WorkLog"
+            });
+            
+            Assert.IsTrue(result is WorkLog.IWorkLogId[]);
+            var typedResult = result as WorkLog.IWorkLogId[];
+            Assert.AreEqual(5, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, typedResult.Select(wl => wl.Id).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_ReadOnlyCollection()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize(typeof(ReadOnlyCollection<WorkLog.IWorkLogId>), new PreparedSqlStatement()
+            {
+                CommandText = "select Id from WorkLog"
+            });
+            
+            Assert.IsTrue(result is ReadOnlyCollection<WorkLog.IWorkLogId>);
+            var typedResult = result as ReadOnlyCollection<WorkLog.IWorkLogId>;
+            Assert.AreEqual(5, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, typedResult.Select(wl => wl.Id).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_IReadOnlyCollection()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize(typeof(IReadOnlyCollection<WorkLog.IWorkLogId>), new PreparedSqlStatement()
+            {
+                CommandText = "select Id from WorkLog"
+            });
+            
+            Assert.IsTrue(result is IReadOnlyCollection<WorkLog.IWorkLogId>);
+            var typedResult = result as IReadOnlyCollection<WorkLog.IWorkLogId>;
+            Assert.AreEqual(5, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, typedResult.Select(wl => wl.Id).ToArray());
         }
     }
 }

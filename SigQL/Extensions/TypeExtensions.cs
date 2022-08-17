@@ -61,7 +61,8 @@ namespace SigQL.Extensions
 
         public static bool IsCollectionType(this Type type)
         {
-            return type.IsGenericType && type.GetGenericTypeDefinition().IsAssignableFrom(typeof(IEnumerable<>));
+            return type.IsArray || 
+                   (type.IsGenericType && (type.GetGenericTypeDefinition().IsAssignableFrom(typeof(IEnumerable<>)) || type.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>))));
         }
     }
 }

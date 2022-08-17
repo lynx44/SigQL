@@ -14,7 +14,15 @@ namespace SigQL
 
             if (columnOutputType.IsCollectionType())
             {
-                columnOutputType = columnOutputType.GetGenericArguments().First();
+                if (columnOutputType.IsGenericType)
+                {
+                    columnOutputType = columnOutputType.GetGenericArguments().First();
+                }
+                else if(columnOutputType.IsArray)
+                {
+                    columnOutputType = columnOutputType.GetElementType();
+                }
+                
             }
 
             return columnOutputType;
