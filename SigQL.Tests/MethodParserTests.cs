@@ -121,6 +121,14 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Get_CanonicalTypeWithRecursion_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogs());
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"WorkLog\".\"StartDate\" \"StartDate\", \"WorkLog\".\"EndDate\" \"EndDate\", \"WorkLog\".\"EmployeeId\" \"EmployeeId\", \"WorkLog\".\"LocationId\" \"LocationId\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\", \"Location\".\"Id\" \"Location.Id\", \"Location\".\"Name\" \"Location.Name\", \"Location\".\"AddressId\" \"Location.AddressId\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) left outer join \"Location\" on ((\"WorkLog\".\"LocationId\" = \"Location\".\"Id\"))", sql);
+        }
+
+        [TestMethod]
         public void GetTableCollection_ReturnsExpectedSql()
         {
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetAllEmployeeFields));

@@ -204,12 +204,7 @@ namespace SigQL
 
         private Type UnwrapCollectionTargetType(Type columnOutputType)
         {
-            while (columnOutputType.IsCollectionType())
-            {
-                columnOutputType = columnOutputType.GetGenericArguments().First();
-            }
-
-            return columnOutputType;
+            return OutputFactory.UnwrapType(columnOutputType);
         }
 
         public IForeignKeyDefinition FindPrimaryForeignKeyMatchForTables(ITableDefinition tableDefinition, ITableDefinition navigationTable)
@@ -241,8 +236,9 @@ namespace SigQL
             return manyToManyTable != null ? foreignKeys : null;
         }
 
-        public TableRelations BuildTableRelationsFromType(Type projectionType, ITableDefinition parentTable = null, ColumnField parentColumnField = null, Type parentType = null)
+        public TableRelations BuildTableRelationsFromType(Type projectionType, List<Type> processedTypes = null, ITableDefinition parentTable = null, ColumnField parentColumnField = null, Type parentType = null)
         {
+            processedTypes ??= new List<Type>();
             return BuildTableRelations(new TableFromType() {
                     Type = projectionType,
                     ColumnFields = UnwrapCollectionTargetType(projectionType).GetProperties().Where(p => !IsClrOnly(p)).Select(p => new ColumnField()
@@ -251,7 +247,7 @@ namespace SigQL
                         Type = p.PropertyType,
                         Property = p
                     }).ToList()
-                }, parentTable, parentColumnField, parentType);
+                }, processedTypes, parentTable, parentColumnField, parentType);
         }
 
         private bool IsClrOnly(PropertyInfo propertyInfo)
@@ -259,14 +255,14 @@ namespace SigQL
             return propertyInfo.GetCustomAttribute<ClrOnlyAttribute>() != null;
         }
 
-        public TableRelations BuildTableRelationsWithMethodParams(ITableDefinition tableDefinition, IEnumerable<ParameterInfo> parameters, ITableDefinition parentTable = null, ColumnField parentColumnField = null, Type parentType = null)
+        public TableRelations BuildTableRelationsWithMethodParams(ITableDefinition tableDefinition, List<Type> processedTypes, IEnumerable<ParameterInfo> parameters, ITableDefinition parentTable = null, ColumnField parentColumnField = null, Type parentType = null)
         {
             return BuildTableRelations(tableDefinition, parameters.Select(p => new ColumnField()
             {
                 Name = this.GetColumnName(p),
                 Type = p.ParameterType,
                 Parameter = p
-            }).ToList(), null, parentTable, parentColumnField, parentType);
+            }).ToList(), null, parentTable, parentColumnField, parentType, processedTypes);
         }
 
         public string GetColumnName(PropertyInfo propertyInfo)
@@ -281,20 +277,23 @@ namespace SigQL
             return columnSpec?.ColumnName ?? parameterInfo.Name;
         }
 
-        private TableRelations BuildTableRelations(TableFromType tableType, ITableDefinition parentTable, ColumnField parentColumnField, Type parentType)
+        private TableRelations BuildTableRelations(TableFromType tableType, List<Type> processedTypes, ITableDefinition parentTable, ColumnField parentColumnField, Type parentType)
         {
             var tableDefinition = this.DetectTable(tableType.Type);
+            processedTypes.Add(UnwrapCollectionTargetType(tableType.Type));
             return BuildTableRelations(tableDefinition, tableType.ColumnFields, tableType.Type, parentTable,
-                parentColumnField, parentType);
+                parentColumnField, parentType, processedTypes);
         }
 
         private TableRelations BuildTableRelations(ITableDefinition tableDefinition, IEnumerable<ColumnField> columnFields, Type tableType, ITableDefinition parentTable,
-            ColumnField parentColumnField, Type parentType)
+            ColumnField parentColumnField, Type parentType, List<Type> processedTypes)
         {
              var columnDescriptions = columnFields
                 .Select(p => new {Column = p, IsTable = this.IsTableOrTableProjection(p.Type)}).ToList();
-            var relations = columnDescriptions.Where(t => t.IsTable)
-                .Select(p => BuildTableRelationsFromType(p.Column.Type, tableDefinition, p.Column, tableType)).ToList();
+             var unprocessedNavigationTables = columnDescriptions.Where(t => t.IsTable && !processedTypes.Contains(UnwrapCollectionTargetType(t.Column.Type))).ToList();
+             processedTypes.AddRange(unprocessedNavigationTables.Select(p => UnwrapCollectionTargetType(p.Column.Type)));
+             var relations = unprocessedNavigationTables
+                .Select(p => BuildTableRelationsFromType(p.Column.Type, processedTypes, tableDefinition, p.Column, tableType)).ToList();
             var columns = columnDescriptions.Where(t => !t.IsTable)
                 .Select(d =>
                 {
@@ -367,7 +366,7 @@ namespace SigQL
             };
         }
 
-        public TableRelations BuildTableRelations(Type projectionType, IEnumerable<ParameterInfo> methodParameters)
+        public TableRelations BuildTableRelations(Type projectionType, List<Type> processedTypes, IEnumerable<ParameterInfo> methodParameters)
         {
             var filteredMethodParameters = methodParameters.ToList();
             // method parameters can use a filter that represents the projection table. We don't want
@@ -390,8 +389,8 @@ namespace SigQL
             };
 
 
-            var projectionTypeFilterTableRelations = projectionTypeTableFilterParameters.Select(p => this.BuildTableRelationsFromType(p.ParameterType)).ToList();
-            projectionTypeFilterTableRelations.Add(BuildTableRelations(tableType, null, null, null));
+            var projectionTypeFilterTableRelations = projectionTypeTableFilterParameters.Select(p => this.BuildTableRelationsFromType(p.ParameterType, processedTypes)).ToList();
+            projectionTypeFilterTableRelations.Add(BuildTableRelations(tableType, processedTypes, null, null, null));
             return MergeTableRelations(projectionTypeFilterTableRelations.ToArray());
         }
 
@@ -429,8 +428,8 @@ namespace SigQL
                     {
                         TableRelations =
                             IsTableOrTableProjection(parameter.ParameterType) && !TableEqualityComparer.Default.Equals(DetectTable(parameter.ParameterType), primaryTableDefinition)
-                                ? BuildTableRelationsWithMethodParams(primaryTableDefinition, parameter.AsEnumerable()) 
-                                : IsTableOrTableProjection(parameter.ParameterType) ? BuildTableRelationsFromType(parameter.ParameterType)
+                                ? BuildTableRelationsWithMethodParams(primaryTableDefinition, new List<Type>(), parameter.AsEnumerable()) 
+                                : IsTableOrTableProjection(parameter.ParameterType) ? BuildTableRelationsFromType(parameter.ParameterType, new List<Type>())
                                     : null
                     };
 
