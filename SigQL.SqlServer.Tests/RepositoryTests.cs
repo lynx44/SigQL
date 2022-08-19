@@ -69,6 +69,17 @@ namespace SigQL.SqlServer.Tests
 
             Assert.AreEqual(expected.Count, actual.Count);
         }
+        
+        [TestMethod]
+        public void GetWorkLogs_AvoidsStackOverflow()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs().Select(e => e.Id);
+
+            AreEquivalent(expected.Select(w => w.Id), actual);
+        }
 
         [TestMethod]
         public void GetAllIds_ViaInnerProjection()
