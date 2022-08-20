@@ -870,8 +870,7 @@ namespace SigQL
                     }
                     else
                     {
-                        //this needs to be updated. change the way the table is found below by using the spec and resolving the name at runtime
-                        return BuildDynamicOrderByIdentifier(orderByClause, tableAliasName, tokens, p).AsEnumerable();
+                        return BuildDynamicOrderByIdentifier(orderByClause, tokens, p).AsEnumerable();
                     }
                     
                 }).ToList()
@@ -880,7 +879,7 @@ namespace SigQL
         }
 
         private IEnumerable<OrderByIdentifier> BuildDynamicOrderByIdentifier(OrderByClause orderByClause,
-            string tableAliasName, List<TokenPath> tokens, OrderBySpec p)
+             List<TokenPath> tokens, OrderBySpec p)
         {
             var tokenName = $"{p.Parameter.Name}_OrderBy";
 
@@ -920,9 +919,7 @@ namespace SigQL
 
                         return orderByNode.SetArgs(
                             new ColumnIdentifier().SetArgs(
-                                tableAliasName == null
-                                    ? (AstNode) new RelationalTable() {Label = orderBy.Table}
-                                    : new Alias() {Label = tableAliasName},
+                                (AstNode) new RelationalTable() {Label = p.ResolveTableAlias(orderBy.Table) },
                                 new RelationalColumn() {Label = orderBy.Column}
                             ));
                     }).ToList();
