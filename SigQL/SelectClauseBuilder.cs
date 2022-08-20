@@ -66,7 +66,7 @@ namespace SigQL
                                     .SetArgs(
                                         new RelationalTable()
                                         {
-                                            Label = column.ColumnDefinition.Table.Name
+                                            Label = column.ColumnDefinition.TableAlias.Alias
                                         },
                                         new RelationalColumn()
                                         {

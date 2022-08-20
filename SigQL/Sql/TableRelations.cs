@@ -5,7 +5,7 @@ using SigQL.Schema;
 
 namespace SigQL.Sql
 {
-    internal class TableRelations
+    internal class TableRelations : ITableHierarchyAlias
     {
         public Type ProjectionType { get; set; }
         public ITableDefinition TargetTable { get; set; }
@@ -13,6 +13,9 @@ namespace SigQL.Sql
         public IEnumerable<ColumnDefinitionWithPath> ProjectedColumns { get; set; }
         public IForeignKeyDefinition ForeignKeyToParent { get; set; }
         public ColumnField ParentColumnField { get; set; }
+        public TypeHierarchyNode HierarchyNode { get; set; }
+        public string Alias => $"{TargetTable.Name}_{HierarchyNode.Depth}_{HierarchyNode.Ordinal}";
+        public string TableName => TargetTable.Name;
     }
 
     internal class ColumnDefinitionWithPath : IColumnDefinition
@@ -37,5 +40,11 @@ namespace SigQL.Sql
             this.columnDefinition = columnDefinition;
             this.Parameter = parameter;
         }
+    }
+
+    public interface ITableHierarchyAlias
+    {
+        string Alias { get; }
+        string TableName { get; }
     }
 }

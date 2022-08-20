@@ -923,6 +923,7 @@ namespace SigQL
             var fromClauseNode = new FromClauseNode();
             var targetTable = tableRelations.TargetTable;
             var tableIdentifier = new TableIdentifier().SetArgs(
+                new Alias() { Label = tableRelations.Alias }.SetArgs(
                 (targetTable.ObjectType == DatabaseObjectType.Table || targetTable.ObjectType == DatabaseObjectType.View)
                 ? (AstNode) new RelationalTable()
                 {
@@ -931,7 +932,7 @@ namespace SigQL
                 : new Function()
                 {
                     Name = targetTable.Name
-                }.SetArgs(functionParameters.Select(p => new NamedParameterIdentifier() { Name = p.Name })));
+                }.SetArgs(functionParameters.Select(p => new NamedParameterIdentifier() { Name = p.Name }))));
 
             var leftOuterJoins = BuildJoins(tableRelations);
 
@@ -944,25 +945,25 @@ namespace SigQL
             var leftOuterJoins = references.SelectMany(navigationTableRelations =>
             {
                 var foreignKey = navigationTableRelations.ForeignKeyToParent;
-                return BuildLeftOuterJoin(foreignKey, navigationTableRelations.TargetTable, navigationTableRelations).AsEnumerable();
+                return BuildLeftOuterJoin(foreignKey, navigationTableRelations.TargetTable, tableRelations, navigationTableRelations, navigationTableRelations).AsEnumerable();
                 
             });
             return leftOuterJoins;
         }
 
         private LeftOuterJoin BuildLeftOuterJoin(IForeignKeyDefinition foreignKey,
-            ITableDefinition navigationTable, TableRelations navigationTableRelations = null)
+            ITableDefinition navigationTable, ITableHierarchyAlias primaryTableAlias, ITableHierarchyAlias foreignTableAlias, TableRelations navigationTableRelations = null)
         {
             var leftOuterJoin = new LeftOuterJoin().SetArgs(
                 new AndOperator().SetArgs(
                 foreignKey.KeyPairs.Select(kp =>
                             new EqualsOperator().SetArgs(
-                                new ColumnIdentifier().SetArgs(new RelationalTable() {Label = kp.ForeignTableColumn.Table.Name},
+                                new ColumnIdentifier().SetArgs(new RelationalTable() {Label = foreignTableAlias.Alias},
                                     new RelationalColumn() {Label = kp.ForeignTableColumn.Name}),
-                                new ColumnIdentifier().SetArgs(new RelationalTable() {Label = kp.PrimaryTableColumn.Table.Name},
+                                new ColumnIdentifier().SetArgs(new RelationalTable() {Label = primaryTableAlias.Alias},
                                     new RelationalColumn() {Label = kp.PrimaryTableColumn.Name})))).AsEnumerable().Cast<AstNode>()
                     .Concat(navigationTableRelations != null ? BuildJoins(navigationTableRelations) : new LeftOuterJoin[0]));
-            leftOuterJoin.RightNode = new TableIdentifier().SetArgs(new RelationalTable() {Label = navigationTable.Name});
+            leftOuterJoin.RightNode = new Alias() { Label = foreignTableAlias.Alias }.SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = navigationTable.Name }));
             return leftOuterJoin;
         }
 
@@ -1121,8 +1122,8 @@ namespace SigQL
         public ColumnAliasForeignKeyPair(IForeignKeyPair foreignKeyPair)
         {
             this.foreignKeyPair = foreignKeyPair;
-            this.ForeignTableColumnWithAlias = new ColumnAliasColumnDefinition(this.ForeignTableColumn);
-            this.PrimaryTableColumnWithAlias = new ColumnAliasColumnDefinition(this.PrimaryTableColumn);
+            this.ForeignTableColumnWithAlias = new ColumnAliasColumnDefinition(this.ForeignTableColumn, null);
+            this.PrimaryTableColumnWithAlias = new ColumnAliasColumnDefinition(this.PrimaryTableColumn, null);
         }
 
         public ColumnAliasColumnDefinition ForeignTableColumnWithAlias { get; }
@@ -1137,8 +1138,11 @@ namespace SigQL
 
         public ITableDefinition Table => columnDefinition.Table;
 
-        public ColumnAliasColumnDefinition(IColumnDefinition columnDefinition)
+        public ITableHierarchyAlias TableAlias { get; }
+
+        public ColumnAliasColumnDefinition(IColumnDefinition columnDefinition, ITableHierarchyAlias tableAlias)
         {
+            TableAlias = tableAlias;
             this.columnDefinition = columnDefinition;
         }
 

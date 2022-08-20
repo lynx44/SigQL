@@ -48,7 +48,7 @@ namespace SigQL
                         }
                         return new ColumnDefinitionWithPropertyPath()
                         {
-                            ColumnDefinition = new ColumnAliasColumnDefinition(targetColumn),
+                            ColumnDefinition = new ColumnAliasColumnDefinition(targetColumn, tableRelations),
                             PropertyPath = new PropertyPath() { PropertyPaths = currentPaths }
                         }.AsEnumerable();
                     }
@@ -82,7 +82,7 @@ namespace SigQL
                         currentPaths.Add(c.Name);
                         return new ColumnDefinitionWithPropertyPath()
                         {
-                            ColumnDefinition = new ColumnAliasColumnDefinition(c),
+                            ColumnDefinition = new ColumnAliasColumnDefinition(c, tableRelations),
                             PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.ToList()}
                         };
                     }).ToList();
@@ -289,18 +289,18 @@ namespace SigQL
         }
 
         private TableRelations BuildTableRelations(ITableDefinition tableDefinition, IEnumerable<ColumnField> columnFields, Type tableType, ITableDefinition parentTable,
-            ColumnField parentColumnField, Type parentType, TypeHierarchyNode parentNode)
+            ColumnField parentColumnField, Type parentType, TypeHierarchyNode node)
         {
              var columnDescriptions = columnFields
                 .Select(p => new {Column = p, IsTable = this.IsTableOrTableProjection(p.Type)}).ToList();
-             var unprocessedNavigationTables = columnDescriptions.Where(t => t.IsTable && !parentNode.IsDescendentOf(UnwrapCollectionTargetType(t.Column.Type))).ToList();
+             var unprocessedNavigationTables = columnDescriptions.Where(t => t.IsTable && !node.IsDescendentOf(UnwrapCollectionTargetType(t.Column.Type))).ToList();
              var typeHierarchyNodes = unprocessedNavigationTables.Select(p => 
                  new
                  {
                      ColumnDescription = p,
-                     Node = new TypeHierarchyNode(UnwrapCollectionTargetType(p.Column.Type), parentNode)
+                     Node = new TypeHierarchyNode(UnwrapCollectionTargetType(p.Column.Type), node)
                  }).ToList();
-             parentNode.Children.AddRange(typeHierarchyNodes.Select(p => p.Node).ToList());
+             node.Children.AddRange(typeHierarchyNodes.Select(p => p.Node).ToList());
              var relations = unprocessedNavigationTables
                 .Select(p => BuildTableRelationsFromType(p.Column.Type, typeHierarchyNodes.First(n => n.ColumnDescription == p).Node, tableDefinition, p.Column, tableType)).ToList();
             var columns = columnDescriptions.Where(t => !t.IsTable)
@@ -329,7 +329,8 @@ namespace SigQL
                 ParentColumnField = parentColumnField,
                 TargetTable = tableDefinition,
                 NavigationTables = relations,
-                ProjectedColumns = columns
+                ProjectedColumns = columns,
+                HierarchyNode = node
             };
 
             IEnumerable<IForeignKeyDefinition> foreignKeys = null;
@@ -350,7 +351,10 @@ namespace SigQL
                     var manyToOneFk = foreignKeys.Except(new [] { oneToManyFk }).First();
                     tableRelations.ForeignKeyToParent = oneToManyFk;
                     tableRelations.ParentColumnField = null;
-                    return this.BuildTableRelations(manyToOneFk, parentColumnField, new[] { tableRelations });
+                    
+                    var hierarchyNode = new TypeHierarchyNode(typeof(void), node);
+                    node.Children.Add(hierarchyNode);
+                    return this.BuildTableRelations(manyToOneFk, parentColumnField, new[] { tableRelations }, hierarchyNode);
                 }
                 else
                 {
@@ -360,7 +364,7 @@ namespace SigQL
             return tableRelations;
         }
 
-        private TableRelations BuildTableRelations(IForeignKeyDefinition foreignKeyDefinition, ColumnField parentColumnField, IEnumerable<TableRelations> relations)
+        private TableRelations BuildTableRelations(IForeignKeyDefinition foreignKeyDefinition, ColumnField parentColumnField, IEnumerable<TableRelations> relations, TypeHierarchyNode node)
         {
             var tableDefinition = foreignKeyDefinition.KeyPairs.First().ForeignTableColumn.Table;
             
@@ -371,7 +375,8 @@ namespace SigQL
                 TargetTable = tableDefinition,
                 NavigationTables = relations,
                 ProjectedColumns = new List<ColumnDefinitionWithPath>(),
-                ForeignKeyToParent = foreignKeyDefinition
+                ForeignKeyToParent = foreignKeyDefinition, 
+                HierarchyNode = node
             };
         }
 
@@ -639,39 +644,41 @@ namespace SigQL
 
             return specInfo;
         }
-
-        public class TypeHierarchyNode
+    }
+    
+    public class TypeHierarchyNode
+    {
+        public TypeHierarchyNode(Type type) : this(type, null)
         {
-            public TypeHierarchyNode(Type type) : this(type, null)
-            {
-            }
+        }
 
-            public TypeHierarchyNode(Type type, TypeHierarchyNode parent)
-            {
-                Type = type;
-                this.Children = new List<TypeHierarchyNode>();
-                this.Parent = parent;
-            }
+        public TypeHierarchyNode(Type type, TypeHierarchyNode parent)
+        {
+            Type = type;
+            this.Children = new List<TypeHierarchyNode>();
+            this.Parent = parent;
+        }
 
-            public TypeHierarchyNode Parent { get; set; }
-            public Type Type { get; set; }
-            public List<TypeHierarchyNode> Children { get; set; }
+        public TypeHierarchyNode Parent { get; set; }
+        private Type Type { get; set; }
+        public List<TypeHierarchyNode> Children { get; set; }
+        public int Depth => this.Parent == null ? 0 : this.Parent.Depth + 1;
+        public int Ordinal => this.Parent == null ? 0 : this.Parent.Children.IndexOf(this);
 
-            public bool IsDescendentOf(Type parentType)
+        public bool IsDescendentOf(Type parentType)
+        {
+            var node = this;
+            while (parentType != typeof(void) && node.Parent != null)
             {
-                var node = this;
-                while (node.Parent != null)
+                if (node.Parent.Type == parentType)
                 {
-                    if (node.Parent.Type == parentType)
-                    {
-                        return true;
-                    }
-
-                    node = node.Parent;
+                    return true;
                 }
 
-                return false;
+                node = node.Parent;
             }
+
+            return false;
         }
     }
 
