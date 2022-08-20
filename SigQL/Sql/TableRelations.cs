@@ -14,8 +14,27 @@ namespace SigQL.Sql
         public IForeignKeyDefinition ForeignKeyToParent { get; set; }
         public ColumnField ParentColumnField { get; set; }
         public TypeHierarchyNode HierarchyNode { get; set; }
-        public string Alias => $"{TargetTable.Name}_{HierarchyNode.Depth}_{HierarchyNode.Ordinal}";
+        public string Alias => $"{TargetTable.Name}_{HierarchyNode.Position}";
         public string TableName => TargetTable.Name;
+
+        public TableRelations Find(string tableName)
+        {
+            if (TargetTable.Name == tableName)
+            {
+                return this;
+            }
+
+            foreach (var navigationTable in this.NavigationTables)
+            {
+                var matchingRelation = navigationTable.Find(tableName);
+                if (matchingRelation != null)
+                {
+                    return matchingRelation;
+                }
+            }
+
+            return null;
+        }
     }
 
     internal class ColumnDefinitionWithPath : IColumnDefinition

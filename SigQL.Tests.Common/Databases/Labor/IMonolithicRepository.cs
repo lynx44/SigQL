@@ -126,7 +126,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         //IEnumerable<itvf_GetWorkLogsByEmployeeId.IId> itvf_GetWorkLogsByEmployeeIdWithClassParameters(itvf_GetWorkLogsByEmployeeId.Parameters parameters);
 
         // poco
-        IEnumerable<WorkLog.WorkLogWithEmployeeWithAddressPoco> GetWorkLogsOrderedByAddressIdPocoReturn([OrderBy(nameof(Address), nameof(WorkLog.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.WorkLogWithEmployeeWithAddressPoco> GetWorkLogsOrderedByAddressIdPocoReturn([OrderBy(nameof(Address), nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
         IEnumerable<WorkLog.WorkLogIdPocoWithClrOnlyProperty> GetWorkLogsWithClrOnlyProperty();
         IEnumerable<WorkLog.WorkLogIdPocoWithNestedClrOnlyProperty> GetWorkLogsWithNestedClrOnlyProperty();
 

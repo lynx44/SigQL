@@ -254,7 +254,7 @@ namespace SigQL
                         primaryTable.PrimaryKey.Columns.Select(pks =>
                             new AndOperator().SetArgs(
                                 new EqualsOperator().SetArgs(
-                                    new ColumnIdentifier().SetArgs(new RelationalTable() {Label = insertSpec.Table.Name},
+                                    new ColumnIdentifier().SetArgs(new RelationalTable() {Label = insertSpec.TableRelations.Alias},
                                         new RelationalColumn() {Label = pks.Name}),
                                     new ColumnIdentifier().SetArgs(new RelationalTable() { Label = outputParameterTableSelectAlias }, new RelationalColumn() {Label = pks.Name})
                                 )))

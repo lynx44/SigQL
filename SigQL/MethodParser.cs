@@ -95,8 +95,8 @@ namespace SigQL
             var orderByParameters = methodParameters.Where(p =>
                 IsOrderByAttributeParameter(p) ||
                 IsDynamicOrderByParameter(p) ||
-                IsOrderByDirectionParameter(p));
-            IEnumerable<OrderBySpec> orderBySpecs = ConvertToOrderBySpecs(orderByParameters, primaryTable);
+                IsOrderByDirectionParameter(p)).ToList();
+            IEnumerable<OrderBySpec> orderBySpecs = ConvertToOrderBySpecs(orderByParameters, primaryTable, fromClauseRelations);
             if (orderBySpecs.Any())
             {
                 statement.OrderByClause = BuildOrderByClause(null, orderBySpecs, tokens);
@@ -166,7 +166,7 @@ namespace SigQL
                                             new Alias() {Label = offsetTableAliasName},
                                             new RelationalColumn() {Label = c.Name}),
                                         new ColumnIdentifier().SetArgs(
-                                            new RelationalTable() {Label = c.Table.Name},
+                                            new RelationalTable() {Label = fromClauseRelations.Alias},
                                             new RelationalColumn() {Label = c.Name})))
                             )
                         )
@@ -190,7 +190,7 @@ namespace SigQL
             else if (detectedParameters.Any())
             {
                 statement.WhereClause = BuildWhereClauseFromTargetTablePerspective(
-                    new RelationalTable() {Label = primaryTable.Name}, primaryTable, detectedParameters, parameterPaths,
+                    new RelationalTable() {Label = fromClauseRelations.Alias}, primaryTable, detectedParameters, parameterPaths,
                     tokens);
             }
 
@@ -297,21 +297,25 @@ namespace SigQL
             return p.ParameterType == typeof(OrderByDirection);
         }
 
-        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<ParameterInfo> orderByParameters, ITableDefinition primaryTable)
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<ParameterInfo> orderByParameters,
+            ITableDefinition primaryTable, TableRelations primaryTableRelations)
         {
-            return orderByParameters.Select(p => ConvertToOrderBySpec(p, primaryTable)).ToList();
+            return orderByParameters.Select(p => ConvertToOrderBySpec(p, primaryTable, primaryTableRelations)).ToList();
         }
 
-        private OrderBySpec ConvertToOrderBySpec(ParameterInfo p, ITableDefinition primaryTable)
+        private OrderBySpec ConvertToOrderBySpec(ParameterInfo p, ITableDefinition primaryTable,
+            TableRelations primaryTableRelations)
         {
+            Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
             if (IsOrderByAttributeParameter(p))
             {
                 var orderByAttribute = p.GetCustomAttribute<OrderByAttribute>();
-                var table = orderByAttribute.Table;
+                var matchingRelation = primaryTableRelations.Find(orderByAttribute.Table);
+                var table = matchingRelation.Alias;
 
                 var column = orderByAttribute.Column;
 
-                return new OrderBySpec()
+                return new OrderBySpec(resolveTableAlias)
                 {
                     TableName = table,
                     ColumnName = column,
@@ -330,9 +334,9 @@ namespace SigQL
                         $"Unable to identify matching database column for order by parameter \"{p.Name}\". Column \"{p.Name}\" does not exist in table {primaryTable.Name}.");
                 }
 
-                return new OrderBySpec()
+                return new OrderBySpec(resolveTableAlias)
                 {
-                    TableName = primaryTable.Name,
+                    TableName = primaryTableRelations.Alias,
                     ColumnName = column.Name,
                     Parameter = p,
                     IsDynamic = false,
@@ -341,7 +345,7 @@ namespace SigQL
             }
             else
             {
-                return new OrderBySpec()
+                return new OrderBySpec(resolveTableAlias)
                 {
                     Parameter = p,
                     IsDynamic = true,
@@ -811,11 +815,23 @@ namespace SigQL
 
         private class OrderBySpec
         {
+            private readonly Func<string, string> resolveTableNameFunc;
+
+            public OrderBySpec(Func<string, string> resolveTableNameFunc)
+            {
+                this.resolveTableNameFunc = resolveTableNameFunc;
+            }
+
             public string TableName { get; set; }
             public string ColumnName { get; set; }
             public ParameterInfo Parameter { get; set; }
             public bool IsDynamic { get; set; }
             public bool IsCollection { get; set; }
+
+            public string ResolveTableAlias(string tableName)
+            {
+                return resolveTableNameFunc(tableName);
+            }
         }
 
         private OrderByClause BuildOrderByClause(string tableAliasName, IEnumerable<OrderBySpec> parameters, List<TokenPath> tokens)
@@ -847,13 +863,14 @@ namespace SigQL
                         });
                         return orderByNode.SetArgs(
                             new ColumnIdentifier().SetArgs(
-                                tableAliasName == null ? (AstNode)new RelationalTable() { Label = p.TableName } : new Alias() { Label = tableAliasName },
+                                (AstNode)new RelationalTable() { Label = tableAliasName ?? p.TableName },
                                 new RelationalColumn() { Label = p.ColumnName }
                             )
                         ).AsEnumerable();
                     }
                     else
                     {
+                        //this needs to be updated. change the way the table is found below by using the spec and resolving the name at runtime
                         return BuildDynamicOrderByIdentifier(orderByClause, tableAliasName, tokens, p).AsEnumerable();
                     }
                     
@@ -945,7 +962,7 @@ namespace SigQL
             var leftOuterJoins = references.SelectMany(navigationTableRelations =>
             {
                 var foreignKey = navigationTableRelations.ForeignKeyToParent;
-                return BuildLeftOuterJoin(foreignKey, navigationTableRelations.TargetTable, tableRelations, navigationTableRelations, navigationTableRelations).AsEnumerable();
+                return BuildLeftOuterJoin(foreignKey, navigationTableRelations.TargetTable, navigationTableRelations, tableRelations, navigationTableRelations).AsEnumerable();
                 
             });
             return leftOuterJoins;
@@ -954,16 +971,20 @@ namespace SigQL
         private LeftOuterJoin BuildLeftOuterJoin(IForeignKeyDefinition foreignKey,
             ITableDefinition navigationTable, ITableHierarchyAlias primaryTableAlias, ITableHierarchyAlias foreignTableAlias, TableRelations navigationTableRelations = null)
         {
+            var tableHierarchyAliases = new List<ITableHierarchyAlias>();
+            tableHierarchyAliases.Add(primaryTableAlias);
+            tableHierarchyAliases.Add(foreignTableAlias);
+
             var leftOuterJoin = new LeftOuterJoin().SetArgs(
                 new AndOperator().SetArgs(
                 foreignKey.KeyPairs.Select(kp =>
                             new EqualsOperator().SetArgs(
-                                new ColumnIdentifier().SetArgs(new RelationalTable() {Label = foreignTableAlias.Alias},
+                                new ColumnIdentifier().SetArgs(new RelationalTable() {Label = tableHierarchyAliases.Single(s => s.TableName == kp.ForeignTableColumn.Table.Name).Alias },
                                     new RelationalColumn() {Label = kp.ForeignTableColumn.Name}),
-                                new ColumnIdentifier().SetArgs(new RelationalTable() {Label = primaryTableAlias.Alias},
+                                new ColumnIdentifier().SetArgs(new RelationalTable() {Label = tableHierarchyAliases.Single(s => s.TableName == kp.PrimaryTableColumn.Table.Name).Alias },
                                     new RelationalColumn() {Label = kp.PrimaryTableColumn.Name})))).AsEnumerable().Cast<AstNode>()
                     .Concat(navigationTableRelations != null ? BuildJoins(navigationTableRelations) : new LeftOuterJoin[0]));
-            leftOuterJoin.RightNode = new Alias() { Label = foreignTableAlias.Alias }.SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = navigationTable.Name }));
+            leftOuterJoin.RightNode = new Alias() { Label = tableHierarchyAliases.Single(s => s.TableName == navigationTable.Name).Alias }.SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = navigationTable.Name }));
             return leftOuterJoin;
         }
 

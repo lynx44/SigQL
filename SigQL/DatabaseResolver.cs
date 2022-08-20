@@ -665,6 +665,8 @@ namespace SigQL
         public int Depth => this.Parent == null ? 0 : this.Parent.Depth + 1;
         public int Ordinal => this.Parent == null ? 0 : this.Parent.Children.IndexOf(this);
 
+        public string Position => Parent == null ? $"{Depth}_{Ordinal}" : $"{Parent.Position}_{Depth}_{Ordinal}";
+        
         public bool IsDescendentOf(Type parentType)
         {
             var node = this;

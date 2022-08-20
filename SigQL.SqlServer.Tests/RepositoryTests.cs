@@ -36,7 +36,11 @@ namespace SigQL.SqlServer.Tests
             sqlStatements = new List<PreparedSqlStatement>();
 
             var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.DataSource, sqlConnection.Database);
-            repositoryBuilder = new RepositoryBuilder(new SqlQueryExecutor(() => laborDbConnection), sqlDatabaseConfiguration, statement => sqlStatements.Add(statement));
+            repositoryBuilder = new RepositoryBuilder(new SqlQueryExecutor(() => laborDbConnection), sqlDatabaseConfiguration, statement =>
+            {
+                Console.WriteLine(statement.CommandText);
+                sqlStatements.Add(statement);
+            });
             this.workLogRepositoryWithIRepository = repositoryBuilder.Build<IWorkLogRepository_IRepository>();
             this.workLogRepository = repositoryBuilder.Build<IWorkLogRepository>();
             this.monolithicRepository = repositoryBuilder.Build<IMonolithicRepository>();
