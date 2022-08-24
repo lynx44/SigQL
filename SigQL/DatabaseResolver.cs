@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices.ComTypes;
 using SigQL.Exceptions;
 using SigQL.Extensions;
 using SigQL.Schema;
@@ -298,7 +299,7 @@ namespace SigQL
                  new
                  {
                      ColumnDescription = p,
-                     Node = new TypeHierarchyNode(UnwrapCollectionTargetType(p.Column.Type), node)
+                     Node = new TypeHierarchyNode(UnwrapCollectionTargetType(p.Column.Type), node, p.Column.Property)
                  }).ToList();
              node.Children.AddRange(typeHierarchyNodes.Select(p => p.Node).ToList());
              var relations = unprocessedNavigationTables
@@ -352,7 +353,7 @@ namespace SigQL
                     tableRelations.ForeignKeyToParent = oneToManyFk;
                     tableRelations.ParentColumnField = null;
                     
-                    var hierarchyNode = new TypeHierarchyNode(typeof(void), node);
+                    var hierarchyNode = new TypeHierarchyNode(typeof(void), node, null);
                     node.Children.Add(hierarchyNode);
                     return this.BuildTableRelations(manyToOneFk, parentColumnField, new[] { tableRelations }, hierarchyNode);
                 }
@@ -648,12 +649,15 @@ namespace SigQL
     
     public class TypeHierarchyNode
     {
-        public TypeHierarchyNode(Type type) : this(type, null)
+        private readonly PropertyInfo propertyInfo;
+
+        public TypeHierarchyNode(Type type) : this(type, null, null)
         {
         }
 
-        public TypeHierarchyNode(Type type, TypeHierarchyNode parent)
+        public TypeHierarchyNode(Type type, TypeHierarchyNode parent, PropertyInfo propertyInfo)
         {
+            this.propertyInfo = propertyInfo;
             Type = type;
             this.Children = new List<TypeHierarchyNode>();
             this.Parent = parent;
@@ -664,6 +668,10 @@ namespace SigQL
         public List<TypeHierarchyNode> Children { get; set; }
         public int Depth => this.Parent == null ? 0 : this.Parent.Depth + 1;
         public int Ordinal => this.Parent == null ? 0 : this.Parent.Children.IndexOf(this);
+
+        public string Path => propertyInfo?.Name;
+
+        public string QualifiedPath => Parent == null ? Type.Name : string.Join("_", new [] { Parent.QualifiedPath, Path }.Where(p => !string.IsNullOrEmpty(p)));
 
         public string Position => Parent == null ? $"{Depth}_{Ordinal}" : $"{Parent.Position}_{Depth}_{Ordinal}";
         

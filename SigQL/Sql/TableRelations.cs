@@ -14,7 +14,7 @@ namespace SigQL.Sql
         public IForeignKeyDefinition ForeignKeyToParent { get; set; }
         public ColumnField ParentColumnField { get; set; }
         public TypeHierarchyNode HierarchyNode { get; set; }
-        public string Alias => $"{TargetTable.Name}_{HierarchyNode.Position}";
+        public string Alias => $"{TargetTable.Name}_{HierarchyNode.QualifiedPath}";
         public string TableName => TargetTable.Name;
 
         public TableRelations Find(string tableName)
