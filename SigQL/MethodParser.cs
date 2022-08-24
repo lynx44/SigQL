@@ -1163,8 +1163,6 @@ namespace SigQL
             TableAlias = tableAlias;
             this.columnDefinition = columnDefinition;
         }
-
-        public string Alias { get; set; }
     }
 
     public static class ForeignKeyDefinitionExtensions

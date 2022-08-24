@@ -75,7 +75,6 @@ namespace SigQL
 
             if (table.PrimaryKey.Columns.Any())
             {
-                // var primaryKeyColumns = table.PrimaryKey.Columns.Select(c => new ColumnAliasColumnDefinition(c)).ToList();
                 var primaryColumns = table.PrimaryKey.Columns
                     .Select(c =>
                     {
@@ -91,52 +90,8 @@ namespace SigQL
                 primaryColumns.AddRange(columns);
                 columns = primaryColumns.ToList();
             }
-           
-            // ensure that foreign and primary join keys are available in the output,
-            // so the materializer can determine the relationships to deduplicate records
-            // var columnAliasForeignKeyPairs = allForeignKeys.SelectMany(fk => fk.ColumnAliasForeignKeyPairs).ToList();
-            // var primaryKeyColumns = columnAliasForeignKeyPairs.Where(fk =>  TableEqualityComparer.Default.Equals(fk.PrimaryTableColumn.Table, table)).Select(kp => kp.PrimaryTableColumnWithAlias).Distinct(ColumnEqualityComparer.Default).Cast<ColumnAliasColumnDefinition>();
-            // if (primaryKeyColumns.Any())
-            // {
-            //     var primaryColumns = primaryKeyColumns
-            //         .Select(c =>
-            //         {
-            //             var currentPaths = propertyPath.ToList();
-            //             currentPaths.Add(c.Name);
-            //             c.Alias = string.Join(".", currentPaths); 
-            //             return new ColumnDefinitionWithPropertyPath()
-            //             {
-            //                 ColumnDefinition = c,
-            //                 PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.ToList()}
-            //             };
-            //         }).ToList();
-            //
-            //     primaryColumns.AddRange(columns);
-            //     columns = primaryColumns.ToList();
-            // }
-            //
-            // var foreignKeyColumns = columnAliasForeignKeyPairs.Where(fk =>  TableEqualityComparer.Default.Equals(fk.ForeignTableColumn.Table, table)).Select(kp => kp.ForeignTableColumnWithAlias).Distinct(ColumnEqualityComparer.Default).Cast<ColumnAliasColumnDefinition>();
-            // if (foreignKeyColumns.Any())
-            // {
-            //     var foreignColumns = foreignKeyColumns
-            //         .Select(c =>
-            //         {
-            //             var currentPaths = propertyPath.ToList();
-            //             currentPaths.Add(c.Name);
-            //             c.Alias = string.Join(".", currentPaths);
-            //             return new ColumnDefinitionWithPropertyPath()
-            //             {
-            //                 ColumnDefinition = c,
-            //                 PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.ToList()}
-            //             };
-            //         }).ToList();
-            //     
-            //     // these columns aren't actually utilized in the output
-            //     // from the materializer, so we can ignore them for now
-            //     // columns.AddRange(foreignColumns);
-            // }
-
-            columns = columns.GroupBy(c => c.ColumnDefinition, c => c, ColumnEqualityComparer.Default).Select(c => c.First()).ToList();
+            
+            columns = columns.GroupBy(c => c.Alias, c => c).Select(c => c.First()).ToList();
 
             return columns;
             }
@@ -617,6 +572,8 @@ namespace SigQL
         {
             public ColumnAliasColumnDefinition ColumnDefinition { get; set; }
             public PropertyPath PropertyPath { get; set; }
+            
+            public string Alias => string.Join(".", PropertyPath.PropertyPaths.Select(p => p));
         }
 
         public IEnumerable<IForeignKeyDefinition> FindAllForeignKeys(TableRelations tableRelations)
