@@ -334,6 +334,11 @@ namespace SigQL
                 HierarchyNode = node
             };
 
+            foreach (var navigationTable in tableRelations.NavigationTables)
+            {
+                navigationTable.Parent = tableRelations;
+            }
+
             IEnumerable<IForeignKeyDefinition> foreignKeys = null;
             if (parentTable != null)
             {
@@ -575,7 +580,8 @@ namespace SigQL
                 NavigationTables = tableRelationsCollection.SelectMany(t => t.NavigationTables).GroupBy(nt => nt.TargetTable, nt => nt, TableEqualityComparer.Default).Select(nt => MergeTableRelations(nt.ToArray())).ToList(),
                 ProjectedColumns = tableRelationsCollection.SelectMany(t => t.ProjectedColumns).Distinct(ColumnEqualityComparer.Default).Cast<ColumnDefinitionWithPath>().ToList(),
                 ForeignKeyToParent = tableRelationsCollection.Where(t => t.ForeignKeyToParent != null).Select(t => t.ForeignKeyToParent).Distinct(ForeignKeyDefinitionEqualityComparer.Default).FirstOrDefault(),
-                ParentColumnField = tableRelationsCollection.Select(p => p.ParentColumnField).FirstOrDefault(c => c != null)
+                ParentColumnField = tableRelationsCollection.Select(p => p.ParentColumnField).FirstOrDefault(c => c != null),
+                Parent = tableRelationsCollection.Select(p => p.Parent).FirstOrDefault(parent => parent != null)
             };
         }
 

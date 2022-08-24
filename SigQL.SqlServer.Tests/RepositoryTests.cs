@@ -84,6 +84,52 @@ namespace SigQL.SqlServer.Tests
 
             AreEquivalent(expected.Select(w => w.Id), actual);
         }
+        
+        [TestMethod]
+        public void GetWorkLogs_ReturnsExpectedEmployees()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Employee = new EFEmployee() { Name = "James" + i }}).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            AreEquivalent(new List<string>()
+            {
+                "James1",
+                "James2",
+                "James3"
+            }, actual.Select(w => w.Employee.Name));
+        }
+        
+        [TestMethod]
+        public void GetWorkLogs_ReturnsExpectedEmployeeAddresses()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Employee = new EFEmployee() { Addresses = new List<EFAddress>() { new EFAddress() { StreetAddress = "street" + i + "-1" }, new EFAddress() { StreetAddress = "street" + i + "-2" } }}}).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            AreEquivalent(new List<string>()
+            {
+                "street1-1",
+                "street1-2",
+                "street2-1",
+                "street2-2",
+                "street3-1",
+                "street3-2",
+            }, actual.SelectMany(w => w.Employee.Addresses).Select(a => a.StreetAddress));
+        }
+        
+        [TestMethod]
+        public void GetWorkLogs_DoesNotMaterializeDescendentEmployees()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Employee = new EFEmployee() { Addresses = new List<EFAddress>() { new EFAddress() { Employees = new List<EFEmployee>() { new EFEmployee() }}}}}).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+           Assert.IsTrue(actual.All(wl => wl.Employee.Addresses.All(a => a.Employees == null)));
+        }
 
         [TestMethod]
         public void GetAllIds_ViaInnerProjection()

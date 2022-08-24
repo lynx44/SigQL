@@ -95,7 +95,7 @@ namespace SigQL
                     {
                         var navigationRows = this.rowValues.Relations[propertyInfo.Name];
 
-                        var navigationProperty = navigationRows.Rows.Values.Where(v => v.Values.Any(p => p.Value != DBNull.Value)).OrderBy(v => v.RowNumber).Select(v => this.rowProjectionBuilder.Build(OutputFactory.UnwrapType(propertyInfo.PropertyType), new RowValues() { Values = v.Values })).ToList();
+                        var navigationProperty = navigationRows.Rows.Values.Where(v => v.Values.Any(p => p.Value != DBNull.Value)).OrderBy(v => v.RowNumber).Select(v => this.rowProjectionBuilder.Build(OutputFactory.UnwrapType(propertyInfo.PropertyType), new RowValues() { Values = v.Values, Relations = v.Relations })).ToList();
 
                         SetReturnValue(OutputFactory.Cast(navigationProperty, propertyInfo.PropertyType), interceptResult);
                         propertyValueCache[propertyInfo] = interceptResult.ReturnValue;

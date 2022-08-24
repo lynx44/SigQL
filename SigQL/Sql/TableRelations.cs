@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using Castle.Components.DictionaryAdapter;
 using SigQL.Schema;
 
 namespace SigQL.Sql
@@ -14,8 +16,32 @@ namespace SigQL.Sql
         public IForeignKeyDefinition ForeignKeyToParent { get; set; }
         public ColumnField ParentColumnField { get; set; }
         public TypeHierarchyNode HierarchyNode { get; set; }
-        public string Alias => $"{TargetTable.Name}<{HierarchyNode.QualifiedPath}>";
+        public string Alias => $"{TargetTable.Name}" + (RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{HierarchyNode.QualifiedPath}>" : null);
         public string TableName => TargetTable.Name;
+        public TableRelations Parent { get; set; }
+
+        public bool RelationTreeHasAnyTableDefinedMultipleTimes()
+        {
+            var root = Parent ?? this;
+            while (root.Parent != null)
+            {
+                root = root.Parent;
+            }
+
+            List<ITableDefinition> tables = new List<ITableDefinition>();
+            AppendTables(root, tables);
+            
+            return tables.GroupBy(t => t.Name).Any(g => g.Count() > 1);
+        }
+
+        private void AppendTables(TableRelations relations, List<ITableDefinition> tables)
+        {
+            tables.Add(relations.TargetTable);
+            foreach (var navigationRelations in relations.NavigationTables)
+            {
+                AppendTables(navigationRelations, tables);
+            }
+        }
 
         public TableRelations Find(string tableName)
         {
