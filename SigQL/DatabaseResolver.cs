@@ -671,7 +671,7 @@ namespace SigQL
 
         public string Path => propertyInfo?.Name;
 
-        public string QualifiedPath => Parent == null ? Type.Name : string.Join("_", new [] { Parent.QualifiedPath, Path }.Where(p => !string.IsNullOrEmpty(p)));
+        public string QualifiedPath => Parent == null ? Type.Name : string.Join(".", new [] { Parent.QualifiedPath, Path }.Where(p => !string.IsNullOrEmpty(p)));
 
         public string Position => Parent == null ? $"{Depth}_{Ordinal}" : $"{Parent.Position}_{Depth}_{Ordinal}";
         
