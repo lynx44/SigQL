@@ -3,6 +3,12 @@
 
 SigQL is a .NET ORM that uses code signatures as the query language. Defining only a method signature, the SQL query and object materialization is handled automatically without writing an implementation.
 
+    public interface IRepository 
+    {
+	    // retrieve a record from the WorkLog table without writing the implementation
+	    public WorkLog Get(int id);
+    }
+
 The goal of SigQL is to enable developers quick and concise access to data by merging SQL directives into method signatures. It is capable of covering the most common use cases, and is not a full featured ORM.
 
 # Contents
@@ -419,7 +425,7 @@ Data classes are often written with circular references. In a traditional ORM, t
 	    public Employee Employee { get; set; }
     }
 
-In these cases, SigQL will only query and materialize properties that have not previously found in it's direct line of descendents.
+In these cases, SigQL will only query and materialize properties that have not previously found in it's direct line of ancestors.
 
 In the example above, if WorkLogs are queried:
 
@@ -475,7 +481,7 @@ And can be filtered, just like tables:
     IEnumerable<vw_EmployeesWithWorkLogCount> GetEmployeesWithWorkLogCount(
 	    [GreaterThan] int workLogCount);
 
-However, because the database does have knowledge about the relationship between views and other objects, it currently cannot be joined to another result set (table, view, function, etc).
+However, because the database does not have knowledge about the relationship between views and other objects, it currently cannot be joined to another result set (table, view, function, etc).
 
 #### Inline Table-valued Functions
 
