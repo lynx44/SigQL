@@ -937,7 +937,7 @@ namespace SigQL
             var fromClauseNode = new FromClauseNode();
             var targetTable = tableRelations.TargetTable;
             var tableIdentifier = new TableIdentifier().SetArgs(
-                new Alias() { Label = tableRelations.Alias }.SetArgs(
+                (tableRelations.Alias == targetTable.Name ? (AstNode) new Placeholder() : new Alias() { Label = tableRelations.Alias }).SetArgs(
                 (targetTable.ObjectType == DatabaseObjectType.Table || targetTable.ObjectType == DatabaseObjectType.View)
                 ? (AstNode) new RelationalTable()
                 {
@@ -981,7 +981,8 @@ namespace SigQL
                                 new ColumnIdentifier().SetArgs(new RelationalTable() {Label = tableHierarchyAliases.Single(s => s.TableName == kp.PrimaryTableColumn.Table.Name).Alias },
                                     new RelationalColumn() {Label = kp.PrimaryTableColumn.Name})))).AsEnumerable().Cast<AstNode>()
                     .Concat(navigationTableRelations != null ? BuildJoins(navigationTableRelations) : new LeftOuterJoin[0]));
-            leftOuterJoin.RightNode = new Alias() { Label = tableHierarchyAliases.Single(s => s.TableName == navigationTable.Name).Alias }.SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = navigationTable.Name }));
+            var rightTableAlias = tableHierarchyAliases.Single(s => s.TableName == navigationTable.Name).Alias;
+            leftOuterJoin.RightNode = (navigationTable.Name == rightTableAlias ? (AstNode) new Placeholder() : new Alias() { Label = rightTableAlias }).SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = navigationTable.Name }));
             return leftOuterJoin;
         }
 
