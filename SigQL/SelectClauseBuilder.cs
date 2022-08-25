@@ -51,22 +51,22 @@ namespace SigQL
                 .ToColumnAliasForeignKeyDefinitions().ToList();
             var columnDefinitions = databaseResolver.ResolveColumnsForSelectStatement(fromClauseRelations, new List<string>(),
                 columnAliasForeignKeyDefinitions, tablePrimaryKeyDefinitions);
-            foreach (var columnDefinition in columnDefinitions)
-            {
-                columnDefinition.ColumnDefinition.Alias =
-                    string.Join(".", columnDefinition.PropertyPath.PropertyPaths.Select(p => p));
-            }
+            //foreach (var columnDefinition in columnDefinitions)
+            //{
+            //    columnDefinition.ColumnDefinition.Alias =
+            //        string.Join(".", columnDefinition.PropertyPath.PropertyPaths.Select(p => p));
+            //}
 
             var selectClause = new SelectClause()
                 .SetArgs(
                     columnDefinitions.Select(column =>
-                        new Alias() { Label = column.ColumnDefinition.Alias }
+                        new Alias() { Label = column.Alias }
                             .SetArgs(
                                 new ColumnIdentifier()
                                     .SetArgs(
                                         new RelationalTable()
                                         {
-                                            Label = column.ColumnDefinition.Table.Name
+                                            Label = column.ColumnDefinition.TableAlias.Alias
                                         },
                                         new RelationalColumn()
                                         {

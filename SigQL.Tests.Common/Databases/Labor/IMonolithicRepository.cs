@@ -9,6 +9,7 @@ namespace SigQL.Tests.Common.Databases.Labor
     {
         IEnumerable<Employee.IEmployeeFields> GetAllEmployeeFields();
         Employee.IEmployeeFields Get(int id);
+        IEnumerable<WorkLog> GetWorkLogs();
         Employee.IEmployeeFields GetByName(string name);
         Employee.IEmployeeFields GetByFilter(Employee.IdFilter filter);
         Employee.IEmployeeFields GetWithSpecifiedColumnName([Column(nameof(Employee.Id))] int employeeId);
@@ -125,7 +126,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         //IEnumerable<itvf_GetWorkLogsByEmployeeId.IId> itvf_GetWorkLogsByEmployeeIdWithClassParameters(itvf_GetWorkLogsByEmployeeId.Parameters parameters);
 
         // poco
-        IEnumerable<WorkLog.WorkLogWithEmployeeWithAddressPoco> GetWorkLogsOrderedByAddressIdPocoReturn([OrderBy(nameof(Address), nameof(WorkLog.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.WorkLogWithEmployeeWithAddressPoco> GetWorkLogsOrderedByAddressIdPocoReturn([OrderBy(nameof(Address), nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
         IEnumerable<WorkLog.WorkLogIdPocoWithClrOnlyProperty> GetWorkLogsWithClrOnlyProperty();
         IEnumerable<WorkLog.WorkLogIdPocoWithNestedClrOnlyProperty> GetWorkLogsWithNestedClrOnlyProperty();
 

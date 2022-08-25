@@ -36,7 +36,11 @@ namespace SigQL.SqlServer.Tests
             sqlStatements = new List<PreparedSqlStatement>();
 
             var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.DataSource, sqlConnection.Database);
-            repositoryBuilder = new RepositoryBuilder(new SqlQueryExecutor(() => laborDbConnection), sqlDatabaseConfiguration, statement => sqlStatements.Add(statement));
+            repositoryBuilder = new RepositoryBuilder(new SqlQueryExecutor(() => laborDbConnection), sqlDatabaseConfiguration, statement =>
+            {
+                Console.WriteLine(statement.CommandText);
+                sqlStatements.Add(statement);
+            });
             this.workLogRepositoryWithIRepository = repositoryBuilder.Build<IWorkLogRepository_IRepository>();
             this.workLogRepository = repositoryBuilder.Build<IWorkLogRepository>();
             this.monolithicRepository = repositoryBuilder.Build<IMonolithicRepository>();
@@ -68,6 +72,181 @@ namespace SigQL.SqlServer.Tests
             var actual = monolithicRepository.CountWorkLogs();
 
             Assert.AreEqual(expected.Count, actual.Count);
+        }
+        
+        [TestMethod]
+        public void GetWorkLogs_AvoidsStackOverflow()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs().Select(e => e.Id);
+
+            AreEquivalent(expected.Select(w => w.Id), actual);
+        }
+        
+        [TestMethod]
+        public void GetWorkLogs_ReturnsExpectedEmployees()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Employee = new EFEmployee() { Name = "James" + i }}).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            AreEquivalent(new List<string>()
+            {
+                "James1",
+                "James2",
+                "James3"
+            }, actual.Select(w => w.Employee.Name));
+        }
+
+        [TestMethod]
+        public void GetWorkLogs_ReturnsExpectedEmployeeAddresses()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Employee = new EFEmployee() { Addresses = new List<EFAddress>() { new EFAddress() { StreetAddress = "street" + i + "-1" }, new EFAddress() { StreetAddress = "street" + i + "-2" } } } }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            AreEquivalent(new List<string>()
+            {
+                "street1-1",
+                "street1-2",
+                "street2-1",
+                "street2-2",
+                "street3-1",
+                "street3-2",
+            }, actual.SelectMany(w => w.Employee.Addresses).Select(a => a.StreetAddress));
+        }
+
+        [TestMethod]
+        public void GetWorkLogs_ReturnsExpectedEmployeeAddressesLocation()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Employee = new EFEmployee() { Addresses = new List<EFAddress>() { new EFAddress() { Locations = new List<EFLocation>() { new EFLocation() { Name = $"WL{i}_Employee_Addresses_Locations1"}, new EFLocation() { Name = $"WL{i}_Employee_Addresses_Locations2"} }} } } }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            AreEquivalent(new List<string>()
+            {
+                "WL1_Employee_Addresses_Locations1",
+                "WL1_Employee_Addresses_Locations2",
+                "WL2_Employee_Addresses_Locations1",
+                "WL2_Employee_Addresses_Locations2",
+                "WL3_Employee_Addresses_Locations1",
+                "WL3_Employee_Addresses_Locations2",
+            }, actual.SelectMany(w => w.Employee.Addresses.SelectMany(a => a.Locations).Select(l => l.Name)));
+        }
+
+        [TestMethod]
+        public void GetWorkLogs_EmployeeAddressesLocationAddress_ReturnsNull()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Employee = new EFEmployee() { Addresses = new List<EFAddress>() { new EFAddress() { Locations = new List<EFLocation>() { new EFLocation() { Address = new EFAddress() } }} } } }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            Assert.IsTrue(actual.All(wl => wl.Employee.Addresses.All(a => a.Locations.All(l => l.Address == null))));
+        }
+
+        [TestMethod]
+        public void GetWorkLogs_EmployeeAddressesEmployees_ReturnsNull()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Employee = new EFEmployee() { Addresses = new List<EFAddress>() { new EFAddress() { Employees = new List<EFEmployee>() { new EFEmployee() }} } } }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            Assert.IsTrue(actual.All(wl => wl.Employee.Addresses.All(a => a.Employees == null)));
+        }
+
+        [TestMethod]
+        public void GetWorkLogs_ReturnsExpectedLocations()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Location = new EFLocation() { Name = "Location" + i } }).ToList();
+
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            AreEquivalent(new List<string>()
+            {
+                "Location1",
+                "Location2",
+                "Location3"
+            }, actual.Select(w => w.Location.Name));
+        }
+        
+        [TestMethod]
+        public void GetWorkLogs_ReturnsExpectedLocationAddress()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Location = new EFLocation() { Address = new EFAddress() { StreetAddress = $"WL{i}_Loc_Address_StreetAddress" }} }).ToList();
+
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            AreEquivalent(new List<string>()
+            {
+                "WL1_Loc_Address_StreetAddress",
+                "WL2_Loc_Address_StreetAddress",
+                "WL3_Loc_Address_StreetAddress"
+            }, actual.Select(w => w.Location.Address.StreetAddress));
+        }
+        
+        [TestMethod]
+        public void GetWorkLogs_ReturnsExpectedLocationAddressEmployee()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Location = new EFLocation() { Address = new EFAddress() { Employees = new List<EFEmployee>() { new EFEmployee() { Name = $"WL{i}_Employee1" }, new EFEmployee() { Name = $"WL{i}_Employee2" }  }}} }).ToList();
+
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            AreEquivalent(new List<string>()
+            {
+                "WL1_Employee1",
+                "WL1_Employee2",
+                "WL2_Employee1",
+                "WL2_Employee2",
+                "WL3_Employee1",
+                "WL3_Employee2",
+            }, actual.SelectMany(w => w.Location.Address.Employees.Select(e => e.Name)));
+        }
+        
+        [TestMethod]
+        public void GetWorkLogs_LocationAddressLocation_ReturnsNull()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Location = new EFLocation() { Address = new EFAddress() { Locations = new List<EFLocation>() { new EFLocation() }}} }).ToList();
+
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            Assert.IsTrue(actual.All(wl => wl.Location.Address.Locations == null));
+        }
+        
+        [TestMethod]
+        public void GetWorkLogs_LocationAddressEmployeeAddress_ReturnsNull()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Location = new EFLocation() { Address = new EFAddress() { Employees = new List<EFEmployee>() { new EFEmployee() { Addresses = new List<EFAddress>() { new EFAddress() }} } } } }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+            Assert.IsTrue(actual.All(wl => wl.Location.Address.Employees.All(e => e.Addresses == null)));
+        }
+        
+        [TestMethod]
+        public void GetWorkLogs_DoesNotMaterializeDescendentEmployees()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Employee = new EFEmployee() { Addresses = new List<EFAddress>() { new EFAddress() { Employees = new List<EFEmployee>() { new EFEmployee() }}}}}).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWorkLogs();
+
+           Assert.IsTrue(actual.All(wl => wl.Employee.Addresses.All(a => a.Employees == null)));
         }
 
         [TestMethod]
