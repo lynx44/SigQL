@@ -24,7 +24,7 @@ The goal of SigQL is to enable developers quick and concise access to data by me
  - [Collection Results](#collection-results)
  - [Filtering by related tables](#filtering-by-related-tables)
  - [Returning Relations](#returning-relations)
-   - [Recursive relationships are not supported](#recursive-relationships-are-not-supported)
+   - [Circular References](#circular-references)
  - [Perspective](#perspective)
  - [Count](#count)
  - [Views](#views)
@@ -402,7 +402,7 @@ Returning related tables is supported:
 
 *Note also that joined rows are de-duplicated into a single instance based on their primary key.*
 
-##### Recursive relationships are not supported
+##### Circular References
 
 Data classes are often written with circular references. In a traditional ORM, the preceding example data classes are commonly defined as:
 
@@ -419,7 +419,15 @@ Data classes are often written with circular references. In a traditional ORM, t
 	    public Employee Employee { get; set; }
     }
 
-SigQL currently makes no effort to resolve circular references. Circular data is rarely desired as a model trait, and SigQL promotes projections to retrieve only necessary data for a particular use case. When projections are defined, it is extremely rare to find a use case where a circular reference is desired as opposed a specifically crafted shape.
+In these cases, SigQL will only query and materialize properties that have not previously found in it's direct line of descendents.
+
+In the example above, if WorkLogs are queried:
+
+    public IEnumerable<WorkLog> GetWorkLogs();
+
+WorkLog.Employees will be queried and materialized, however, WorkLog.Employees.WorkLogs will return null, since the WorkLog property of Employee introduces a cycle in this branch.
+
+Circular data is rarely desired as a model trait, and SigQL encourages projections to retrieve only necessary data for a particular use case. When projections are defined, it is extremely rare to find a use case where a circular reference is desired as opposed a specifically crafted shape.
 
 #### Perspective
 
