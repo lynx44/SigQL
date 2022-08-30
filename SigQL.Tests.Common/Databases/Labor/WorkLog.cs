@@ -228,5 +228,11 @@ namespace SigQL.Tests.Common.Databases.Labor
             [LessThanOrEqual]
             public DateTime StartDate { get; set; }
         }
+        
+        public class ClrOnlyFilter
+        {
+            [ClrOnly] public int Id { get; set; }
+            public int EmployeeId { get; set; }
+        }
     }
 }

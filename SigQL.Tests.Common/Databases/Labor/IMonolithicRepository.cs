@@ -23,6 +23,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyIdNotIn([Not] IEnumerable<int?> id);
         IEnumerable<Employee.IEmployeeFields> GetClrOnly([ClrOnly] int id);
         IEnumerable<WorkLog.IWorkLogId> GetClrOnlyMixedWithColumnParams([ClrOnly] int id, int employeeId);
+        IEnumerable<Employee.IEmployeeFields> GetClrOnlyParameterClass([ClrOnly] Employee.IdFilter filter);
+        IEnumerable<WorkLog.IWorkLogId> GetClrOnlyFilterClassProperty(WorkLog.ClrOnlyFilter filter);
         // not like
 
 

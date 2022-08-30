@@ -407,18 +407,26 @@ namespace SigQL
                             {
                                 var filterComparisons = parameter.Type.GetProperties().Where(p => !this.databaseResolver.IsTableOrTableProjection(p.PropertyType)).SelectMany(property =>
                                 {
-                                    var parameterName = property.Name;
+                                    if (!this.databaseResolver.IsClrOnly(property))
+                                    {
+                                        var parameterName = property.Name;
 
-                                    var column = GetColumnForParameterName(parameter.TableRelations, this.databaseResolver.GetColumnName(property));
+                                        var column = GetColumnForParameterName(parameter.TableRelations, this.databaseResolver.GetColumnName(property));
 
-                                    var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
-                                            .SetArgs(primaryTableReference,
-                                                new RelationalColumn()
-                                                {
-                                                    Label = column.Name
-                                                }), parameterName, property.PropertyType, parameter.ParameterInfo,
-                                        new List<PropertyInfo>() { property }, parameterPaths, tokens);
-                                    return comparisonNode.AsEnumerable().ToList();
+                                        var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
+                                                .SetArgs(primaryTableReference,
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = column.Name
+                                                    }), parameterName, property.PropertyType, parameter.ParameterInfo,
+                                            new List<PropertyInfo>() { property }, parameterPaths, tokens);
+                                        return comparisonNode.AsEnumerable().ToList();
+                                    }
+                                    else
+                                    {
+                                        return new List<AstNode>();
+                                    }
+                                    
                                 }).ToList();
 
                                 var navComparisons = parameter.TableRelations.NavigationTables.Select(nt =>

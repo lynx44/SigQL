@@ -302,6 +302,22 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void GetClrOnlyParameterClass_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetClrOnlyParameterClass(new Employee.IdFilter()));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\"", sql);
+        }
+
+        [TestMethod]
+        public void GetClrOnlyFilterClassProperty_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetClrOnlyFilterClassProperty(new WorkLog.ClrOnlyFilter()));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"EmployeeId\" = @EmployeeId))", sql);
+        }
+
+        [TestMethod]
         public void GetPocoWithClrOnlyProperty_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithClrOnlyProperty());
