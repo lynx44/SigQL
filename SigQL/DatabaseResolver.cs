@@ -210,9 +210,13 @@ namespace SigQL
                 }, node, parentTable, parentColumnField, parentType);
         }
 
-        private bool IsClrOnly(PropertyInfo propertyInfo)
+        internal bool IsClrOnly(PropertyInfo propertyInfo)
         {
             return propertyInfo.GetCustomAttribute<ClrOnlyAttribute>() != null;
+        }
+        internal bool IsClrOnly(ParameterInfo parameterInfo)
+        {
+            return parameterInfo.GetCustomAttribute<ClrOnlyAttribute>() != null;
         }
 
         public TableRelations BuildTableRelationsWithMethodParams(ITableDefinition tableDefinition, TypeHierarchyNode node, IEnumerable<ParameterInfo> parameters, ITableDefinition parentTable = null, ColumnField parentColumnField = null, Type parentType = null)

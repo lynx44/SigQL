@@ -378,69 +378,78 @@ namespace SigQL
             ITableDefinition primaryTable, IEnumerable<DetectedParameter> parameters,
             List<ParameterPath> parameterPaths, List<TokenPath> tokens)
         {
-            return new WhereClause().SetArgs(new AndOperator().SetArgs(parameters.SelectMany<DetectedParameter, AstNode>(
-                parameter =>
-                {
-                    // if this is a primitive or built in .NET type, just set it equal
-                    // to the expected value
-                    //var isTableOrTableProjection = this.databaseResolver.IsTableOrTableProjection(parameter.Type);
-
-                    if (!this.databaseResolver.IsTableOrTableProjection(parameter.Type) &&
-                        parameter.TableRelations == null)
+            var andOperator = new AndOperator().SetArgs(parameters.SelectMany<DetectedParameter, AstNode>(
+                    parameter =>
                     {
-                        var parameterName = parameter.ParameterInfo.Name;
-                        var column = GetColumnForParameterName(primaryTable, parameter.Name);
+                        // if this is a primitive or built in .NET type, just set it equal
+                        // to the expected value
+                        //var isTableOrTableProjection = this.databaseResolver.IsTableOrTableProjection(parameter.Type);
+                        if (!this.databaseResolver.IsClrOnly(parameter.ParameterInfo))
+                        {
 
-                        var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
-                            .SetArgs(primaryTableReference,
-                                new RelationalColumn()
+                            if (!this.databaseResolver.IsTableOrTableProjection(parameter.Type) &&
+                                parameter.TableRelations == null)
+                            {
+                                var parameterName = parameter.ParameterInfo.Name;
+                                var column = GetColumnForParameterName(primaryTable, parameter.Name);
+
+                                var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
+                                    .SetArgs(primaryTableReference,
+                                        new RelationalColumn()
+                                        {
+                                            Label = column.Name
+                                        }), parameterName, parameter.Type, parameter.ParameterInfo, new List<PropertyInfo>(), parameterPaths, tokens);
+                                return comparisonNode.AsEnumerable().ToList();
+                            }
+                            else
+                            if (this.databaseResolver.IsTableOrTableProjection(parameter.Type) &&
+                                TableEqualityComparer.Default.Equals(primaryTable, parameter.TableRelations.TargetTable))
+                            {
+                                var filterComparisons = parameter.Type.GetProperties().Where(p => !this.databaseResolver.IsTableOrTableProjection(p.PropertyType)).SelectMany(property =>
                                 {
-                                    Label = column.Name
-                                }), parameterName, parameter.Type, parameter.ParameterInfo, new List<PropertyInfo>(), parameterPaths, tokens);
-                        return comparisonNode.AsEnumerable().ToList();
-                    }
-                    else
-                        if (this.databaseResolver.IsTableOrTableProjection(parameter.Type) &&
-                            TableEqualityComparer.Default.Equals(primaryTable, parameter.TableRelations.TargetTable))
-                    {
-                        var filterComparisons = parameter.Type.GetProperties().Where(p => !this.databaseResolver.IsTableOrTableProjection(p.PropertyType)).SelectMany(property =>
-                         {
-                             var parameterName = property.Name;
+                                    var parameterName = property.Name;
 
-                             var column = GetColumnForParameterName(parameter.TableRelations, this.databaseResolver.GetColumnName(property));
+                                    var column = GetColumnForParameterName(parameter.TableRelations, this.databaseResolver.GetColumnName(property));
 
-                             var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
-                                     .SetArgs(primaryTableReference,
-                                         new RelationalColumn()
-                                         {
-                                             Label = column.Name
-                                         }), parameterName, property.PropertyType, parameter.ParameterInfo,
-                                 new List<PropertyInfo>() { property }, parameterPaths, tokens);
-                             return comparisonNode.AsEnumerable().ToList();
-                         }).ToList();
+                                    var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
+                                            .SetArgs(primaryTableReference,
+                                                new RelationalColumn()
+                                                {
+                                                    Label = column.Name
+                                                }), parameterName, property.PropertyType, parameter.ParameterInfo,
+                                        new List<PropertyInfo>() { property }, parameterPaths, tokens);
+                                    return comparisonNode.AsEnumerable().ToList();
+                                }).ToList();
 
-                        var navComparisons = parameter.TableRelations.NavigationTables.Select(nt =>
+                                var navComparisons = parameter.TableRelations.NavigationTables.Select(nt =>
+                                {
+                                    return BuildWhereClauseForPerspective(primaryTableReference,
+                                        nt, "0", parameterPaths, parameter.ParameterInfo,
+                                        new List<PropertyInfo>() { nt.ParentColumnField.Property }, tokens);
+                                });
+
+                                return navComparisons.Concat(filterComparisons).ToList();
+                            }
+                            else
+                                // this is referencing a foreign table, reference the table
+                            {
+                                return parameter.TableRelations.NavigationTables.Select(nt =>
+                                {
+                                    return BuildWhereClauseForPerspective(primaryTableReference,
+                                        nt, "0", parameterPaths, parameter.ParameterInfo,
+                                        nt.ParentColumnField?.Property.AsEnumerable().ToList() ?? new List<PropertyInfo>(), tokens);
+                                });
+                            }
+                        }
+                        else
                         {
-                            return BuildWhereClauseForPerspective(primaryTableReference,
-                                nt, "0", parameterPaths, parameter.ParameterInfo,
-                                new List<PropertyInfo>() { nt.ParentColumnField.Property }, tokens);
-                        });
+                            return new List<AstNode>();
+                        }
 
-                        return navComparisons.Concat(filterComparisons).ToList();
-                    }
-                    else
-                        // this is referencing a foreign table, reference the table
-                    {
-                        return parameter.TableRelations.NavigationTables.Select(nt =>
-                        {
-                            return BuildWhereClauseForPerspective(primaryTableReference,
-                                nt, "0", parameterPaths, parameter.ParameterInfo,
-                                nt.ParentColumnField?.Property.AsEnumerable().ToList() ?? new List<PropertyInfo>(), tokens);
-                        });
-                    }
-
-                }).ToList()
-            ));
+                    }).ToList()
+            );
+            var whereClause = new WhereClause().SetArgs(andOperator);
+            return andOperator.Args.Any() ? whereClause : null;
         }
 
         private AstNode BuildComparisonNode(AstNode columnNode,

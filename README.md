@@ -310,9 +310,9 @@ Sort direction can also be specified via parameters:
 
 Offset does not need to be specified to use Fetch. The following example is the recommended approach to retrieve a single item:
 
-    Employee.IName Get(int id, [Fetch] int fetch = 1);
+    Employee.IName Get(string name, [Fetch] int fetch = 1);
     ...
-    var employee = employeeRepository.Get(123); // no need to specify default fetch
+    var employee = employeeRepository.Get("John"); // no need to specify default fetch
 
 *Note that passing a value greater than the non-default value for fetch (1) will throw an exception, since the return type is not a collection*
 
@@ -463,6 +463,9 @@ Both of these result in similar data being retrieved, but the orientation of the
 Counting the total number of rows in a result set can be achieved by using the ICountResult\<T\> interface:
 
     ICountResult<WorkLog.IWorkLogId> CountWorkLogs(int employeeId);
+	...
+	var countResult = repository.CountWorkLogs(1);
+	var numberOfItems = countResult.Count;
 
 #### Views
 

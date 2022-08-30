@@ -21,6 +21,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         Employee.IEmployeeFields GetByNameFilter(Employee.EmployeeNameFilter filter);
         Employee.IEmployeeFields GetByNameFilterNot(Employee.EmployeeNameNotFilter filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyIdNotIn([Not] IEnumerable<int?> id);
+        IEnumerable<Employee.IEmployeeFields> GetClrOnly([ClrOnly] int id);
+        IEnumerable<WorkLog.IWorkLogId> GetClrOnlyMixedWithColumnParams([ClrOnly] int id, int employeeId);
         // not like
 
 
