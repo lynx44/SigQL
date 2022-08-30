@@ -103,8 +103,8 @@ namespace SigQL
             }
 
             // offset functionality
-            var offsetParameter = methodParameters.SingleOrDefault(p => p.GetCustomAttribute<OffsetAttribute>() != null);
-            var fetchParameter = methodParameters.SingleOrDefault(p => p.GetCustomAttribute<FetchAttribute>() != null);
+            var offsetParameter = GetParameterPathWithAttribute<OffsetAttribute>(methodParameters);
+            var fetchParameter = GetParameterPathWithAttribute<FetchAttribute>(methodParameters);
             if ((offsetParameter != null || fetchParameter != null))
             {
                 if ((fromClauseRelations.NavigationTables != null && fromClauseRelations.NavigationTables.Any()))
@@ -227,13 +227,67 @@ namespace SigQL
             return sqlStatement;
         }
 
+        private static ParameterPath GetParameterPathWithAttribute<TAttribute>(ParameterInfo[] methodParameters)
+            where TAttribute : Attribute
+        {
+            var parameterPathWithAttribute = methodParameters.SingleOrDefault(p => p.GetCustomAttribute<TAttribute>() != null);
+            if (parameterPathWithAttribute != null)
+            {
+                return 
+                    new ParameterPath()
+                    {
+                        Parameter = parameterPathWithAttribute
+                    };
+            }
+
+            return FindClassFilterPropertyWithAttribute<TAttribute>(methodParameters);
+        }
+
+        private static ParameterPath FindClassFilterPropertyWithAttribute<TAttribute>(ParameterInfo[] methodParameters)
+            where TAttribute : Attribute
+        {
+            var propertiesWithAttribute = methodParameters.Select(p =>
+            {
+                var isClass = p.ParameterType.IsClass || p.ParameterType.IsInterface;
+                if (isClass)
+                {
+                    var propsWithAttr = p.ParameterType.GetProperties().Where(p => p.GetCustomAttribute<TAttribute>() != null);
+                    if (propsWithAttr.Count() >= 2)
+                    {
+                        throw new InvalidAttributeException(typeof(TAttribute), propsWithAttr,
+                            $"Attribute [{typeof(TAttribute).Name}] is specified more than once.");
+                    }
+
+                    if (propsWithAttr.Any())
+                    {
+                        return
+                            new ParameterPath()
+                            {
+                                Parameter = p,
+                                Properties = propsWithAttr.ToList()
+                            };
+                    }
+                }
+
+                return null;
+            }).Where(p => p != null).ToList();
+
+            if (propertiesWithAttribute.Count >= 2)
+            {
+                throw new InvalidAttributeException(typeof(TAttribute), propertiesWithAttribute.Select(p => p.Properties.Last()),
+                    $"Attribute [{typeof(TAttribute).Name}] is specified more than once.");
+            }
+
+            return propertiesWithAttribute.SingleOrDefault();
+        }
+
         private bool IsFunctionParameter(ParameterInfo parameter)
         {
             return parameter.GetCustomAttribute<ParameterAttribute>() != null;
         }
 
         private OrderByClause BuildOrderByWithOffsetClause(Select statement, string primaryTableAlias, IEnumerable<OrderBySpec> orderBySpecs,
-            List<TokenPath> tokens, ParameterInfo offsetParameter, List<ParameterPath> parameterPaths, ParameterInfo fetchParameter)
+            List<TokenPath> tokens, ParameterPath offsetParameter, List<ParameterPath> parameterPaths, ParameterPath fetchParameter)
         {
             OrderByClause offsetOrderByClause;
             if (statement.OrderByClause != null)
@@ -253,9 +307,9 @@ namespace SigQL
             var offsetClause = new OffsetClause();
             if (offsetParameter != null)
             {
-                var offsetSqlParameterName = offsetParameter.Name;
-                parameterPaths.Add(new ParameterPath()
-                    {Parameter = offsetParameter, SqlParameterName = offsetSqlParameterName});
+                var offsetSqlParameterName = offsetParameter.GenerateSuggestedSqlParameterName();
+                offsetParameter.SqlParameterName = offsetSqlParameterName;
+                parameterPaths.Add(offsetParameter);
                 offsetClause.OffsetCount = new NamedParameterIdentifier() {Name = offsetSqlParameterName};
             }
             else
@@ -265,9 +319,9 @@ namespace SigQL
 
             if (fetchParameter != null)
             {
-                var fetchSqlParameterName = fetchParameter.Name;
-                parameterPaths.Add(new ParameterPath()
-                    {Parameter = fetchParameter, SqlParameterName = fetchSqlParameterName});
+                var fetchSqlParameterName = fetchParameter.GenerateSuggestedSqlParameterName();
+                fetchParameter.SqlParameterName = fetchSqlParameterName;
+                parameterPaths.Add(fetchParameter);
                 offsetClause.Fetch = new FetchClause()
                     {FetchCount = new NamedParameterIdentifier() {Name = fetchSqlParameterName}};
             }
@@ -407,7 +461,7 @@ namespace SigQL
                             {
                                 var filterComparisons = parameter.Type.GetProperties().Where(p => !this.databaseResolver.IsTableOrTableProjection(p.PropertyType)).SelectMany(property =>
                                 {
-                                    if (!this.databaseResolver.IsClrOnly(property))
+                                    if (!this.databaseResolver.IsDecoratedNonColumn(property))
                                     {
                                         var parameterName = property.Name;
 
@@ -1114,6 +1168,11 @@ namespace SigQL
         {
             if (Properties != null && Properties.Any()) return Properties.Last().PropertyType;
             return Parameter.ParameterType;
+        }
+
+        public string GenerateSuggestedSqlParameterName()
+        {
+            return $"{Parameter.Name}{(Properties != null ? string.Join("_", Properties.Select(p => p.Name)) : null)}";
         }
     }
 

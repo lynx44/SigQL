@@ -87,6 +87,17 @@ namespace SigQL.Tests.Common.Databases.Labor
             Employee.IName EmployeeNames { get; set; }
         }
 
+        public class FilterWithOffset
+        {
+            [Offset] public int Offset { get; set; }
+        }
+
+        public class FilterWithOffsetAndParameter
+        {
+            [Offset] public int Offset { get; set; }
+            public DateTime StartDate { get; set; }
+        }
+
         public class LocationWorkLogFilter
         {
             public Location.ILocationId Location { get; set; }
@@ -127,6 +138,11 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         public class GetByEmployeeNameFilter
         {
+            public Employee.EmployeeNameFilter Employee { get; set; }
+        }
+        public class GetByEmployeeNameFilterWithOffset
+        {
+            [Offset] public int Offset { get; set; }
             public Employee.EmployeeNameFilter Employee { get; set; }
         }
 

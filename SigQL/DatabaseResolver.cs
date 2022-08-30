@@ -252,7 +252,7 @@ namespace SigQL
             ColumnField parentColumnField, Type parentType, TypeHierarchyNode node)
         {
              var columnDescriptions = columnFields
-                .Select(p => new {Column = p, IsTable = this.IsTableOrTableProjection(p.Type)}).ToList();
+                .Select(p => new {Column = p, IsTable = this.IsTableOrTableProjection(p.Type)}).Where(p => !IsDecoratedNonColumn(p.Column.Property)).ToList();
              var unprocessedNavigationTables = columnDescriptions.Where(t => t.IsTable && !node.IsDescendentOf(UnwrapCollectionTargetType(t.Column.Type))).ToList();
              var typeHierarchyNodes = unprocessedNavigationTables.Select(p => 
                  new
@@ -327,6 +327,14 @@ namespace SigQL
                 }
             }
             return tableRelations;
+        }
+
+        public bool IsDecoratedNonColumn(PropertyInfo property)
+        {
+            return
+                property.GetCustomAttribute<OffsetAttribute>() != null ||
+                property.GetCustomAttribute<FetchAttribute>() != null ||
+                property.GetCustomAttribute<ClrOnlyAttribute>() != null;
         }
 
         private TableRelations BuildTableRelations(IForeignKeyDefinition foreignKeyDefinition, ColumnField parentColumnField, IEnumerable<TableRelations> relations, TypeHierarchyNode node)

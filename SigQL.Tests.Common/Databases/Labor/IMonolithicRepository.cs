@@ -112,6 +112,9 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> TakeWorkLogsOnly([Fetch] int take);
         IEnumerable<WorkLog.IWorkLogId> TakeWorkLogsOnlyWithFilter([Fetch] int take, int id);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogs([Offset] int skip);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsViaClassFilter(WorkLog.FilterWithOffset filter);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsViaClassFilterAndParameter(WorkLog.FilterWithOffsetAndParameter filter);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithNavigationTableFilterWithOffset(WorkLog.GetByEmployeeNameFilterWithOffset filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithOrder([Offset] int skip, [OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate))] OrderByDirection order = OrderByDirection.Ascending);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithPrimaryTableFilter([Offset] int skip, DateTime startDate);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithNavigationTableFilter([Offset] int skip, WorkLog.GetByEmployeeNameFilter filter);

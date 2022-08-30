@@ -1,4 +1,5 @@
 ﻿
+
 # SigQL
 
 SigQL is a .NET ORM that uses code signatures as the query language. Defining only a method signature, the SQL query and object materialization is handled automatically without writing an implementation.
@@ -581,7 +582,7 @@ The below list documents all features applicable to input parameters (WHERE clau
 
 | Feature | Parameter (L0) | Class (L1) | Class Property (L2) |
 |--|--|--|--|
-| [ClrOnly]  | No | No (planned) | No (planned) |
+| [ClrOnly]  | No | Yes | Yes |
 | [Column] | Yes | Yes | Yes |
 | [Fetch] | Yes | No (planned) | No |
 | [GreaterThan] | Yes | Yes | Yes |
@@ -594,7 +595,7 @@ The below list documents all features applicable to input parameters (WHERE clau
 | [Contains] | Yes | Yes | Yes |
 | [EndsWith] | Yes | Yes | Yes |
 | [Not] | Yes | Yes | Yes |
-| [Offset] | No | No (planned) | No |
+| [Offset] | Yes | No (planned) | No |
 | [Parameter] | Yes| No (planned) | No |
 | [Set] | Yes| Yes (cannot mix with filter properties) | No |
 | [ViaRelation] | Yes| No (planned) | No |
@@ -607,7 +608,9 @@ The below list documents all features applicable to return types. All other feat
 
 | Feature | Class (L1) | Class Property (L2) |
 |--|--|--|--|
-| [ClrOnly]  | Yes | Yes |
+| [ClrOnly] | Yes | Yes |
+| [Column] | No (planned) | No (planned) |
+| [ViaRelation] | No (planned) | No (planned) |
 
 ### Insert, Update, and Delete
 
