@@ -1452,6 +1452,39 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void OffsetFetch_WithPrimaryAndNavigationTableFilter()
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                var workLog = new EFWorkLog()
+                {
+                    StartDate = new DateTime(2022, 1, 1)
+                };
+                var employee = new EFEmployee()
+                {
+                    Name = "Employee" + (i % 2)
+                };
+                workLog.Employee = employee;
+                
+                this.laborDbContext.WorkLog.Add(workLog);
+            }
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.SkipTakeWorkLogsByStartDateAndEmployeeName(new WorkLog.GetByStartDateAndEmployeeNameFilterWithOffsetFetch()
+            {
+                Offset = 1,
+                Fetch = 1,
+                Employee = new Employee.EmployeeNameFilter()
+                {
+                    Name = "Employee1"
+                },
+                StartDate = new DateTime(2022, 1, 1)
+            }).Select(wl => wl.Id).ToList();
+
+            Assert.AreEqual(1, actual.Count);
+            AreSame(new int[] { 4 }, actual);
+        }
+
+        [TestMethod]
         public void ViaAttribute_ManyToOne()
         {
             var location1 = new EFLocation();

@@ -748,6 +748,42 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void FetchViaClassFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() =>
+                this.monolithicRepository.TakeWorkLogsViaClassFilter(new WorkLog.FilterWithFetch()));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog0\".\"Id\" from \"WorkLog\" \"WorkLog0\" order by (select 1) offset 0 rows fetch next @filterFetch rows only) \"offset_WorkLog\" inner join \"WorkLog\" on ((\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\")) left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
+        }
+
+        [TestMethod]
+        public void OffsetFetchViaClassFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() =>
+                this.monolithicRepository.SkipTakeWorkLogsViaClassFilter(new WorkLog.FilterWithOffsetFetch()));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog0\".\"Id\" from \"WorkLog\" \"WorkLog0\" order by (select 1) offset @filterOffset rows fetch next @filterFetch rows only) \"offset_WorkLog\" inner join \"WorkLog\" on ((\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\")) left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
+        }
+
+        [TestMethod]
+        public void FetchViaClassFilter_OneTableOnly_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() =>
+                this.monolithicRepository.TakeWorkLogsOnlyViaClassFilter(new WorkLog.FilterWithFetch()));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by (select 1) offset 0 rows fetch next @filterFetch rows only", sql);
+        }
+
+        [TestMethod]
+        public void FetchViaClassFilter_OneTableOnly_RetainsWhereClause()
+        {
+            var sql = GetSqlForCall(() =>
+                this.monolithicRepository.TakeWorkLogsOnlyWithFilterViaClassFilter(new WorkLog.FilterWithFetchAndParameter()));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" = @Id)) order by (select 1) offset 0 rows fetch next @filterFetch rows only", sql);
+        }
+
+        [TestMethod]
         public void EnumReturnProperty_ReturnsExpectedSql()
         {
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetAddressesWithEnumClassification));

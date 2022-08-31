@@ -120,6 +120,13 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithNavigationTableFilter([Offset] int skip, WorkLog.GetByEmployeeNameFilter filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> TakeWorkLogs([Fetch] int take);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> SkipTakeWorkLogs([Offset] int skip, [Fetch] int take);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> TakeWorkLogsViaClassFilter(WorkLog.FilterWithFetch filter);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> SkipTakeWorkLogsViaClassFilter(WorkLog.FilterWithOffsetFetch filter);
+        IEnumerable<WorkLog.IWorkLogId> TakeWorkLogsOnlyViaClassFilter(WorkLog.FilterWithFetch filter);
+        IEnumerable<WorkLog.IWorkLogId> TakeWorkLogsOnlyWithFilterViaClassFilter(WorkLog.FilterWithFetchAndParameter filter);
+
+        IEnumerable<Labor.WorkLog.IWorkLogId> SkipTakeWorkLogsByStartDateAndEmployeeName(
+            WorkLog.GetByStartDateAndEmployeeNameFilterWithOffsetFetch filter);
         ICountResult<WorkLog.IWorkLogId> CountWorkLogs();
         IEnumerable<DiagnosticLog.IFields> FetchDiagnosticLogs([Fetch] int take);
 
