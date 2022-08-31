@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SigQL.Types;
 using SigQL.Types.Attributes;
 
 namespace SigQL.Tests.Common.Databases.Labor
@@ -273,6 +274,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             [ClrOnly] public int Id { get; set; }
             public int EmployeeId { get; set; }
+        }
+
+        public class OrderByDirectionStartDate
+        {
+            public OrderByDirection StartDate { get; set; }
         }
     }
 }

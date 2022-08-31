@@ -49,6 +49,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsAttribute([OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate))] OrderByDirection direction = OrderByDirection.Ascending);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogs(OrderByDirection startDate = OrderByDirection.Ascending);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsMultiple(OrderByDirection startDate = OrderByDirection.Ascending, OrderByDirection endDate = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsViaClassFilter(WorkLog.OrderByDirectionStartDate filter);
         IEnumerable<WorkLog.IWorkLogId> INVALID_GetOrderedWorkLogs(OrderByDirection theStartDate = OrderByDirection.Ascending);
         //IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsGenericType<TOrder>(OrderBy<TOrder> direction = null);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicOrderBy(IOrderBy order);

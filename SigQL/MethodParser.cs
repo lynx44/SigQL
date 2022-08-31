@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -92,10 +93,7 @@ namespace SigQL
                 FromClause = fromClause
             };
 
-            var orderByParameters = methodParameters.Where(p =>
-                IsOrderByAttributeParameter(p) ||
-                IsDynamicOrderByParameter(p) ||
-                IsOrderByDirectionParameter(p)).ToList();
+            var orderByParameters = FindOrderByParameters(methodParameters);
             IEnumerable<OrderBySpec> orderBySpecs = ConvertToOrderBySpecs(orderByParameters, primaryTable, fromClauseRelations);
             if (orderBySpecs.Any())
             {
@@ -227,6 +225,17 @@ namespace SigQL
             return sqlStatement;
         }
 
+        private List<ParameterPath> FindOrderByParameters(ParameterInfo[] methodParameters)
+        {
+            return methodParameters.Where(p =>
+                IsOrderByAttributeParameter(p) ||
+                IsDynamicOrderByParameter(p) ||
+                IsOrderByDirectionParameter(p)).Select(p => new ParameterPath()
+            {
+                Parameter = p
+            }).ToList();
+        }
+
         private static ParameterPath GetParameterPathWithAttribute<TAttribute>(ParameterInfo[] methodParameters)
             where TAttribute : Attribute
         {
@@ -307,7 +316,7 @@ namespace SigQL
             var offsetClause = new OffsetClause();
             if (offsetParameter != null)
             {
-                var offsetSqlParameterName = offsetParameter.GenerateSuggestedSqlParameterName();
+                var offsetSqlParameterName = offsetParameter.GenerateSuggestedSqlIdentifierName();
                 offsetParameter.SqlParameterName = offsetSqlParameterName;
                 parameterPaths.Add(offsetParameter);
                 offsetClause.OffsetCount = new NamedParameterIdentifier() {Name = offsetSqlParameterName};
@@ -319,7 +328,7 @@ namespace SigQL
 
             if (fetchParameter != null)
             {
-                var fetchSqlParameterName = fetchParameter.GenerateSuggestedSqlParameterName();
+                var fetchSqlParameterName = fetchParameter.GenerateSuggestedSqlIdentifierName();
                 fetchParameter.SqlParameterName = fetchSqlParameterName;
                 parameterPaths.Add(fetchParameter);
                 offsetClause.Fetch = new FetchClause()
@@ -346,24 +355,24 @@ namespace SigQL
             return p.GetCustomAttribute<OrderByAttribute>() != null;
         }
 
-        private static bool IsOrderByDirectionParameter(ParameterInfo p)
+        private static bool IsOrderByDirectionParameter(ParameterPath p)
         {
-            return p.ParameterType == typeof(OrderByDirection);
+            return p.GetEndpointType() == typeof(OrderByDirection);
         }
 
-        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<ParameterInfo> orderByParameters,
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(List<ParameterPath> orderByParameters,
             ITableDefinition primaryTable, TableRelations primaryTableRelations)
         {
             return orderByParameters.Select(p => ConvertToOrderBySpec(p, primaryTable, primaryTableRelations)).ToList();
         }
 
-        private OrderBySpec ConvertToOrderBySpec(ParameterInfo p, ITableDefinition primaryTable,
+        private OrderBySpec ConvertToOrderBySpec(ParameterPath parameterPath, ITableDefinition primaryTable,
             TableRelations primaryTableRelations)
         {
             Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
-            if (IsOrderByAttributeParameter(p))
+            var orderByAttribute = parameterPath.GetEndpointAttribute<OrderByAttribute>();
+            if (orderByAttribute != null)
             {
-                var orderByAttribute = p.GetCustomAttribute<OrderByAttribute>();
                 var matchingRelation = primaryTableRelations.Find(orderByAttribute.Table);
                 var table = matchingRelation.Alias;
 
@@ -373,26 +382,26 @@ namespace SigQL
                 {
                     TableName = table,
                     ColumnName = column,
-                    Parameter = p,
+                    ParameterPath = parameterPath,
                     IsDynamic = false,
                     IsCollection = false
                 };
             }
-            else if (IsOrderByDirectionParameter(p))
+            else if (IsOrderByDirectionParameter(parameterPath))
             {
-                var column = primaryTable.Columns.FindByName(p.Name);
+                var column = primaryTable.Columns.FindByName(parameterPath.GetEndpointColumnName());
 
                 if (column == null)
                 {
                     throw new InvalidIdentifierException(
-                        $"Unable to identify matching database column for order by parameter \"{p.Name}\". Column \"{p.Name}\" does not exist in table {primaryTable.Name}.");
+                        $"Unable to identify matching database column for order by parameter \"{parameterPath.GenerateClassQualifiedName()}\". Column \"{parameterPath.GetEndpointColumnName()}\" does not exist in table {primaryTable.Name}.");
                 }
 
                 return new OrderBySpec(resolveTableAlias)
                 {
                     TableName = primaryTableRelations.Alias,
                     ColumnName = column.Name,
-                    Parameter = p,
+                    ParameterPath = parameterPath,
                     IsDynamic = false,
                     IsCollection = false
                 };
@@ -401,9 +410,9 @@ namespace SigQL
             {
                 return new OrderBySpec(resolveTableAlias)
                 {
-                    Parameter = p,
+                    ParameterPath = parameterPath,
                     IsDynamic = true,
-                    IsCollection = p.ParameterType.IsCollectionType()
+                    IsCollection = parameterPath.GetEndpointType().IsCollectionType()
                 };
 
             }
@@ -895,9 +904,9 @@ namespace SigQL
 
             public string TableName { get; set; }
             public string ColumnName { get; set; }
-            public ParameterInfo Parameter { get; set; }
             public bool IsDynamic { get; set; }
             public bool IsCollection { get; set; }
+            public ParameterPath ParameterPath { get; set; }
 
             public string ResolveTableAlias(string tableName)
             {
@@ -913,12 +922,13 @@ namespace SigQL
                 {
                     if (!p.IsDynamic)
                     {
-                        var tokenName = $"{p.Parameter.Name}_OrderByDirection";
+                        var tokenName = $"{p.ParameterPath.SqlParameterName}_OrderByDirection";
 
                         var orderByNode = new OrderByIdentifier() { Direction = $"{{{tokenName}}}" };
                         tokens.Add(new TokenPath()
                         {
-                            Parameter = p.Parameter,
+                            Parameter = p.ParameterPath.Parameter,
+                            Properties = p.ParameterPath.Properties,
                             UpdateNodeFunc = (parameterValue, parameterArg) =>
                             {
                                 var directionString = "asc";
@@ -952,12 +962,13 @@ namespace SigQL
         private IEnumerable<OrderByIdentifier> BuildDynamicOrderByIdentifier(OrderByClause orderByClause,
              List<TokenPath> tokens, OrderBySpec p)
         {
-            var tokenName = $"{p.Parameter.Name}_OrderBy";
+            var tokenName = $"{p.ParameterPath.GenerateSuggestedSqlIdentifierName()}_OrderBy";
 
             List<OrderByIdentifier> orderByClauses = new List<OrderByIdentifier>();
             tokens.Add(new TokenPath()
             {
-                Parameter = p.Parameter,
+                Parameter = p.ParameterPath.Parameter,
+                Properties = p.ParameterPath.Properties,
                 UpdateNodeFunc = (parameterValue, parameterArg) =>
                 {
                     var orderBys = p.IsCollection ? parameterValue as IEnumerable<IOrderBy> : (parameterValue as IOrderBy).AsEnumerable();
@@ -973,12 +984,12 @@ namespace SigQL
                         var tableIdentifier = this.databaseConfiguration.Tables.FindByName(orderBy.Table);
                         if (tableIdentifier == null)
                         {
-                            throw new InvalidIdentifierException($"Unable to identify matching database table for order by parameter {p.Parameter.Name} with specified table name \"{orderBy.Table}\". Table {orderBy.Table} could not be found.");
+                            throw new InvalidIdentifierException($"Unable to identify matching database table for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified table name \"{orderBy.Table}\". Table {orderBy.Table} could not be found.");
                         }
 
                         if (tableIdentifier.Columns.FindByName(orderBy.Column) == null)
                         {
-                            throw new InvalidIdentifierException($"Unable to identify matching database column for order by parameter {p.Parameter.Name} with specified column name \"{orderBy.Column}\". Column {orderBy.Column} does not exist in table {tableIdentifier.Name}.");
+                            throw new InvalidIdentifierException($"Unable to identify matching database column for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified column name \"{orderBy.Column}\". Column {orderBy.Column} does not exist in table {tableIdentifier.Name}.");
                         }
 
                         var orderByNode = new OrderByIdentifier()
@@ -1164,15 +1175,39 @@ namespace SigQL
         public string SqlParameterName { get; set; }
         public ParameterInfo Parameter { get; set; }
         public IEnumerable<PropertyInfo> Properties { get; set; }
+        
         public Type GetEndpointType()
         {
             if (Properties != null && Properties.Any()) return Properties.Last().PropertyType;
             return Parameter.ParameterType;
         }
 
-        public string GenerateSuggestedSqlParameterName()
+        public T GetEndpointAttribute<T>()
+            where T: Attribute
+        {
+            if (Properties != null && Properties.Any()) return Properties.Last().GetCustomAttribute<T>();
+            return Parameter.GetCustomAttribute<T>();
+        }
+
+        public string GenerateSuggestedSqlIdentifierName()
         {
             return $"{Parameter.Name}{(Properties != null ? string.Join("_", Properties.Select(p => p.Name)) : null)}";
+        }
+
+        public string GenerateClassQualifiedName()
+        {
+            return $"{Parameter.Name}{(Properties != null ? "." + string.Join(".", Properties.Select(p => p.Name)) : null)}";
+        }
+
+        public string GetEndpointColumnName()
+        {
+            var columnAttribute = this.GetEndpointAttribute<ColumnAttribute>();
+            if (columnAttribute != null)
+            {
+                return columnAttribute.ColumnName;
+            }
+            if (Properties != null && Properties.Any()) return Properties.Last().Name;
+            return Parameter.Name;
         }
     }
 
