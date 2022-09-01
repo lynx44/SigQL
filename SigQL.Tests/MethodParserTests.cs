@@ -577,7 +577,7 @@ namespace SigQL.Tests
         [TestMethod]
         public void OrderByDirectionViaClassFilter_ReturnsExpectedSql()
         {
-            var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsViaClassFilter(new WorkLog.OrderByDirectionStartDate()));
+            var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsViaClassFilter(new WorkLog.OrderByDirectionStartDate() { StartDate = OrderByDirection.Ascending }));
 
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by \"WorkLog\".\"StartDate\" asc", sql);
         }

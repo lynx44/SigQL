@@ -25,7 +25,7 @@ namespace SigQL
         {
             var projectionType = OutputFactory.UnwrapType(outputType);
 
-            var fromClauseRelations = this.databaseResolver.BuildTableRelationsFromType(projectionType);
+            var fromClauseRelations = this.databaseResolver.BuildTableRelationsFromType(projectionType, ColumnFilters.FromClause);
 
             var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
 

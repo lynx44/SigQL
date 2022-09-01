@@ -349,7 +349,7 @@ namespace SigQL
                     }
                     
                     var parameterInfo = tableTypeParameters.Single();
-                    var tableRelations = this.databaseResolver.BuildTableRelationsFromType(parameterInfo.ParameterType);
+                    var tableRelations = this.databaseResolver.BuildTableRelationsFromType(parameterInfo.ParameterType, ColumnFilters.WhereClause);
                     insertSpec.ColumnParameters = tableRelations.ProjectedColumns.Select(pc =>
                         new InsertColumnParameter()
                         {

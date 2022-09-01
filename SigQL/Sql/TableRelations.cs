@@ -66,7 +66,7 @@ namespace SigQL.Sql
     internal class ColumnDefinitionWithPath : IColumnDefinition
     {
         private readonly IColumnDefinition columnDefinition;
-        public ParameterInfo Parameter { get; }
+        public ParameterInfo Parameter { get; set; }
         public PropertyInfo Property { get; }
 
         public string Name => columnDefinition.Name;

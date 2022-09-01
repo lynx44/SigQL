@@ -93,7 +93,7 @@ namespace SigQL
                 FromClause = fromClause
             };
 
-            var orderByParameters = FindOrderByParameters(methodParameters);
+            var orderByParameters = FindOrderByParameters(projectionType, methodParameters);
             IEnumerable<OrderBySpec> orderBySpecs = ConvertToOrderBySpecs(orderByParameters, primaryTable, fromClauseRelations);
             if (orderBySpecs.Any())
             {
@@ -225,15 +225,17 @@ namespace SigQL
             return sqlStatement;
         }
 
-        private List<ParameterPath> FindOrderByParameters(ParameterInfo[] methodParameters)
+        private TableRelations FindOrderByParameters(Type projectionType, ParameterInfo[] methodParameters)
         {
-            return methodParameters.Where(p =>
-                IsOrderByAttributeParameter(p) ||
-                IsDynamicOrderByParameter(p) ||
-                IsOrderByDirectionParameter(p)).Select(p => new ParameterPath()
-            {
-                Parameter = p
-            }).ToList();
+            var orderByTableRelations = this.databaseResolver.BuildTableRelations(projectionType, methodParameters, ColumnFilters.OrderBy);
+            return orderByTableRelations;
+            //return methodParameters.Where(p =>
+            //    IsOrderByAttributeParameter(p) ||
+            //    IsDynamicOrderByParameter(p) ||
+            //    IsOrderByDirectionParameter(p)).Select(p => new ParameterPath()
+            //    {
+            //        Parameter = p
+            //    }).ToList();
         }
 
         private static ParameterPath GetParameterPathWithAttribute<TAttribute>(ParameterInfo[] methodParameters)
@@ -360,10 +362,11 @@ namespace SigQL
             return p.GetEndpointType() == typeof(OrderByDirection);
         }
 
-        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(List<ParameterPath> orderByParameters,
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(TableRelations orderByParameters,
             ITableDefinition primaryTable, TableRelations primaryTableRelations)
         {
-            return orderByParameters.Select(p => ConvertToOrderBySpec(p, primaryTable, primaryTableRelations)).ToList();
+            var parameterPaths = this.databaseResolver.ProjectedColumnsToParameterPaths(orderByParameters, new List<PropertyInfo>());
+            return parameterPaths.Select(p => ConvertToOrderBySpec(p, primaryTable, primaryTableRelations)).ToList();
         }
 
         private OrderBySpec ConvertToOrderBySpec(ParameterPath parameterPath, ITableDefinition primaryTable,
@@ -470,7 +473,7 @@ namespace SigQL
                             {
                                 var filterComparisons = parameter.Type.GetProperties().Where(p => !this.databaseResolver.IsTableOrTableProjection(p.PropertyType)).SelectMany(property =>
                                 {
-                                    if (!this.databaseResolver.IsDecoratedNonColumn(property))
+                                    if (!ColumnAttributes.IsDecoratedNonColumn(property))
                                     {
                                         var parameterName = property.Name;
 
@@ -886,7 +889,7 @@ namespace SigQL
                     else
                         // this is referencing a foreign table, reference the table
                     {
-                        return BuildWhereOperationsForJoinTables(this.databaseResolver.BuildTableRelationsFromType(parameter.Type), parameterPaths, parameter.ParameterInfo, new List<PropertyInfo>());
+                        return BuildWhereOperationsForJoinTables(this.databaseResolver.BuildTableRelationsFromType(parameter.Type, ColumnFilters.WhereClause), parameterPaths, parameter.ParameterInfo, new List<PropertyInfo>());
                     }
                             
                 })
@@ -922,7 +925,7 @@ namespace SigQL
                 {
                     if (!p.IsDynamic)
                     {
-                        var tokenName = $"{p.ParameterPath.SqlParameterName}_OrderByDirection";
+                        var tokenName = $"{p.ParameterPath.GenerateSuggestedSqlIdentifierName()}_OrderByDirection";
 
                         var orderByNode = new OrderByIdentifier() { Direction = $"{{{tokenName}}}" };
                         tokens.Add(new TokenPath()
