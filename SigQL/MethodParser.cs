@@ -229,13 +229,6 @@ namespace SigQL
         {
             var orderByTableRelations = this.databaseResolver.BuildTableRelations(projectionType, methodParameters, ColumnFilters.OrderBy);
             return orderByTableRelations;
-            //return methodParameters.Where(p =>
-            //    IsOrderByAttributeParameter(p) ||
-            //    IsDynamicOrderByParameter(p) ||
-            //    IsOrderByDirectionParameter(p)).Select(p => new ParameterPath()
-            //    {
-            //        Parameter = p
-            //    }).ToList();
         }
 
         private static ParameterPath GetParameterPathWithAttribute<TAttribute>(ParameterInfo[] methodParameters)

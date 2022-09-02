@@ -663,7 +663,7 @@ namespace SigQL
                  }).ToList();
             var navigationParameterPaths = tableRelations.NavigationTables.SelectMany(t =>
                 ProjectedColumnsToParameterPaths(t,
-                    parentPropertyPath.AppendOne(t.ParentColumnField.Property).ToList()));
+                    t.ParentColumnField != null ? parentPropertyPath.AppendOne(t.ParentColumnField.Property).ToList() : parentPropertyPath));
 
             return tableParameterPaths.Concat(navigationParameterPaths).ToList();
         }
