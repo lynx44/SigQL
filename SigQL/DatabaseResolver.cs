@@ -283,15 +283,29 @@ namespace SigQL
             var columns = columnDescriptions.Where(t => !t.IsTable)
                 .Select(d =>
                 {
-                    var tableColumn = tableDefinition.Columns.FindByName(d.Column.Name);
+                    var columnName = d.Column.Parameter != null ? GetColumnName(d.Column.Parameter) : GetColumnName(d.Column.Property);
+                    var tableColumn = tableDefinition.Columns.FindByName(columnName);
                     if (tableColumn == null)
                     {
-                        if(IsColumnType(d.Column.Property.PropertyType))
-                            throw new InvalidIdentifierException(
-                                $"Unable to identify matching database column for property {GetParentTableClassQualifiedNameForType(tableType)}.{d.Column.Property.Name}. Column {d.Column.Name} does not exist in table {tableDefinition.Name}.");
+                        if (d.Column.Property != null)
+                        {
+                            if (IsColumnType(d.Column.Property.PropertyType))
+                                throw new InvalidIdentifierException(
+                                    $"Unable to identify matching database column for property {GetParentTableClassQualifiedNameForType(tableType)}.{d.Column.Property.Name}. Column {d.Column.Name} does not exist in table {tableDefinition.Name}.");
+                            else
+                                throw new InvalidIdentifierException(
+                                    $"Unable to identify matching database table for property {GetParentTableClassQualifiedNameForType(tableType)}.{d.Column.Property.Name} of type {d.Column.Property.PropertyType}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(d.Column.Property.PropertyType))} does not exist.");
+                        }
                         else
-                            throw new InvalidIdentifierException(
-                                $"Unable to identify matching database table for property {GetParentTableClassQualifiedNameForType(tableType)}.{d.Column.Property.Name} of type {d.Column.Property.PropertyType}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(d.Column.Property.PropertyType))} does not exist.");
+                        {
+                            if (IsColumnType(d.Column.Parameter.ParameterType))
+                                throw new InvalidIdentifierException(
+                                    $"Unable to identify matching database column for parameter {d.Column.Parameter.Name}. Column {d.Column.Name} does not exist in table {tableDefinition.Name}.");
+                            else
+                                throw new InvalidIdentifierException(
+                                    $"Unable to identify matching database table for parameter {d.Column.Parameter.Name} of type {d.Column.Parameter.ParameterType}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(d.Column.Parameter.ParameterType))} does not exist.");
+                        }
+                        
                     }
                     return d.Column.Parameter != null
                             ? new ColumnDefinitionWithPath(tableColumn,
@@ -639,7 +653,8 @@ namespace SigQL
                 specInfo.IgnoreIfNull = customAttributes.Any(c => c.AttributeType == typeof(IgnoreIfNullAttribute));
                 specInfo.IgnoreIfNullOrEmpty = customAttributes.Any(c => c.AttributeType == typeof(IgnoreIfNullOrEmptyAttribute));
                 // pull this from ViaRelation as well, if it has a . near the end OR decorate with both
-                specInfo.ColumnName = customAttributes.Where(c => c.AttributeType == typeof(ColumnAttribute)).Select(c => c.ConstructorArguments.First().Value as string).FirstOrDefault();
+                specInfo.ColumnName = customAttributes.Where(c => c.AttributeType == typeof(ColumnAttribute)).Select(c => c.ConstructorArguments.First().Value as string).FirstOrDefault() ??
+                                      customAttributes.Where(c => c.AttributeType == typeof(OrderByAttribute)).Select(c => c.ConstructorArguments.Skip(1).First().Value as string).FirstOrDefault();
                 specInfo.Not = customAttributes.Any(c => c.AttributeType == typeof(NotAttribute));
                 specInfo.GreaterThan = customAttributes.Any(c => c.AttributeType == typeof(GreaterThanAttribute));
                 specInfo.GreaterThanOrEqual = customAttributes.Any(c => c.AttributeType == typeof(GreaterThanOrEqualAttribute));
@@ -770,19 +785,23 @@ namespace SigQL
         public static bool IsOrderBy(PropertyInfo property)
         {
             return property?.GetCustomAttribute<OrderByAttribute>() != null ||
-                property?.PropertyType == typeof(OrderByDirection) ||
-                (((property?.PropertyType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
-                  ((property?.PropertyType)?.IsAssignableFrom(
-                      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
+                property?.PropertyType == typeof(OrderByDirection) 
+                //||
+                //(((property?.PropertyType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
+                //  ((property?.PropertyType)?.IsAssignableFrom(
+                //      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false))
+                ;
         }
 
         public static bool IsOrderBy(ParameterInfo parameter)
         {
             return parameter?.GetCustomAttribute<OrderByAttribute>() != null ||
-                parameter?.ParameterType == typeof(OrderByDirection) ||
-                (((parameter?.ParameterType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
-                  ((parameter?.ParameterType)?.IsAssignableFrom(
-                      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
+                parameter?.ParameterType == typeof(OrderByDirection) 
+                //||
+                //(((parameter?.ParameterType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
+                //  ((parameter?.ParameterType)?.IsAssignableFrom(
+                //      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false))
+                ;
         }
     }
 }

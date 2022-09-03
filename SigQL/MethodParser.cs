@@ -93,8 +93,12 @@ namespace SigQL
                 FromClause = fromClause
             };
 
-            var orderByParameters = FindOrderByParameters(projectionType, methodParameters);
-            IEnumerable<OrderBySpec> orderBySpecs = ConvertToOrderBySpecs(orderByParameters, primaryTable, fromClauseRelations);
+            var orderByParameters = FindOrderByTableRelations(projectionType, methodParameters);
+            
+            var orderBySpecs = ConvertToOrderBySpecs(orderByParameters, primaryTable, fromClauseRelations).ToList();
+            var dynamicOrderByParameterPaths = this.FindDynamicOrderByParameterPaths(methodParameters);
+            var dynamicOrderBySpecs = ConvertToOrderBySpecs(dynamicOrderByParameterPaths, primaryTable, fromClauseRelations);
+            orderBySpecs.AddRange(dynamicOrderBySpecs);
             if (orderBySpecs.Any())
             {
                 statement.OrderByClause = BuildOrderByClause(null, orderBySpecs, tokens);
@@ -225,12 +229,42 @@ namespace SigQL
             return sqlStatement;
         }
 
-        private TableRelations FindOrderByParameters(Type projectionType, ParameterInfo[] methodParameters)
+        private TableRelations FindOrderByTableRelations(Type projectionType, ParameterInfo[] methodParameters)
         {
             var orderByTableRelations = this.databaseResolver.BuildTableRelations(projectionType, methodParameters, ColumnFilters.OrderBy);
             return orderByTableRelations;
         }
 
+        private IEnumerable<IArgument> FindMatchingArguments(IEnumerable<IArgument> arguments,
+            Func<IArgument, bool> matchCondition)
+        {
+            var matches = new List<IArgument>();
+            var matchingArguments = arguments.Where(a => matchCondition(a)).ToList();
+            matches.AddRange(matchingArguments);
+            matches.AddRange(arguments.SelectMany(a => FindMatchingArguments(a.ClassProperties, matchCondition)).ToList());
+
+            return matches;
+        }
+
+        private IEnumerable<ParameterPath> FindDynamicOrderByParameterPaths(ParameterInfo[] parameters)
+        {
+            var orderByArguments = FindMatchingArguments(parameters.AsArguments(this.databaseResolver), a => a.Type.IsAssignableFrom(typeof(OrderBy)) ||
+                a.Type.IsAssignableFrom(typeof(IEnumerable<OrderBy>)));
+            var parameterPaths = orderByArguments.Select(a =>
+            {
+                var pathToRoot = a.PathToRoot();
+                var parameterArg = pathToRoot.First();
+                var propertyArgs = pathToRoot.Skip(1).ToList();
+                return new ParameterPath()
+                {
+                    Parameter = parameterArg.GetParameterInfo(),
+                    Properties = propertyArgs.Select(p => p.GetPropertyInfo()).ToList()
+                };
+            }).ToList();
+
+            return parameterPaths;
+        }
+        
         private static ParameterPath GetParameterPathWithAttribute<TAttribute>(ParameterInfo[] methodParameters)
             where TAttribute : Attribute
         {
@@ -360,6 +394,20 @@ namespace SigQL
         {
             var parameterPaths = this.databaseResolver.ProjectedColumnsToParameterPaths(orderByParameters, new List<PropertyInfo>());
             return parameterPaths.Select(p => ConvertToOrderBySpec(p, primaryTable, primaryTableRelations)).ToList();
+        }
+        
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<ParameterPath> dynamicOrderByParameterPaths, ITableDefinition primaryTable, TableRelations primaryTableRelations)
+        {
+            Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
+            return dynamicOrderByParameterPaths.Select(parameterPath =>
+            {
+                return new OrderBySpec(resolveTableAlias)
+                {
+                    ParameterPath = parameterPath,
+                    IsDynamic = true,
+                    IsCollection = parameterPath.GetEndpointType().IsCollectionType()
+                };
+            }).ToList();
         }
 
         private OrderBySpec ConvertToOrderBySpec(ParameterPath parameterPath, ITableDefinition primaryTable,
@@ -1192,7 +1240,7 @@ namespace SigQL
 
         public string GenerateClassQualifiedName()
         {
-            return $"{Parameter.Name}{(Properties != null ? "." + string.Join(".", Properties.Select(p => p.Name)) : null)}";
+            return $"{Parameter.Name}{(Properties != null && Properties.Any() ? "." + string.Join(".", Properties.Select(p => p.Name)) : null)}";
         }
 
         public string GetEndpointColumnName()
@@ -1295,5 +1343,122 @@ namespace SigQL
             Type = type;
             ParameterInfo = parameterInfo;
         }
+    }
+
+    /// <summary>
+    /// Generic class that wraps common accessors for
+    /// ParameterInfo and PropertyInfo
+    /// </summary>
+    internal interface IArgument
+    {
+        Type Type { get; }
+        string Name { get; }
+        TAttribute GetCustomAttribute<TAttribute>()
+            where TAttribute : Attribute;
+
+        IEnumerable<IArgument> ClassProperties { get; }
+
+        IArgument Parent { get; }
+
+        ParameterInfo GetParameterInfo();
+        PropertyInfo GetPropertyInfo();
+    }
+
+    internal static class MethodInfoExtensions
+    {
+        public static IEnumerable<IArgument> GetArguments(this MethodInfo method, DatabaseResolver databaseResolver)
+        {
+            return method.GetParameters().Select(p => new ParameterArgument(p, databaseResolver)).ToList();
+        }
+        public static IEnumerable<IArgument> AsArguments(this IEnumerable<ParameterInfo> parameters, DatabaseResolver databaseResolver)
+        {
+            return parameters.Select(p => new ParameterArgument(p, databaseResolver)).ToList();
+        }
+    }
+
+    internal static class IArgumentExtensions
+    {
+        public static IEnumerable<IArgument> PathToRoot(this IArgument argument)
+        {
+            var arguments = new List<IArgument>();
+            do
+            {
+                arguments.Add(argument);
+                argument = argument.Parent;
+            } while (argument != null);
+
+            return arguments;
+        }
+    }
+
+    internal class ParameterArgument : IArgument
+    {
+        public IArgument Parent { get; }
+        public ParameterInfo GetParameterInfo()
+        {
+            return this.parameterInfo;
+        }
+
+        public PropertyInfo GetPropertyInfo()
+        {
+            throw new InvalidOperationException("Argument is a paramter, not a property");
+        }
+
+        private readonly ParameterInfo parameterInfo;
+        private readonly DatabaseResolver databaseResolver;
+
+        public ParameterArgument(ParameterInfo parameterInfo, DatabaseResolver databaseResolver)
+        {
+            this.parameterInfo = parameterInfo;
+            this.databaseResolver = databaseResolver;
+        }
+
+        public Type Type => parameterInfo.ParameterType;
+        public string Name => parameterInfo.Name;
+        public TAttribute GetCustomAttribute<TAttribute>()
+            where TAttribute : Attribute
+        {
+            return parameterInfo.GetCustomAttribute<TAttribute>();
+        }
+
+        public IEnumerable<IArgument> ClassProperties =>
+            this.databaseResolver.IsTableOrTableProjection(this.Type)
+                ? this.Type.GetProperties().Select(p => new PropertyArgument(p, this, databaseResolver)).ToList()
+                : new List<PropertyArgument>();
+    }
+
+    internal class PropertyArgument : IArgument
+    {
+        public IArgument Parent { get; }
+        public ParameterInfo GetParameterInfo()
+        {
+            throw new InvalidOperationException("Argument is a property, not a parameter");
+        }
+
+        public PropertyInfo GetPropertyInfo()
+        {
+            return this.propertyInfo;
+        }
+
+        private readonly PropertyInfo propertyInfo;
+        private readonly DatabaseResolver databaseResolver;
+
+        public PropertyArgument(PropertyInfo propertyInfo, IArgument parent, DatabaseResolver databaseResolver)
+        {
+            Parent = parent;
+            this.propertyInfo = propertyInfo;
+            this.databaseResolver = databaseResolver;
+        }
+
+        public Type Type => propertyInfo.PropertyType;
+        public string Name => propertyInfo.Name;
+        public TAttribute GetCustomAttribute<TAttribute>() where TAttribute : Attribute
+        {
+            return propertyInfo.GetCustomAttribute<TAttribute>();
+        }
+        public IEnumerable<IArgument> ClassProperties =>
+            this.databaseResolver.IsTableOrTableProjection(this.Type)
+                ? this.Type.GetProperties().Select(p => new PropertyArgument(p, this, databaseResolver)).ToList()
+                : new List<PropertyArgument>();
     }
 }

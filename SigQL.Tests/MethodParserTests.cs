@@ -668,10 +668,9 @@ namespace SigQL.Tests
         [TestMethod]
         public void Offset_RetainsOrderBy_ReturnsExpectedSql()
         {
-            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetNextWorkLogsWithOrder));
-            var sql = GetSqlFor(methodInfo);
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithOrder(1, OrderByDirection.Ascending));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog0\".\"Id\" from \"WorkLog\" \"WorkLog0\" order by \"WorkLog0\".\"StartDate\" {order_OrderByDirection} offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on ((\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\")) left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog0\".\"Id\" from \"WorkLog\" \"WorkLog0\" order by \"WorkLog0\".\"StartDate\" asc offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on ((\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\")) left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
         }
 
         [TestMethod]
@@ -1386,7 +1385,7 @@ namespace SigQL.Tests
                     catch (InvalidIdentifierException ex)
                     {
                         Assert.AreEqual(
-                            "Unable to identify matching database column for order by parameter \"theStartDate\". Column \"theStartDate\" does not exist in table WorkLog.",
+                            "Unable to identify matching database column for parameter theStartDate. Column theStartDate does not exist in table WorkLog.",
                             ex.Message);
                         throw;
                     }
