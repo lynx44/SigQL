@@ -1299,6 +1299,63 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void GetOrderedViaDescendingDynamicEnumerableOrderByViaClassFilterProperty()
+        {
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 1, 1) });
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 3, 1) });
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 1, 1) });
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2019, 1, 1) });
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2022, 1, 1) });
+            this.laborDbContext.SaveChanges();
+            var expected = this.laborDbContext.WorkLog.OrderBy(w => w.StartDate).ThenByDescending(w => w.Id).Select(wl => wl.Id).ToList();
+            var actual = this.monolithicRepository.GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(
+                new WorkLog.DynamicOrderByEnumerable()
+                {
+                    OrderBys = new List<OrderBy>()
+                    {
+                        new OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate), OrderByDirection.Ascending),
+                        new OrderBy(nameof(WorkLog), nameof(WorkLog.Id), OrderByDirection.Descending)
+                    }
+                }).Select(wl => wl.Id).ToList();
+
+            AreSame(expected, actual);
+        }
+
+        [TestMethod]
+        public void GetOrderedViaDescendingDynamicEnumerableOrderByViaClassFilterProperty_EmptyCollection()
+        {
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 1, 1) });
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 3, 1) });
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 1, 1) });
+            this.laborDbContext.SaveChanges();
+            var expected = this.laborDbContext.WorkLog.Select(wl => wl.Id).ToList();
+            var actual = this.monolithicRepository.GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(
+                new WorkLog.DynamicOrderByEnumerable()
+                {
+                    OrderBys = new List<OrderBy>()
+                }).Select(wl => wl.Id).ToList();
+
+            AreSame(expected, actual);
+        }
+
+        [TestMethod]
+        public void GetOrderedViaDescendingDynamicEnumerableOrderByViaClassFilterProperty_NullCollection()
+        {
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 1, 1) });
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 3, 1) });
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 1, 1) });
+            this.laborDbContext.SaveChanges();
+            var expected = this.laborDbContext.WorkLog.Select(wl => wl.Id).ToList();
+            var actual = this.monolithicRepository.GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(
+                new WorkLog.DynamicOrderByEnumerable()
+                {
+                    OrderBys = null
+                }).Select(wl => wl.Id).ToList();
+
+            AreSame(expected, actual);
+        }
+
+        [TestMethod]
         public void GetOrderedViaNestedNavigationProperty()
         {
             this.laborDbContext.WorkLog.Add(new EFWorkLog()

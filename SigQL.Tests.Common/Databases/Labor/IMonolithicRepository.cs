@@ -54,6 +54,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         //IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsGenericType<TOrder>(OrderBy<TOrder> direction = null);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicOrderBy(IOrderBy order);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicEnumerableOrderBy(IEnumerable<IOrderBy> orders);
+        IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(WorkLog.DynamicOrderByEnumerable filter);
+
         IEnumerable<WorkLog.IWorkLogWithEmployeeWithAddress> GetWorkLogsOrderedByAddressId([OrderBy(nameof(Address), nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithLike(Like name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithStartsWith([StartsWith] string name);

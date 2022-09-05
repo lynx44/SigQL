@@ -252,7 +252,7 @@ namespace SigQL
                 a.Type.IsAssignableFrom(typeof(IEnumerable<OrderBy>)));
             var parameterPaths = orderByArguments.Select(a =>
             {
-                var pathToRoot = a.PathToRoot();
+                var pathToRoot = a.PathToRoot().Reverse();
                 var parameterArg = pathToRoot.First();
                 var propertyArgs = pathToRoot.Skip(1).ToList();
                 return new ParameterPath()

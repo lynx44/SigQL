@@ -772,14 +772,18 @@ namespace SigQL
                 property.GetCustomAttribute<OffsetAttribute>() != null ||
                 property.GetCustomAttribute<FetchAttribute>() != null ||
                 property.GetCustomAttribute<ClrOnlyAttribute>() != null ||
-                IsOrderBy(property);
+                IsOrderBy(property) ||
+                IsDynamicOrderBy(property)
+                ;
         }
         public static bool IsDecoratedNonColumn(ParameterInfo parameter)
         {
             return
                 parameter?.GetCustomAttribute<OffsetAttribute>() != null ||
                 parameter?.GetCustomAttribute<FetchAttribute>() != null ||
-                parameter?.GetCustomAttribute<ClrOnlyAttribute>() != null;
+                parameter?.GetCustomAttribute<ClrOnlyAttribute>() != null ||
+                IsOrderBy(parameter) ||
+                IsDynamicOrderBy(parameter);
         }
 
         public static bool IsOrderBy(PropertyInfo property)
@@ -802,6 +806,22 @@ namespace SigQL
                 //  ((parameter?.ParameterType)?.IsAssignableFrom(
                 //      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false))
                 ;
+        }
+
+        public static bool IsDynamicOrderBy(PropertyInfo property)
+        {
+            return
+                (((property?.PropertyType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
+                  ((property?.PropertyType)?.IsAssignableFrom(
+                      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
+        }
+
+        public static bool IsDynamicOrderBy(ParameterInfo parameter)
+        {
+            return
+                (((parameter?.ParameterType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
+                  ((parameter?.ParameterType)?.IsAssignableFrom(
+                      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
         }
     }
 }

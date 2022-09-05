@@ -637,6 +637,46 @@ namespace SigQL.Tests
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\"", sql);
         }
 
+        [TestMethod]
+        public void OrderByDynamicEnumerableViaClassFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(
+               new WorkLog.DynamicOrderByEnumerable()
+               {
+                   OrderBys = new List<OrderBy>()
+                   {
+                       new OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate), OrderByDirection.Ascending),
+                       new OrderBy(nameof(WorkLog), nameof(WorkLog.Id), OrderByDirection.Descending)
+                   }
+               }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by \"WorkLog\".\"StartDate\" asc, \"WorkLog\".\"Id\" desc", sql);
+        }
+
+        [TestMethod]
+        public void OrderByDynamicEnumerableViaClassFilter_EmptyCollection_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(
+                new WorkLog.DynamicOrderByEnumerable()
+                {
+                    OrderBys = new List<OrderBy>()
+                }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\"", sql);
+        }
+
+        [TestMethod]
+        public void OrderByDynamicEnumerableViaClassFilter_NullCollection_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(
+                new WorkLog.DynamicOrderByEnumerable()
+                {
+                    OrderBys = null
+                }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\"", sql);
+        }
+
         //[TestMethod]
         //public void OrderBy_ThrowsExceptionForTypeWithMultipleProperties()
         //{
