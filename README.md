@@ -592,10 +592,10 @@ The below list documents all features applicable to input parameters (WHERE clau
 | [EndsWith] | Yes | Yes | Yes |
 | [Not] | Yes | Yes | Yes |
 | [Offset] | Yes | Yes | No |
-| [Parameter] | Yes| No (planned) | No |
-| [Set] | Yes| Yes (cannot mix with filter properties) | No |
-| [ViaRelation] | Yes| No (planned) | No |
-| OrderByDirection | Yes | No (planned) | No |
+| [Parameter] | Yes | No (planned) | No |
+| [Set] | Yes | Yes (cannot mix with filter properties) | No |
+| [ViaRelation] | Yes| Yes | No |
+| OrderByDirection | Yes | Yes | No |
 | IEnumerable<> (IN clause) | Yes | Yes | Yes |
 
 #### Output Matrix
