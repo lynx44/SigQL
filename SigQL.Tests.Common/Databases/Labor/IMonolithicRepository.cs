@@ -82,6 +82,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddress([ViaRelation(nameof(Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address) + "." + nameof(Address.StreetAddress))] string streetAddress);
         IEnumerable<Employee.IEmployeeId> EF_GetEmployeeIdsForStreetAddress([ViaRelation(nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address) + "." + nameof(Address.StreetAddress))] string streetAddress);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameWithDifferingParameterName([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))] string theEmployeeName);
+        IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForWorkLogLocationIdClassFilter(Employee.WorkLogLocationIdFilterViaRelation filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameViaClassFilter(WorkLog.EmployeeNameViaRelationFilter filter);
+        IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddressViaClassFilter(Employee.StreetAddressFilterViaRelation filter);
+        IEnumerable<Employee.IEmployeeId> EF_GetEmployeeIdsForStreetAddressViaClassFilter(Employee.EFStreetAddressFilterViaRelation filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameWithDifferingParameterNameViaClassFilter(WorkLog.EmployeeNameFilterWithAliasViaRelation filter);
 
         /// <summary>
         /// This is illegal. The interface T specified in the OrderBy<T> definition must only contain one column,

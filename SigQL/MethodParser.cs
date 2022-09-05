@@ -235,20 +235,9 @@ namespace SigQL
             return orderByTableRelations;
         }
 
-        private IEnumerable<IArgument> FindMatchingArguments(IEnumerable<IArgument> arguments,
-            Func<IArgument, bool> matchCondition)
-        {
-            var matches = new List<IArgument>();
-            var matchingArguments = arguments.Where(a => matchCondition(a)).ToList();
-            matches.AddRange(matchingArguments);
-            matches.AddRange(arguments.SelectMany(a => FindMatchingArguments(a.ClassProperties, matchCondition)).ToList());
-
-            return matches;
-        }
-
         private IEnumerable<ParameterPath> FindDynamicOrderByParameterPaths(ParameterInfo[] parameters)
         {
-            var orderByArguments = FindMatchingArguments(parameters.AsArguments(this.databaseResolver), a => a.Type.IsAssignableFrom(typeof(OrderBy)) ||
+            var orderByArguments = this.databaseResolver.FindMatchingArguments(parameters.AsArguments(this.databaseResolver), a => a.Type.IsAssignableFrom(typeof(OrderBy)) ||
                 a.Type.IsAssignableFrom(typeof(IEnumerable<OrderBy>)));
             var parameterPaths = orderByArguments.Select(a =>
             {
@@ -1362,6 +1351,8 @@ namespace SigQL
 
         ParameterInfo GetParameterInfo();
         PropertyInfo GetPropertyInfo();
+
+        TResult WhenParameter<TResult>(Func<ParameterInfo, TResult> parameterAction, Func<PropertyInfo, TResult> propertyAction);
     }
 
     internal static class MethodInfoExtensions
@@ -1404,6 +1395,11 @@ namespace SigQL
             throw new InvalidOperationException("Argument is a paramter, not a property");
         }
 
+        public TResult WhenParameter<TResult>(Func<ParameterInfo, TResult> parameterAction, Func<PropertyInfo, TResult> propertyAction)
+        {
+            return parameterAction(this.parameterInfo);
+        }
+
         private readonly ParameterInfo parameterInfo;
         private readonly DatabaseResolver databaseResolver;
 
@@ -1439,6 +1435,12 @@ namespace SigQL
         {
             return this.propertyInfo;
         }
+
+        public TResult WhenParameter<TResult>(Func<ParameterInfo, TResult> parameterAction, Func<PropertyInfo, TResult> propertyAction)
+        {
+            return propertyAction(this.propertyInfo);
+        }
+
 
         private readonly PropertyInfo propertyInfo;
         private readonly DatabaseResolver databaseResolver;

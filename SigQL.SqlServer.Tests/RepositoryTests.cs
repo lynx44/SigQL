@@ -1648,6 +1648,130 @@ namespace SigQL.SqlServer.Tests
             AreSame(expected, actual);
         }
 
+        [TestMethod]
+        public void ViaAttributeClassFilter_ManyToOne()
+        {
+            var location1 = new EFLocation();
+            var location2 = new EFLocation();
+            this.laborDbContext.Location.Add(location1);
+            this.laborDbContext.Location.Add(location2);
+            for (int i = 0; i < 5; i++)
+            {
+                var workLog = new EFWorkLog() { Location = i % 2 == 0 ? location1 : location2 };
+                var employee = new EFEmployee();
+                workLog.Employee = employee;
+                
+                this.laborDbContext.WorkLog.Add(workLog);
+            }
+            this.laborDbContext.SaveChanges();
+            var expected = this.laborDbContext.Employee.Where(e => e.WorkLogs.Any(wl => wl.LocationId == location1.Id)).Select(wl => wl.Id).ToList();
+            var actual = this.monolithicRepository.GetEmployeeIdsForWorkLogLocationIdClassFilter(
+                new Employee.WorkLogLocationIdFilterViaRelation()
+                {
+                    LocationId = location1.Id
+                }).Select(wl => wl.Id).ToList();
+
+            AreSame(expected, actual);
+        }
+
+        [TestMethod]
+        public void ViaAttributeClassFilter_OneToMany()
+        {
+            var workLog1 = new EFWorkLog();
+            var employee1 = new EFEmployee() { Name = "Joe" };
+            workLog1.Employee = employee1;
+
+            var workLog2 = new EFWorkLog();
+            var employee2 = new EFEmployee() { Name = "John" };
+            workLog2.Employee = employee2;
+
+            var workLog3 = new EFWorkLog();
+            var employee3 = new EFEmployee() { Name = "John" };
+            workLog3.Employee = employee3;
+            
+            this.laborDbContext.WorkLog.Add(workLog1);
+            this.laborDbContext.WorkLog.Add(workLog2);
+            this.laborDbContext.WorkLog.Add(workLog3);
+            this.laborDbContext.SaveChanges();
+            var expected = this.laborDbContext.WorkLog.Where(wl => wl.Employee.Name == "John").Select(wl => wl.Id).ToList();
+            var actual = this.monolithicRepository.GetWorkLogIdsForEmployeeNameViaClassFilter(
+                new WorkLog.EmployeeNameViaRelationFilter()
+                {
+                    Name = "John"
+                }).Select(wl => wl.Id).ToList();
+
+            AreSame(expected, actual);
+        }
+
+        [TestMethod]
+        public void ViaAttributeClassFilter_OneToMany_WithDifferingParameterName()
+        {
+            var workLog1 = new EFWorkLog();
+            var employee1 = new EFEmployee() { Name = "Joe" };
+            workLog1.Employee = employee1;
+
+            var workLog2 = new EFWorkLog();
+            var employee2 = new EFEmployee() { Name = "John" };
+            workLog2.Employee = employee2;
+
+            var workLog3 = new EFWorkLog();
+            var employee3 = new EFEmployee() { Name = "John" };
+            workLog3.Employee = employee3;
+            
+            this.laborDbContext.WorkLog.Add(workLog1);
+            this.laborDbContext.WorkLog.Add(workLog2);
+            this.laborDbContext.WorkLog.Add(workLog3);
+            this.laborDbContext.SaveChanges();
+            var expected = this.laborDbContext.WorkLog.Where(wl => wl.Employee.Name == "John").Select(wl => wl.Id).ToList();
+            var actual = this.monolithicRepository.GetWorkLogIdsForEmployeeNameWithDifferingParameterNameViaClassFilter(
+                new WorkLog.EmployeeNameFilterWithAliasViaRelation()
+                {
+                    TheEmployeeName = "John"
+                }).Select(wl => wl.Id).ToList();
+
+            AreSame(expected, actual);
+        }
+
+        [TestMethod]
+        public void ViaRelationManyToManyClassFilter_WithIntermediateTableSpecified()
+        {
+            var employee1 = new EFEmployee();
+            var address1 = new EFAddress() { StreetAddress = "456 Melrose" };
+            address1.Employees = new List<EFEmployee>()
+            {
+                employee1
+            };
+
+            var employee2 = new EFEmployee();
+            var address2 = new EFAddress() { StreetAddress = "123 Fake St" };
+            address2.Employees = new List<EFEmployee>()
+            {
+                employee2
+            };
+
+            var employee3 = new EFEmployee();
+            var address3 = new EFAddress() { StreetAddress = "123 Fake St" };
+            address3.Employees = new List<EFEmployee>()
+            {
+                employee3
+            };
+
+            this.laborDbContext.Address.Add(address1);
+            this.laborDbContext.Address.Add(address2);
+            this.laborDbContext.Address.Add(address3);
+            this.laborDbContext.SaveChanges();
+
+            var expected = this.laborDbContext.Employee.Where(e => e.Addresses.Any(a => a.StreetAddress == "123 Fake St")).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.EF_GetEmployeeIdsForStreetAddressViaClassFilter(
+                    new Employee.EFStreetAddressFilterViaRelation()
+                    {
+                        StreetAddress = "123 Fake St"
+                    }
+                ).Select(e => e.Id).ToList();
+
+            AreSame(expected, actual);
+        }
+
         #region View 
 
         [TestMethod]

@@ -285,5 +285,17 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             public IEnumerable<IOrderBy> OrderBys { get; set; }
         }
+
+        public class EmployeeNameViaRelationFilter
+        {
+            [ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee) + "." + nameof(Labor.Employee.Name))]
+            public string Name { get; set; }
+        }
+
+        public class EmployeeNameFilterWithAliasViaRelation
+        {
+            [ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))]
+            public string TheEmployeeName { get; set; }
+        }
     }
 }

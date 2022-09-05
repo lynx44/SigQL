@@ -416,23 +416,42 @@ namespace SigQL
             return MergeTableRelations(projectionTypeFilterTableRelations.ToArray());
         }
 
+        private IEnumerable<DetectedParameter> BuildViaRelationParameters(ITableDefinition primaryTableDefinition,
+            IEnumerable<ParameterInfo> parameters)
+        {
+            var arguments = parameters.AsArguments(this);
+            var viaRelationArgs = FindMatchingArguments(arguments, a => a.GetCustomAttribute<ViaRelationAttribute>() != null);
+            var detectedParameters = viaRelationArgs.Select(a =>
+                new DetectedParameter(a.Name, a.Type, a.PathToRoot().Reverse().First().GetParameterInfo())
+                {
+                    TableRelations = BuildTableRelationsFromViaParameter(a, a.GetCustomAttribute<ViaRelationAttribute>())
+                }).ToList();
+
+            return detectedParameters;
+        }
+        
+        public IEnumerable<IArgument> FindMatchingArguments(IEnumerable<IArgument> arguments,
+            Func<IArgument, bool> matchCondition)
+        {
+            var matches = new List<IArgument>();
+            var matchingArguments = arguments.Where(a => matchCondition(a)).ToList();
+            matches.AddRange(matchingArguments);
+            matches.AddRange(arguments.SelectMany(a => FindMatchingArguments(a.ClassProperties, matchCondition)).ToList());
+
+            return matches;
+        }
+
         public IEnumerable<DetectedParameter> BuildDetectedParameters(ITableDefinition primaryTableDefinition, IEnumerable<ParameterInfo> parameters)
         {
             var columnFilter = ColumnFilters.WhereClause;
             var allDetectedParameters = new List<DetectedParameter>();
+            var viaRelationParameters = this.BuildViaRelationParameters(primaryTableDefinition, parameters);
             foreach (var parameter in parameters.Where(IsWhereClauseParameter))
             {
                 var hasViaRelationAttribute =
                     parameter.CustomAttributes.Any(a => a.AttributeType == typeof(ViaRelationAttribute));
                 if (hasViaRelationAttribute)
                 {
-                    var viaRelationAttribute = parameter.GetCustomAttributes(typeof(ViaRelationAttribute)).Cast<ViaRelationAttribute>().First();
-                    allDetectedParameters.Add(
-                        new DetectedParameter(GetColumnName(parameter), parameter.ParameterType, parameter)
-                        {
-                            TableRelations =
-                                BuildTableRelationsFromViaParameter(parameter, viaRelationAttribute)
-                        });
                 }
                 else if (parameter.GetCustomAttribute<ParameterAttribute>() != null)
                 {
@@ -467,6 +486,8 @@ namespace SigQL
                         detectedParameter);
                 }
             }
+
+            allDetectedParameters.AddRange(viaRelationParameters);
            
             return allDetectedParameters;
         }
@@ -490,7 +511,7 @@ namespace SigQL
                    p.GetCustomAttribute<EndsWithAttribute>() == null;
         }
 
-        private TableRelations BuildTableRelationsFromViaParameter(ParameterInfo parameter,
+        private TableRelations BuildTableRelationsFromViaParameter(IArgument argument,
             ViaRelationAttribute attribute)
         {
             var relations = 
@@ -511,7 +532,7 @@ namespace SigQL
                 if (targetTable == null)
                 {
                     throw new InvalidIdentifierException(
-                        $"Unable to identify matching database table for parameter {parameter.Name} with ViaRelation[\"{attribute.Path}\"]. Table {tableName} does not exist.");
+                        $"Unable to identify matching database table for parameter {argument.Name} with ViaRelation[\"{attribute.Path}\"]. Table {tableName} does not exist.");
                 }
                 //if(!allTableRelations.Any() && !TableEqualityComparer.Default.Equals(targetTable, primaryTable)
                 //{
@@ -530,11 +551,11 @@ namespace SigQL
                     if (column == null)
                     {
                         throw new InvalidIdentifierException(
-                            $"Unable to identify matching database column for parameter {parameter.Name} with ViaRelation[\"{attribute.Path}\"]. Column {columnName} does not exist in table {targetTable.Name}.");
+                            $"Unable to identify matching database column for parameter {argument.Name} with ViaRelation[\"{attribute.Path}\"]. Column {columnName} does not exist in table {targetTable.Name}.");
                     }
                     tableRelations.ProjectedColumns = new List<ColumnDefinitionWithPath>()
                     {
-                        new ColumnDefinitionWithPath(column, parameter)
+                         argument.WhenParameter(p => new ColumnDefinitionWithPath(column, p), p => new ColumnDefinitionWithPath(column, p)) 
                     };
                 }
 
@@ -561,7 +582,7 @@ namespace SigQL
                         FindPrimaryForeignKeyMatchForTables(tableRelation.TargetTable, previousRelation.TargetTable);
                     if(tableRelation.ForeignKeyToParent == null)
                         throw new InvalidIdentifierException(
-                            $"Unable to identify matching database foreign key for parameter {parameter.Name} with ViaRelation[\"{attribute.Path}\"]. No foreign key between {previousRelation.TargetTable.Name} and {tableRelation.TargetTable.Name} could be found.");
+                            $"Unable to identify matching database foreign key for parameter {argument.Name} with ViaRelation[\"{attribute.Path}\"]. No foreign key between {previousRelation.TargetTable.Name} and {tableRelation.TargetTable.Name} could be found.");
                 }
                 previousRelation = tableRelation;
             }
@@ -772,6 +793,7 @@ namespace SigQL
                 property.GetCustomAttribute<OffsetAttribute>() != null ||
                 property.GetCustomAttribute<FetchAttribute>() != null ||
                 property.GetCustomAttribute<ClrOnlyAttribute>() != null ||
+                property.GetCustomAttribute<ViaRelationAttribute>() != null ||
                 IsOrderBy(property) ||
                 IsDynamicOrderBy(property)
                 ;
@@ -782,6 +804,7 @@ namespace SigQL
                 parameter?.GetCustomAttribute<OffsetAttribute>() != null ||
                 parameter?.GetCustomAttribute<FetchAttribute>() != null ||
                 parameter?.GetCustomAttribute<ClrOnlyAttribute>() != null ||
+                parameter?.GetCustomAttribute<ViaRelationAttribute>() != null ||
                 IsOrderBy(parameter) ||
                 IsDynamicOrderBy(parameter);
         }
