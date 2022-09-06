@@ -638,6 +638,22 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void OrderByRelationDynamic_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetOrderedWorkLogsWithDynamicOrderByRelation(new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name), OrderByDirection.Ascending)));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) order by \"Employee\".\"Name\" asc", sql);
+        }
+
+        [TestMethod]
+        public void OrderByRelationDynamic_ReturnsExpectedSqlWithAliasPath()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetOrderedWorkLogsWithDynamicOrderByRelationCanonicalDataType(new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name), OrderByDirection.Ascending)));
+
+            Assert.AreEqual("select \"WorkLog<WorkLog>\".\"Id\" \"Id\", \"WorkLog<WorkLog>\".\"StartDate\" \"StartDate\", \"WorkLog<WorkLog>\".\"EndDate\" \"EndDate\", \"WorkLog<WorkLog>\".\"EmployeeId\" \"EmployeeId\", \"Employee<WorkLog.Employee>\".\"Id\" \"Employee.Id\", \"Employee<WorkLog.Employee>\".\"Name\" \"Employee.Name\", \"Address\".\"Id\" \"Employee.Addresses.Id\", \"Address\".\"StreetAddress\" \"Employee.Addresses.StreetAddress\", \"Address\".\"City\" \"Employee.Addresses.City\", \"Address\".\"State\" \"Employee.Addresses.State\", \"Location\".\"Id\" \"Employee.Addresses.Locations.Id\", \"Location\".\"Name\" \"Employee.Addresses.Locations.Name\", \"Location\".\"AddressId\" \"Employee.Addresses.Locations.AddressId\", \"Address\".\"Classification\" \"Employee.Addresses.Classification\", \"WorkLog<WorkLog>\".\"LocationId\" \"LocationId\", \"Location<WorkLog.Location>\".\"Id\" \"Location.Id\", \"Location<WorkLog.Location>\".\"Name\" \"Location.Name\", \"Location<WorkLog.Location>\".\"AddressId\" \"Location.AddressId\", \"Address<WorkLog.Location.Address>\".\"Id\" \"Location.Address.Id\", \"Address<WorkLog.Location.Address>\".\"StreetAddress\" \"Location.Address.StreetAddress\", \"Address<WorkLog.Location.Address>\".\"City\" \"Location.Address.City\", \"Address<WorkLog.Location.Address>\".\"State\" \"Location.Address.State\", \"Employee\".\"Id\" \"Location.Address.Employees.Id\", \"Employee\".\"Name\" \"Location.Address.Employees.Name\", \"Address<WorkLog.Location.Address>\".\"Classification\" \"Location.Address.Classification\" from \"WorkLog\" \"WorkLog<WorkLog>\" left outer join \"Employee\" \"Employee<WorkLog.Employee>\" on ((\"WorkLog<WorkLog>\".\"EmployeeId\" = \"Employee<WorkLog.Employee>\".\"Id\")) left outer join \"EmployeeAddress\" \"EmployeeAddress<WorkLog.Employee.Addresses>\" on ((\"EmployeeAddress<WorkLog.Employee.Addresses>\".\"EmployeeId\" = \"Employee<WorkLog.Employee>\".\"Id\")) left outer join \"Address\" on ((\"EmployeeAddress<WorkLog.Employee.Addresses>\".\"AddressId\" = \"Address\".\"Id\")) left outer join \"Location\" on ((\"Location\".\"AddressId\" = \"Address\".\"Id\")) left outer join \"Location\" \"Location<WorkLog.Location>\" on ((\"WorkLog<WorkLog>\".\"LocationId\" = \"Location<WorkLog.Location>\".\"Id\")) left outer join \"Address\" \"Address<WorkLog.Location.Address>\" on ((\"Location<WorkLog.Location>\".\"AddressId\" = \"Address<WorkLog.Location.Address>\".\"Id\")) left outer join \"EmployeeAddress\" \"EmployeeAddress<WorkLog.Location.Address.Employees>\" on ((\"EmployeeAddress<WorkLog.Location.Address.Employees>\".\"AddressId\" = \"Address<WorkLog.Location.Address>\".\"Id\")) left outer join \"Employee\" on ((\"EmployeeAddress<WorkLog.Location.Address.Employees>\".\"EmployeeId\" = \"Employee\".\"Id\")) order by \"Employee<WorkLog.Employee>\".\"Name\" asc", sql);
+        }
+
+        [TestMethod]
         public void OrderByDynamicEnumerableViaClassFilter_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(

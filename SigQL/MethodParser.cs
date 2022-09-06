@@ -388,9 +388,11 @@ namespace SigQL
         private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<ParameterPath> dynamicOrderByParameterPaths, ITableDefinition primaryTable, TableRelations primaryTableRelations)
         {
             Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
+            Func<IEnumerable<string>, string> resolveTableRelations = (relationTableNames) => primaryTableRelations.FindViaRelations(relationTableNames).Alias;
+
             return dynamicOrderByParameterPaths.Select(parameterPath =>
             {
-                return new OrderBySpec(resolveTableAlias)
+                return new OrderBySpec(resolveTableAlias, resolveTableRelations)
                 {
                     ParameterPath = parameterPath,
                     IsDynamic = true,
@@ -403,6 +405,7 @@ namespace SigQL
             TableRelations primaryTableRelations)
         {
             Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
+            Func<IEnumerable<string>, string> resolveTableRelations = (relationTableNames) => primaryTableRelations.FindViaRelations(relationTableNames).Alias;
             var orderByAttribute = parameterPath.GetEndpointAttribute<OrderByAttribute>();
             if (orderByAttribute != null)
             {
@@ -411,7 +414,7 @@ namespace SigQL
 
                 var column = orderByAttribute.Column;
 
-                return new OrderBySpec(resolveTableAlias)
+                return new OrderBySpec(resolveTableAlias, resolveTableRelations)
                 {
                     TableName = table,
                     ColumnName = column,
@@ -422,7 +425,17 @@ namespace SigQL
             }
             else if (IsOrderByDirectionParameter(parameterPath))
             {
-                var column = primaryTable.Columns.FindByName(parameterPath.GetEndpointColumnName());
+                string columnName;
+                if ((parameterPath.Properties?.Any()).GetValueOrDefault(false))
+                {
+                    columnName = this.databaseResolver.GetColumnName(parameterPath.Properties.Last());
+                }
+                else
+                {
+                    columnName = this.databaseResolver.GetColumnName(parameterPath.Parameter);
+                }
+                
+                var column = primaryTable.Columns.FindByName(columnName);
 
                 if (column == null)
                 {
@@ -430,7 +443,7 @@ namespace SigQL
                         $"Unable to identify matching database column for order by parameter \"{parameterPath.GenerateClassQualifiedName()}\". Column \"{parameterPath.GetEndpointColumnName()}\" does not exist in table {primaryTable.Name}.");
                 }
 
-                return new OrderBySpec(resolveTableAlias)
+                return new OrderBySpec(resolveTableAlias, resolveTableRelations)
                 {
                     TableName = primaryTableRelations.Alias,
                     ColumnName = column.Name,
@@ -441,7 +454,7 @@ namespace SigQL
             }
             else
             {
-                return new OrderBySpec(resolveTableAlias)
+                return new OrderBySpec(resolveTableAlias, resolveTableRelations)
                 {
                     ParameterPath = parameterPath,
                     IsDynamic = true,
@@ -929,10 +942,13 @@ namespace SigQL
         private class OrderBySpec
         {
             private readonly Func<string, string> resolveTableNameFunc;
+            private readonly Func<IEnumerable<string>, string> resolveTableAliasViaRelationPathFunc;
 
-            public OrderBySpec(Func<string, string> resolveTableNameFunc)
+            public OrderBySpec(Func<string, string> resolveTableNameFunc,
+                Func<IEnumerable<string>, string> resolveTableAliasViaRelationPathFunc)
             {
                 this.resolveTableNameFunc = resolveTableNameFunc;
+                this.resolveTableAliasViaRelationPathFunc = resolveTableAliasViaRelationPathFunc;
             }
 
             public string TableName { get; set; }
@@ -944,6 +960,11 @@ namespace SigQL
             public string ResolveTableAlias(string tableName)
             {
                 return resolveTableNameFunc(tableName);
+            }
+
+            public string ResolveTableRelations(IEnumerable<string> tableRelationPath)
+            {
+                return resolveTableAliasViaRelationPathFunc(tableRelationPath);
             }
         }
 
@@ -992,7 +1013,8 @@ namespace SigQL
             return orderByClause;
         }
 
-        private IEnumerable<OrderByIdentifier> BuildDynamicOrderByIdentifier(OrderByClause orderByClause,
+        private IEnumerable<OrderByIdentifier> BuildDynamicOrderByIdentifier(
+            OrderByClause orderByClause,
              List<TokenPath> tokens, OrderBySpec p)
         {
             var tokenName = $"{p.ParameterPath.GenerateSuggestedSqlIdentifierName()}_OrderBy";
@@ -1014,16 +1036,48 @@ namespace SigQL
 
                     var orderByIdentifiers = orderBys.Select(orderBy =>
                     {
-                        var tableIdentifier = this.databaseConfiguration.Tables.FindByName(orderBy.Table);
-                        if (tableIdentifier == null)
+                        string tableName;
+                        var orderByRelation = orderBy as OrderByRelation;
+                        if (orderByRelation != null)
                         {
-                            throw new InvalidIdentifierException($"Unable to identify matching database table for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified table name \"{orderBy.Table}\". Table {orderBy.Table} could not be found.");
-                        }
+                            
+                            var tableRelations = this.databaseResolver.BuildTableRelationsFromViaParameter(
+                                new ParameterArgument(p.ParameterPath.Parameter, this.databaseResolver),
+                                orderByRelation.ViaRelationPath);
 
-                        if (tableIdentifier.Columns.FindByName(orderBy.Column) == null)
-                        {
-                            throw new InvalidIdentifierException($"Unable to identify matching database column for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified column name \"{orderBy.Column}\". Column {orderBy.Column} does not exist in table {tableIdentifier.Name}.");
+                            var tableRelationPaths = new List<string>();
+                            var currTableRelations = tableRelations;
+                            string columnName;
+                            do
+                            {
+                                tableRelationPaths.Add(currTableRelations.TableName);
+                                if (!currTableRelations.NavigationTables.Any())
+                                {
+                                    orderByRelation.Column = currTableRelations.ProjectedColumns.Single().Name;
+                                }
+                                currTableRelations = currTableRelations.NavigationTables.SingleOrDefault();
+                                
+                            } while (currTableRelations != null);
+
+                            tableName = p.ResolveTableRelations(tableRelationPaths);
+                            orderByRelation.Table = tableName;
                         }
+                        else
+                        {
+                            var tableIdentifier = this.databaseConfiguration.Tables.FindByName(orderBy.Table);
+                            if (tableIdentifier == null)
+                            {
+                                throw new InvalidIdentifierException($"Unable to identify matching database table for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified table name \"{orderBy.Table}\". Table {orderBy.Table} could not be found.");
+                            }
+
+                            if (tableIdentifier.Columns.FindByName(orderBy.Column) == null)
+                            {
+                                throw new InvalidIdentifierException($"Unable to identify matching database column for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified column name \"{orderBy.Column}\". Column {orderBy.Column} does not exist in table {tableIdentifier.Name}.");
+                            }
+
+                            tableName = p.ResolveTableAlias(tableIdentifier.Name);
+                        }
+                        
 
                         var orderByNode = new OrderByIdentifier()
                         {
@@ -1034,7 +1088,7 @@ namespace SigQL
 
                         return orderByNode.SetArgs(
                             new ColumnIdentifier().SetArgs(
-                                (AstNode) new RelationalTable() {Label = p.ResolveTableAlias(orderBy.Table) },
+                                (AstNode) new RelationalTable() {Label = tableName },
                                 new RelationalColumn() {Label = orderBy.Column}
                             ));
                     }).ToList();
@@ -1392,7 +1446,7 @@ namespace SigQL
 
         public PropertyInfo GetPropertyInfo()
         {
-            throw new InvalidOperationException("Argument is a paramter, not a property");
+            throw new InvalidOperationException("Argument is a parameter, not a property");
         }
 
         public TResult WhenParameter<TResult>(Func<ParameterInfo, TResult> parameterAction, Func<PropertyInfo, TResult> propertyAction)

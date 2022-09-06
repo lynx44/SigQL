@@ -61,6 +61,31 @@ namespace SigQL.Sql
 
             return null;
         }
+
+        public TableRelations FindViaRelations(IEnumerable<string> tableRelationPath)
+        {
+            if (tableRelationPath.FirstOrDefault() == this.TableName)
+            {
+                return FindViaRelations(tableRelationPath.Skip(1).ToList(), this);
+            }
+
+            return null;
+        }
+
+        private TableRelations FindViaRelations(IEnumerable<string> relatedTableNames, TableRelations tableRelation)
+        {
+
+            var nextTableName = relatedTableNames.FirstOrDefault();
+            var matchingTableRelation = tableRelation.NavigationTables.FirstOrDefault(t => t.TableName == nextTableName);
+            var remainingTableNames = relatedTableNames.Skip(1).ToList();
+
+            if (!remainingTableNames.Any())
+            {
+                return matchingTableRelation;
+            }
+
+            return FindViaRelations(remainingTableNames, matchingTableRelation);
+        }
     }
 
     internal class ColumnDefinitionWithPath : IColumnDefinition

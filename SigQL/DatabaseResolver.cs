@@ -424,7 +424,7 @@ namespace SigQL
             var detectedParameters = viaRelationArgs.Select(a =>
                 new DetectedParameter(a.Name, a.Type, a.PathToRoot().Reverse().First().GetParameterInfo())
                 {
-                    TableRelations = BuildTableRelationsFromViaParameter(a, a.GetCustomAttribute<ViaRelationAttribute>())
+                    TableRelations = BuildTableRelationsFromViaParameter(a, a.GetCustomAttribute<ViaRelationAttribute>().Path)
                 }).ToList();
 
             return detectedParameters;
@@ -511,11 +511,11 @@ namespace SigQL
                    p.GetCustomAttribute<EndsWithAttribute>() == null;
         }
 
-        private TableRelations BuildTableRelationsFromViaParameter(IArgument argument,
-            ViaRelationAttribute attribute)
+        internal TableRelations BuildTableRelationsFromViaParameter(IArgument argument,
+            string viaRelationPath)
         {
-            var relations = 
-                attribute.Path.
+            var relations =
+                viaRelationPath.
                     Split(new [] { "->" }, StringSplitOptions.RemoveEmptyEntries)
                     .ToList();
 
@@ -532,7 +532,7 @@ namespace SigQL
                 if (targetTable == null)
                 {
                     throw new InvalidIdentifierException(
-                        $"Unable to identify matching database table for parameter {argument.Name} with ViaRelation[\"{attribute.Path}\"]. Table {tableName} does not exist.");
+                        $"Unable to identify matching database table for parameter {argument.Name} with ViaRelation[\"{viaRelationPath}\"]. Table {tableName} does not exist.");
                 }
                 //if(!allTableRelations.Any() && !TableEqualityComparer.Default.Equals(targetTable, primaryTable)
                 //{
@@ -551,7 +551,7 @@ namespace SigQL
                     if (column == null)
                     {
                         throw new InvalidIdentifierException(
-                            $"Unable to identify matching database column for parameter {argument.Name} with ViaRelation[\"{attribute.Path}\"]. Column {columnName} does not exist in table {targetTable.Name}.");
+                            $"Unable to identify matching database column for parameter {argument.Name} with ViaRelation[\"{viaRelationPath}\"]. Column {columnName} does not exist in table {targetTable.Name}.");
                     }
                     tableRelations.ProjectedColumns = new List<ColumnDefinitionWithPath>()
                     {
@@ -582,7 +582,7 @@ namespace SigQL
                         FindPrimaryForeignKeyMatchForTables(tableRelation.TargetTable, previousRelation.TargetTable);
                     if(tableRelation.ForeignKeyToParent == null)
                         throw new InvalidIdentifierException(
-                            $"Unable to identify matching database foreign key for parameter {argument.Name} with ViaRelation[\"{attribute.Path}\"]. No foreign key between {previousRelation.TargetTable.Name} and {tableRelation.TargetTable.Name} could be found.");
+                            $"Unable to identify matching database foreign key for parameter {argument.Name} with ViaRelation[\"{viaRelationPath}\"]. No foreign key between {previousRelation.TargetTable.Name} and {tableRelation.TargetTable.Name} could be found.");
                 }
                 previousRelation = tableRelation;
             }
@@ -675,7 +675,7 @@ namespace SigQL
                 specInfo.IgnoreIfNullOrEmpty = customAttributes.Any(c => c.AttributeType == typeof(IgnoreIfNullOrEmptyAttribute));
                 // pull this from ViaRelation as well, if it has a . near the end OR decorate with both
                 specInfo.ColumnName = customAttributes.Where(c => c.AttributeType == typeof(ColumnAttribute)).Select(c => c.ConstructorArguments.First().Value as string).FirstOrDefault() ??
-                                      customAttributes.Where(c => c.AttributeType == typeof(OrderByAttribute)).Select(c => c.ConstructorArguments.Skip(1).First().Value as string).FirstOrDefault();
+                                      customAttributes.Where(c => c.AttributeType == typeof(ViaRelationAttribute)).Select(c => (c.ConstructorArguments.First().Value as string).Split('.').Last()).FirstOrDefault();
                 specInfo.Not = customAttributes.Any(c => c.AttributeType == typeof(NotAttribute));
                 specInfo.GreaterThan = customAttributes.Any(c => c.AttributeType == typeof(GreaterThanAttribute));
                 specInfo.GreaterThanOrEqual = customAttributes.Any(c => c.AttributeType == typeof(GreaterThanOrEqualAttribute));
