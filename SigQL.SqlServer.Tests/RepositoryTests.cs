@@ -249,6 +249,30 @@ namespace SigQL.SqlServer.Tests
            Assert.IsTrue(actual.All(wl => wl.Employee.Addresses.All(a => a.Employees == null)));
         }
 
+
+
+        [TestMethod]
+        public void OrderByRelation_ReturnsExpectedOrder()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Employee = new EFEmployee() { Name = "James" + (4 - i) } }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetOrderedWorkLogsWithDynamicOrderByRelationCanonicalDataType(new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name), OrderByDirection.Ascending));
+
+            AreSame(new List<string>()
+            {
+                "James1",
+                "James2",
+                "James3"
+            }, actual.Select(w => w.Employee.Name));
+            AreSame(new List<int>()
+            {
+                3,
+                2,
+                1
+            }, actual.Select(w => w.Id));
+        }
+
         [TestMethod]
         public void GetAllIds_ViaInnerProjection()
         {
