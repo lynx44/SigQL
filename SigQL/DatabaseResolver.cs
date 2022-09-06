@@ -497,7 +497,6 @@ namespace SigQL
             return
                 ((p.GetCustomAttribute<OffsetAttribute>() == null) &&
                  (p.GetCustomAttribute<FetchAttribute>() == null) &&
-                 (p.GetCustomAttribute<OrderByAttribute>() == null) &&
                  (p.ParameterType != typeof(OrderByDirection)) &&
                  (!p.ParameterType.IsAssignableFrom(typeof(IEnumerable<IOrderBy>)))) &&
                  (!p.ParameterType.IsAssignableFrom(typeof(IOrderBy))) ||
@@ -811,7 +810,7 @@ namespace SigQL
 
         public static bool IsOrderBy(PropertyInfo property)
         {
-            return property?.GetCustomAttribute<OrderByAttribute>() != null ||
+            return 
                 property?.PropertyType == typeof(OrderByDirection) 
                 //||
                 //(((property?.PropertyType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
@@ -822,7 +821,7 @@ namespace SigQL
 
         public static bool IsOrderBy(ParameterInfo parameter)
         {
-            return parameter?.GetCustomAttribute<OrderByAttribute>() != null ||
+            return 
                 parameter?.ParameterType == typeof(OrderByDirection) 
                 //||
                 //(((parameter?.ParameterType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||

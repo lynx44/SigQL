@@ -646,6 +646,14 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void OrderByRelationDynamic_WhenTableDoesNotExistOnOutputType_ThrowsException()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetOrderedWorkLogsWithDynamicOrderByRelation(new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name), OrderByDirection.Ascending)));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) order by \"Employee\".\"Name\" asc", sql);
+        }
+
+        [TestMethod]
         public void OrderByRelationDynamic_ReturnsExpectedSqlWithAliasPath()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetOrderedWorkLogsWithDynamicOrderByRelationCanonicalDataType(new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name), OrderByDirection.Ascending)));
