@@ -575,6 +575,22 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void OrderByDirectionMultipleColumns_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogs(OrderByDirection.Ascending, OrderByDirection.Ascending, OrderByDirection.Descending));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by \"WorkLog\".\"StartDate\" asc, \"WorkLog\".\"EndDate\" asc, \"WorkLog\".\"EmployeeId\" desc", sql);
+        }
+
+        [TestMethod]
+        public void OrderByDirectionMixedOrderByTypes_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogs(OrderByDirection.Ascending, OrderByDirection.Descending, new OrderBy(nameof(WorkLog), nameof(WorkLog.EndDate))));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" = @Employee0Name))))) order by \"Employee\".\"Name\" asc, \"WorkLog\".\"StartDate\" desc, \"WorkLog\".\"EndDate\" asc", sql);
+        }
+
+        [TestMethod]
         public void OrderByDirectionViaClassFilter_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsViaClassFilter(new WorkLog.OrderByDirectionStartDate() { StartDate = OrderByDirection.Ascending }));

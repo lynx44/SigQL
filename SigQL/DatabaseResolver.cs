@@ -268,18 +268,28 @@ namespace SigQL
         private TableRelations BuildTableRelations(ITableDefinition tableDefinition, IEnumerable<ColumnField> columnFields, Type tableType, ITableDefinition parentTable,
             ColumnField parentColumnField, Type parentType, TypeHierarchyNode node, Func<ColumnField, bool, bool> columnFilter)
         {
-             var columnDescriptions = columnFields
-                .Select(p => new {Column = p, IsTable = this.IsTableOrTableProjection(p.Type)}).Where(c => columnFilter(c.Column, c.IsTable)).ToList(); //.Where(p => !IsDecoratedNonColumn(p.Column.Property)).ToList();
-             var unprocessedNavigationTables = columnDescriptions.Where(t => t.IsTable && !node.IsDescendentOf(UnwrapCollectionTargetType(t.Column.Type))).ToList();
-             var typeHierarchyNodes = unprocessedNavigationTables.Select(p => 
+            var columnsWithTables = 
+                columnFields.Select(p => new {Column = p, IsTable = this.IsTableOrTableProjection(p.Type)});
+            var viaRelationColumns = columnsWithTables.Where(c => ColumnFilters.ViaRelation(c.Column, c.IsTable)).ToList();
+            
+            columnsWithTables = columnsWithTables.Except(viaRelationColumns).ToList();
+            var columnDescriptions = columnsWithTables.Where(c => columnFilter(c.Column, c.IsTable)).ToList();
+            var unprocessedNavigationTables = columnDescriptions.Where(t => t.IsTable && !node.IsDescendentOf(UnwrapCollectionTargetType(t.Column.Type))).ToList();
+            var typeHierarchyNodes = unprocessedNavigationTables.Select(p => 
                  new
                  {
                      ColumnDescription = p,
                      Node = new TypeHierarchyNode(UnwrapCollectionTargetType(p.Column.Type), node, p.Column.Property)
                  }).ToList();
-             node.Children.AddRange(typeHierarchyNodes.Select(p => p.Node).ToList());
-             var relations = unprocessedNavigationTables
-                .Select(p => BuildTableRelationsFromType(p.Column.Type, columnFilter, typeHierarchyNodes.First(n => n.ColumnDescription == p).Node, tableDefinition, p.Column, tableType)).ToList();
+            node.Children.AddRange(typeHierarchyNodes.Select(p => p.Node).ToList());
+            var relations = unprocessedNavigationTables
+                .Select(p =>
+                {
+                    p.Column.Parent = parentColumnField;
+                    return BuildTableRelationsFromType(p.Column.Type, columnFilter,
+                            typeHierarchyNodes.First(n => n.ColumnDescription == p).Node, tableDefinition, p.Column,
+                            tableType);
+                }).ToList();
             var columns = columnDescriptions.Where(t => !t.IsTable)
                 .Select(d =>
                 {
@@ -324,6 +334,7 @@ namespace SigQL
                 HierarchyNode = node
             };
 
+
             foreach (var navigationTable in tableRelations.NavigationTables)
             {
                 navigationTable.Parent = tableRelations;
@@ -357,7 +368,17 @@ namespace SigQL
                     tableRelations.ForeignKeyToParent = foreignKey;
                 }
             }
-            return tableRelations;
+            
+            var viaTableRelations = viaRelationColumns.Select(c =>
+            {
+                c.Column.Parent = parentColumnField;
+                IArgument argument = c.Column.AsArgument(this);
+                return BuildTableRelationsFromViaParameter(argument,
+                    argument.GetCustomAttribute<ViaRelationAttribute>().Path);
+            }).ToList();
+
+            var result = MergeTableRelations(viaTableRelations.AppendOne(tableRelations).ToArray());
+            return result;
         }
 
         private TableRelations BuildTableRelations(IForeignKeyDefinition foreignKeyDefinition, ColumnField parentColumnField, IEnumerable<TableRelations> relations, TypeHierarchyNode node)
@@ -599,6 +620,7 @@ namespace SigQL
         {
             return new TableRelations()
             {
+                ProjectionType = tableRelationsCollection.Where(p => p.ProjectionType != null).Select(p => p.ProjectionType).FirstOrDefault(),
                 TargetTable = tableRelationsCollection.First().TargetTable,
                 NavigationTables = tableRelationsCollection.SelectMany(t => t.NavigationTables).GroupBy(nt => nt.TargetTable, nt => nt, TableEqualityComparer.Default).Select(nt => MergeTableRelations(nt.ToArray())).ToList(),
                 ProjectedColumns = tableRelationsCollection.SelectMany(t => t.ProjectedColumns)
@@ -691,16 +713,23 @@ namespace SigQL
         public IEnumerable<ParameterPath> ProjectedColumnsToParameterPaths(TableRelations tableRelations, List<PropertyInfo> parentPropertyPath)
         {
             var tableParameterPaths = tableRelations.ProjectedColumns
-                .Select(p => new ParameterPath()
-                 {
-                     Parameter = !parentPropertyPath.Any() ? tableRelations.ParentColumnField?.Parameter ?? p.Parameter : null,
-                     Properties = p.Property != null ? parentPropertyPath.AppendOne(p.Property).ToList() : parentPropertyPath
-                 }).ToList();
+                .Select(p => 
+                    new ParameterPath()
+                    {
+                        Parameter = !parentPropertyPath.Any() ? tableRelations.ParentColumnField?.Parameter ?? p.Parameter : null,
+                        Properties = p.Property != null ? parentPropertyPath.AppendOne(p.Property).ToList() : parentPropertyPath
+                    }).ToList();
             var navigationParameterPaths = tableRelations.NavigationTables.SelectMany(t =>
                 ProjectedColumnsToParameterPaths(t,
                     t.ParentColumnField != null ? parentPropertyPath.AppendOne(t.ParentColumnField.Property).ToList() : parentPropertyPath));
 
             return tableParameterPaths.Concat(navigationParameterPaths).ToList();
+        }
+        
+        internal int GetOrdinal(ParameterInfo[] methodParameters, ParameterPath path)
+        {
+            var parameterList = methodParameters.ToList();
+            return parameterList.IndexOf(path.Parameter);
         }
     }
     
@@ -781,6 +810,10 @@ namespace SigQL
             isTable ||
             ColumnAttributes.IsOrderBy(column.Property) || 
             ColumnAttributes.IsOrderBy(column.Parameter);
+
+        public static Func<ColumnField, bool, bool> ViaRelation = (column, isTable) =>
+            ColumnAttributes.IsViaRelation(column.Property) || 
+            ColumnAttributes.IsViaRelation(column.Parameter);
     }
 
     internal class ColumnAttributes
@@ -806,6 +839,16 @@ namespace SigQL
                 parameter?.GetCustomAttribute<ViaRelationAttribute>() != null ||
                 IsOrderBy(parameter) ||
                 IsDynamicOrderBy(parameter);
+        }
+
+        public static bool IsViaRelation(ParameterInfo parameter)
+        {
+            return parameter?.GetCustomAttribute<ViaRelationAttribute>() != null;
+        }
+
+        public static bool IsViaRelation(PropertyInfo property)
+        {
+            return property?.GetCustomAttribute<ViaRelationAttribute>() != null;
         }
 
         public static bool IsOrderBy(PropertyInfo property)

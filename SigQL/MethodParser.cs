@@ -95,10 +95,12 @@ namespace SigQL
 
             var orderByParameters = FindOrderByTableRelations(projectionType, methodParameters);
             
-            var orderBySpecs = ConvertToOrderBySpecs(orderByParameters, primaryTable, fromClauseRelations).ToList();
+            var orderBySpecs = ConvertToOrderBySpecs(methodParameters, orderByParameters, primaryTable, fromClauseRelations).ToList();
             var dynamicOrderByParameterPaths = this.FindDynamicOrderByParameterPaths(methodParameters);
-            var dynamicOrderBySpecs = ConvertToOrderBySpecs(dynamicOrderByParameterPaths, primaryTable, fromClauseRelations);
+            var dynamicOrderBySpecs = ConvertToOrderBySpecs(methodParameters, dynamicOrderByParameterPaths, primaryTable, fromClauseRelations);
+
             orderBySpecs.AddRange(dynamicOrderBySpecs);
+            orderBySpecs = orderBySpecs.OrderBy(o => o.Ordinal).ToList();
             if (orderBySpecs.Any())
             {
                 statement.OrderByClause = BuildOrderByClause(null, orderBySpecs, tokens);
@@ -237,18 +239,20 @@ namespace SigQL
 
         private IEnumerable<ParameterPath> FindDynamicOrderByParameterPaths(ParameterInfo[] parameters)
         {
+            var parameterList = parameters.ToList();
             var orderByArguments = this.databaseResolver.FindMatchingArguments(parameters.AsArguments(this.databaseResolver), a => a.Type.IsAssignableFrom(typeof(OrderBy)) ||
-                a.Type.IsAssignableFrom(typeof(IEnumerable<OrderBy>)));
+                                                                                                                                   a.Type.IsAssignableFrom(typeof(IEnumerable<OrderBy>)));
             var parameterPaths = orderByArguments.Select(a =>
             {
                 var pathToRoot = a.PathToRoot().Reverse();
                 var parameterArg = pathToRoot.First();
                 var propertyArgs = pathToRoot.Skip(1).ToList();
-                return new ParameterPath()
-                {
-                    Parameter = parameterArg.GetParameterInfo(),
-                    Properties = propertyArgs.Select(p => p.GetPropertyInfo()).ToList()
-                };
+                return 
+                    new ParameterPath()
+                    {
+                        Parameter = parameterArg.GetParameterInfo(),
+                        Properties = propertyArgs.Select(p => p.GetPropertyInfo()).ToList(),
+                    };
             }).ToList();
 
             return parameterPaths;
@@ -362,14 +366,14 @@ namespace SigQL
             return p.GetEndpointType() == typeof(OrderByDirection);
         }
 
-        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(TableRelations orderByParameters,
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(ParameterInfo[] methodParameters, TableRelations orderByParameters,
             ITableDefinition primaryTable, TableRelations primaryTableRelations)
         {
             var parameterPaths = this.databaseResolver.ProjectedColumnsToParameterPaths(orderByParameters, new List<PropertyInfo>());
-            return parameterPaths.Select(p => ConvertToOrderBySpec(p, primaryTable, primaryTableRelations)).ToList();
+            return parameterPaths.Select(p => ConvertToOrderBySpec(p, this.databaseResolver.GetOrdinal(methodParameters, p),  primaryTable, primaryTableRelations)).ToList();
         }
         
-        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<ParameterPath> dynamicOrderByParameterPaths, ITableDefinition primaryTable, TableRelations primaryTableRelations)
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(ParameterInfo[] methodParameters, IEnumerable<ParameterPath> dynamicOrderByParameterPaths, ITableDefinition primaryTable, TableRelations primaryTableRelations)
         {
             Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
 
@@ -379,12 +383,13 @@ namespace SigQL
                 {
                     ParameterPath = parameterPath,
                     IsDynamic = true,
-                    IsCollection = parameterPath.GetEndpointType().IsCollectionType()
+                    IsCollection = parameterPath.GetEndpointType().IsCollectionType(),
+                    Ordinal = this.databaseResolver.GetOrdinal(methodParameters, parameterPath)
                 };
             }).ToList();
         }
 
-        private OrderBySpec ConvertToOrderBySpec(ParameterPath parameterPath, ITableDefinition primaryTable,
+        private OrderBySpec ConvertToOrderBySpec(ParameterPath parameterPath, int ordinal, ITableDefinition primaryTable,
             TableRelations primaryTableRelations)
         {
             Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
@@ -430,7 +435,8 @@ namespace SigQL
                     ColumnName = column.Name,
                     ParameterPath = parameterPath,
                     IsDynamic = false,
-                    IsCollection = false
+                    IsCollection = false,
+                    Ordinal = ordinal
                 };
             }
             else
@@ -439,7 +445,8 @@ namespace SigQL
                 {
                     ParameterPath = parameterPath,
                     IsDynamic = true,
-                    IsCollection = parameterPath.GetEndpointType().IsCollectionType()
+                    IsCollection = parameterPath.GetEndpointType().IsCollectionType(),
+                    Ordinal = ordinal
                 };
 
             }
@@ -937,6 +944,7 @@ namespace SigQL
             public bool IsDynamic { get; set; }
             public bool IsCollection { get; set; }
             public ParameterPath ParameterPath { get; set; }
+            public int Ordinal { get; set; }
 
             public string ResolveTableAlias(string tableName)
             {
@@ -1063,7 +1071,7 @@ namespace SigQL
                             ));
                     }).ToList();
 
-                    orderByClause.SetArgs(orderByIdentifiers);
+                    orderByClause.Args = (orderByClause.Args ?? new List<AstNode>()).Concat(orderByIdentifiers).ToList();
 
                     return new Dictionary<string, object>();
                 }
