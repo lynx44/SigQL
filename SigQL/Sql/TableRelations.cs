@@ -9,16 +9,37 @@ namespace SigQL.Sql
 {
     internal class TableRelations : ITableHierarchyAlias
     {
-        public Type ProjectionType { get; set; }
+        public TableRelations()
+        {
+            this.NavigationTables = new List<TableRelations>();
+            this.ProjectedColumns = new List<TableRelationColumnDefinition>();
+        }
+        public IArgument Argument { get; set; }
+        //public Type ProjectionType { get; set; }
         public ITableDefinition TargetTable { get; set; }
         public IEnumerable<TableRelations> NavigationTables { get; set; }
-        public IEnumerable<ColumnDefinitionWithPath> ProjectedColumns { get; set; }
+        public IEnumerable<TableRelationColumnDefinition> ProjectedColumns { get; set; }
         public IForeignKeyDefinition ForeignKeyToParent { get; set; }
-        public ColumnField ParentColumnField { get; set; }
-        public TypeHierarchyNode HierarchyNode { get; set; }
-        public string Alias => $"{TargetTable.Name}" + (RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{HierarchyNode.QualifiedPath}>" : null);
+        public string Alias => $"{TargetTable.Name}" + (RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{Argument.FullyQualifiedName()}>" : null);
         public string TableName => TargetTable.Name;
         public TableRelations Parent { get; set; }
+
+        public TableRelations Filter(TableRelationsColumnSource source, TableRelationsFilter filter)
+        {
+            var matchingColumns = this.ProjectedColumns.Where(c => c.Source.HasFlag(source) && filter.IsMatch(c.Argument, false)).ToList();
+            var filteredTableRelations = new TableRelations()
+            {
+                Argument = this.Argument,
+                ForeignKeyToParent = this.ForeignKeyToParent,
+                ProjectedColumns = matchingColumns,
+                TargetTable = this.TargetTable
+            };
+            var matchingNavigationTables = this.NavigationTables.Select(t => Filter(source, filter)).Where(t => t != null).ToList();
+            matchingNavigationTables.ForEach(t => t.Parent = filteredTableRelations);
+            filteredTableRelations.NavigationTables = matchingNavigationTables;
+            
+            return filteredTableRelations;
+        }
 
         public bool RelationTreeHasAnyTableDefinedMultipleTimes()
         {
@@ -88,28 +109,32 @@ namespace SigQL.Sql
         }
     }
 
-    internal class ColumnDefinitionWithPath : IColumnDefinition
+    internal class TableRelationColumnDefinition : IColumnDefinition
     {
         private readonly IColumnDefinition columnDefinition;
-        public ParameterInfo Parameter { get; set; }
-        public PropertyInfo Property { get; }
+        
+        public IArgument Argument { get; set; }
 
         public string Name => columnDefinition.Name;
         public string DataTypeDeclaration => columnDefinition.DataTypeDeclaration;
 
         public ITableDefinition Table => columnDefinition.Table;
 
-        public ColumnDefinitionWithPath(IColumnDefinition columnDefinition, PropertyInfo property)
-        {
-            this.columnDefinition = columnDefinition;
-            this.Property = property;
-        }
+        public TableRelationsColumnSource Source { get; set; }
 
-        public ColumnDefinitionWithPath(IColumnDefinition columnDefinition, ParameterInfo parameter)
+        public TableRelationColumnDefinition(IColumnDefinition columnDefinition, IArgument argument, TableRelationsColumnSource source)
         {
             this.columnDefinition = columnDefinition;
-            this.Parameter = parameter;
+            this.Argument = argument;
+            this.Source = source;
         }
+    }
+
+    [Flags]
+    internal enum TableRelationsColumnSource
+    {
+        ReturnType,
+        Parameters
     }
 
     public interface ITableHierarchyAlias

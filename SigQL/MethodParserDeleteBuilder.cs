@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using SigQL.Extensions;
 using SigQL.Schema;
+using SigQL.Sql;
 using SigQL.Types.Attributes;
 
 namespace SigQL
@@ -14,10 +15,12 @@ namespace SigQL
             var tokens = new List<TokenPath>();
             var parameterPaths = new List<ParameterPath>();
             var methodInfo = deleteSpec.RootMethodInfo;
-            var parameters = this.databaseResolver.BuildDetectedParameters(deleteSpec.Table, methodInfo.GetParameters()).ToList();
-            var primaryTable = deleteSpec.Table;
+            
+            var tableRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.ToArgumentContainer(deleteSpec.Table,
+                methodInfo.GetParameters().AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters);
+            var primaryTable = tableRelations.TargetTable;
             var whereClause = BuildWhereClauseFromTargetTablePerspective(
-                new RelationalTable() {Label = primaryTable.Name}, primaryTable, parameters, parameterPaths,
+                new RelationalTable() {Label = primaryTable.Name}, tableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause), parameterPaths,
                 tokens);
 
             var statement = new Delete()

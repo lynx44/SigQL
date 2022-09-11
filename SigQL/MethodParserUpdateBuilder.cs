@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using SigQL.Extensions;
 using SigQL.Schema;
+using SigQL.Sql;
 using SigQL.Types.Attributes;
 
 namespace SigQL
@@ -19,10 +20,11 @@ namespace SigQL
             WhereClause whereClause = null;
             if (updateSpec.FilterParameters.Any())
             {
-                var parameters = this.databaseResolver.BuildDetectedParameters(updateSpec.Table, updateSpec.FilterParameters).ToList();
+                var tableRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.ToArgumentContainer(updateSpec.Table,
+                    updateSpec.FilterParameters.AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters);
 
                 whereClause = BuildWhereClauseFromTargetTablePerspective(
-                    new RelationalTable() { Label = primaryTable.Name }, primaryTable, parameters, parameterPaths,
+                    new RelationalTable() { Label = primaryTable.Name }, tableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause), parameterPaths,
                     tokens);
             }
             
@@ -75,36 +77,34 @@ namespace SigQL
                     updateSpec.Table = this.databaseConfiguration.Tables.FindByName(updateAttribute.TableName);
                 }
 
-                var setParameters = methodInfo.GetParameters().Where(p => p.GetCustomAttribute<SetAttribute>() != null).ToList();
+                var arguments = methodInfo.GetParameters().AsArguments(this.databaseResolver);
+                var setParameters = arguments.Where(p => p.GetCustomAttribute<SetAttribute>() != null).ToList();
                 
                 updateSpec.SetColumnParameters = setParameters.SelectMany(c =>
                 {
-                    if (this.databaseResolver.IsTableOrTableProjection(c.ParameterType))
+                    if (this.databaseResolver.IsTableOrTableProjection(c.Type))
                     {
-                        return c.ParameterType.GetProperties().Select(pr => new UpdateColumnParameter()
+                        return c.Type.GetProperties().Select(pr => new UpdateColumnParameter()
                         {
                             Column = updateSpec.Table.Columns.FindByName(pr.Name),
-                            ParameterPath = new ParameterPath()
+                            ParameterPath = new ParameterPath(c)
                             {
-                                SqlParameterName = $"{c.Name}{pr.Name}",
-                                Parameter = c,
-                                Properties = pr.AsEnumerable()
+                                SqlParameterName = $"{c.Name}{pr.Name}"
                             }
                         });
                     }
                     return new UpdateColumnParameter()
                     {
                         Column = updateSpec.Table.Columns.FindByName(c.Name),
-                        ParameterPath = new ParameterPath()
+                        ParameterPath = new ParameterPath(c)
                         {
-                            SqlParameterName = c.Name,
-                            Parameter = c
+                            SqlParameterName = c.Name
                         }
                     }.AsEnumerable();
                 }).ToList();
 
-                var filterParameters = methodInfo.GetParameters().Except(setParameters).ToList();
-                updateSpec.FilterParameters = filterParameters;
+                var filterParameters = arguments.Except(setParameters).ToList();
+                updateSpec.FilterParameters = filterParameters.Select(c => c.GetParameterInfo()).ToList();
 
                 updateSpec.RootMethodInfo = methodInfo;
 

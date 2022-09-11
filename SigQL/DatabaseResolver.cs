@@ -13,7 +13,7 @@ using SigQL.Types.Attributes;
 
 namespace SigQL
 {
-    internal class DatabaseResolver
+    internal partial class DatabaseResolver
     {
         private readonly IDatabaseConfiguration databaseConfiguration;
 
@@ -29,76 +29,77 @@ namespace SigQL
         {
             ITableDefinition table = null;
             table = tableRelations.TargetTable;
-            if (tableRelations.ProjectionType != null)
-            {
-            var classProperties = UnwrapCollectionTargetType(tableRelations.ProjectionType).GetProperties();
-            var columns = classProperties.SelectMany(p =>
-            {
-                var currentPaths = propertyPath.ToList();
-                currentPaths.Add(p.Name);
-                var propertyType = p.PropertyType;
-                if (!IsClrOnly(p))
+            //if (tableRelations.ProjectionType != null)
+            //{
+                var classProperties = tableRelations.Argument.ClassProperties;
+                var columns = classProperties.SelectMany(p =>
                 {
-                    if (IsColumnType(propertyType))
+                    var currentPaths = propertyPath.ToList();
+                    currentPaths.Add(p.Name);
+                    var propertyType = p.Type;
+                    if (!IsClrOnly(p))
                     {
-                        var targetColumn = table.Columns.FindByName(p.Name);
-                        if (targetColumn == null)
+                        if (IsColumnType(propertyType))
                         {
-                            throw new InvalidIdentifierException(
-                                $"Unable to identify matching database column for property {GetParentTableClassQualifiedNameForType(tableRelations.ProjectionType)}.{string.Join(".", currentPaths)}. Column {p.Name} does not exist in table {table.Name}.");
+                            var targetColumn = table.Columns.FindByName(p.Name);
+                            if (targetColumn == null)
+                            {
+                                throw new InvalidIdentifierException(
+                                    $"Unable to identify matching database column for property {p.FullyQualifiedName()}. Column {p.Name} does not exist in table {table.Name}.");
+                            }
+                            return new ColumnDefinitionWithPropertyPath()
+                            {
+                                ColumnDefinition = new ColumnAliasColumnDefinition(targetColumn, tableRelations),
+                                PropertyPath = new PropertyPath() { PropertyPaths = currentPaths }
+                            }.AsEnumerable();
                         }
-                        return new ColumnDefinitionWithPropertyPath()
+                        else
+                        if (IsTableOrTableProjection(propertyType))
                         {
-                            ColumnDefinition = new ColumnAliasColumnDefinition(targetColumn, tableRelations),
-                            PropertyPath = new PropertyPath() { PropertyPaths = currentPaths }
-                        }.AsEnumerable();
-                    }
-                    else
-                    if (IsTableOrTableProjection(propertyType))
-                    {
-                        var navigationTableRelations = tableRelations.NavigationTables.SingleOrDefault(t => t.ParentColumnField.Name == p.Name && t.ParentColumnField.Type == propertyType);
-                        if (navigationTableRelations != null)
+
+                            var navigationTableRelations = tableRelations.NavigationTables.SingleOrDefault(t => t.Argument == p);
+                            if (navigationTableRelations != null)
+                            {
+                                return ResolveColumnsForSelectStatement(navigationTableRelations, currentPaths, allForeignKeys, tableKeyDefinitions);
+                            }
+                        }
+                        else
                         {
-                            return ResolveColumnsForSelectStatement(navigationTableRelations, currentPaths, allForeignKeys, tableKeyDefinitions);
+                            throw new InvalidIdentifierException($"Unable to identify matching database table for property {p.FullyQualifiedName()} of type {propertyType}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(propertyType))} does not exist.");
                         }
                     }
-                    else
-                    {
-                        throw new InvalidIdentifierException($"Unable to identify matching database table for property {GetParentTableClassQualifiedNameForType(tableRelations.ProjectionType)}.{string.Join(".", currentPaths)} of type {propertyType}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(propertyType))} does not exist.");
-                    }
+
+                    return new ColumnDefinitionWithPropertyPath[0];
+                }).Where(c => c != null).ToList();
+
+                tableKeyDefinitions[string.Join(".", propertyPath.ToList())] = table.PrimaryKey;
+
+                if (table.PrimaryKey.Columns.Any())
+                {
+                    var primaryColumns = table.PrimaryKey.Columns
+                        .Select(c =>
+                        {
+                            var currentPaths = propertyPath.ToList();
+                            currentPaths.Add(c.Name);
+                            return new ColumnDefinitionWithPropertyPath()
+                            {
+                                ColumnDefinition = new ColumnAliasColumnDefinition(c, tableRelations),
+                                PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.ToList()}
+                            };
+                        }).ToList();
+                
+                    primaryColumns.AddRange(columns);
+                    columns = primaryColumns.ToList();
                 }
+                
+                columns = columns.GroupBy(c => c.Alias, c => c).Select(c => c.First()).ToList();
 
-                return new ColumnDefinitionWithPropertyPath[0];
-            }).Where(c => c != null).ToList();
-
-            tableKeyDefinitions[string.Join(".", propertyPath.ToList())] = table.PrimaryKey;
-
-            if (table.PrimaryKey.Columns.Any())
-            {
-                var primaryColumns = table.PrimaryKey.Columns
-                    .Select(c =>
-                    {
-                        var currentPaths = propertyPath.ToList();
-                        currentPaths.Add(c.Name);
-                        return new ColumnDefinitionWithPropertyPath()
-                        {
-                            ColumnDefinition = new ColumnAliasColumnDefinition(c, tableRelations),
-                            PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.ToList()}
-                        };
-                    }).ToList();
-            
-                primaryColumns.AddRange(columns);
-                columns = primaryColumns.ToList();
-            }
-            
-            columns = columns.GroupBy(c => c.Alias, c => c).Select(c => c.First()).ToList();
-
-            return columns;
-            }
-            else
-            {
-                return ResolveColumnsForSelectStatement(tableRelations.NavigationTables.Single(), propertyPath.ToList(), allForeignKeys, tableKeyDefinitions);
-            }
+                return columns;
+            //}
+            //else
+            //{
+            //    return ResolveColumnsForSelectStatement(tableRelations.NavigationTables.Single(), propertyPath.ToList(), allForeignKeys, tableKeyDefinitions);
+            //}
         }
 
         private static bool IsColumnType(Type propertyType)
@@ -196,251 +197,128 @@ namespace SigQL
             return manyToManyTable != null ? foreignKeys : null;
         }
 
-        public TableRelations BuildTableRelationsFromType(Type projectionType, Func<ColumnField, bool, bool> columnFilter, TypeHierarchyNode node = null, ITableDefinition parentTable = null, ColumnField parentColumnField = null, Type parentType = null)
+        //public TableRelations BuildTableRelationsFromType(Type projectionType, TableRelationsFilter filter, TypeHierarchyNode node = null, ITableDefinition parentTable = null, ColumnField parentColumnField = null, Type parentType = null)
+        //{
+        //    node ??= new TypeHierarchyNode(UnwrapCollectionTargetType(projectionType));
+        //    return BuildTableRelations(new TableFromType() {
+        //            Type = projectionType,
+        //            ColumnFields = this.ToArgumentContainer(projectionType).Arguments.Where(p => !IsClrOnly(p)).Select(p => new ColumnField()
+        //            {
+        //                Name = this.GetColumnName(p),
+        //                Type = p.Type,
+        //                Argument = p
+        //            }).ToList()
+        //        }, node, parentTable, parentColumnField, parentType, columnFilter);
+        //}
+
+        internal bool IsClrOnly(IArgument argument)
         {
-            node ??= new TypeHierarchyNode(UnwrapCollectionTargetType(projectionType));
-            return BuildTableRelations(new TableFromType() {
-                    Type = projectionType,
-                    ColumnFields = UnwrapCollectionTargetType(projectionType).GetProperties().Where(p => !IsClrOnly(p)).Select(p => new ColumnField()
-                    {
-                        Name = this.GetColumnName(p),
-                        Type = p.PropertyType,
-                        Property = p
-                    }).ToList()
-                }, node, parentTable, parentColumnField, parentType, columnFilter);
+            return argument.GetCustomAttribute<ClrOnlyAttribute>() != null;
+        }
+        internal bool IsClrOnly(ParameterInfo parameter)
+        {
+            return parameter.GetCustomAttribute<ClrOnlyAttribute>() != null;
         }
 
-        internal bool IsClrOnly(PropertyInfo propertyInfo)
-        {
-            return propertyInfo.GetCustomAttribute<ClrOnlyAttribute>() != null;
-        }
-        internal bool IsClrOnly(ParameterInfo parameterInfo)
-        {
-            return parameterInfo.GetCustomAttribute<ClrOnlyAttribute>() != null;
-        }
+        //public TableRelations BuildTableRelationsWithMethodParams(ITableDefinition tableDefinition,
+        //    IEnumerable<IArgument> parameters, TableRelationsFilter filter,
+        //    TypeHierarchyNode node,
+        //    ITableDefinition parentTable = null, ColumnField parentColumnField = null, Type parentType = null)
+        //{
+        //    return BuildTableRelations(tableDefinition, parameters.Select(p => new ColumnField()
+        //    {
+        //        Name = this.GetColumnName(p),
+        //        Type = p.Type,
+        //        Argument = p
+        //    }).ToList(), null, parentTable, parentColumnField, parentType, node, filter);
+        //}
 
-        public TableRelations BuildTableRelationsWithMethodParams(ITableDefinition tableDefinition,
-            IEnumerable<ParameterInfo> parameters, Func<ColumnField, bool, bool> columnSelector,
-            TypeHierarchyNode node,
-            ITableDefinition parentTable = null, ColumnField parentColumnField = null, Type parentType = null)
-        {
-            return BuildTableRelations(tableDefinition, parameters.Select(p => new ColumnField()
-            {
-                Name = this.GetColumnName(p),
-                Type = p.ParameterType,
-                Parameter = p
-            }).ToList(), null, parentTable, parentColumnField, parentType, node, columnSelector);
-        }
+        //public TableRelations BuildTableRelationsWithMethodParams(Type projectionType,
+        //    IEnumerable<ParameterInfo> parameters, Func<ColumnField, bool, bool> columnSelector)
+        //{
+        //    var tableDefinition = this.DetectTable(projectionType);
+        //    var node = new TypeHierarchyNode(this.UnwrapCollectionTargetType(projectionType));
 
-        public TableRelations BuildTableRelationsWithMethodParams(Type projectionType,
-            IEnumerable<ParameterInfo> parameters, Func<ColumnField, bool, bool> columnSelector)
-        {
-            var tableDefinition = this.DetectTable(projectionType);
-            var node = new TypeHierarchyNode(this.UnwrapCollectionTargetType(projectionType));
+        //    BuildTableRelations(ToArgumentContainer(projectionType))
+        //    return BuildTableRelations(tableDefinition, parameters.Select(p => new ColumnField()
+        //    {
+        //        Name = this.GetColumnName(p),
+        //        Type = p.ParameterType,
+        //        Parameter = p
+        //    }).ToList(), projectionType, null, null, null, node, columnSelector);
+        //}
 
-            return BuildTableRelations(tableDefinition, parameters.Select(p => new ColumnField()
-            {
-                Name = this.GetColumnName(p),
-                Type = p.ParameterType,
-                Parameter = p
-            }).ToList(), projectionType, null, null, null, node, columnSelector);
+        public string GetColumnName(IArgument argument)
+        {
+            var columnSpec = this.GetColumnSpec(argument);
+            return columnSpec?.ColumnName ?? argument.Name;
         }
 
-        public string GetColumnName(PropertyInfo propertyInfo)
-        {
-            var columnSpec = this.GetColumnSpec(propertyInfo.PropertyType, propertyInfo.CustomAttributes);
-            return columnSpec?.ColumnName ?? propertyInfo.Name;
-        }
-
-        public string GetColumnName(ParameterInfo parameterInfo)
-        {
-            var columnSpec = this.GetColumnSpec(parameterInfo.ParameterType, parameterInfo.CustomAttributes);
-            return columnSpec?.ColumnName ?? parameterInfo.Name;
-        }
-
-        private TableRelations BuildTableRelations(TableFromType tableType, TypeHierarchyNode node, ITableDefinition parentTable, ColumnField parentColumnField, Type parentType, Func<ColumnField, bool, bool> columnFilter)
-        {
-            var tableDefinition = this.DetectTable(tableType.Type);
-            return BuildTableRelations(tableDefinition, tableType.ColumnFields, tableType.Type, parentTable,
-                parentColumnField, parentType, node, columnFilter);
-        }
-
-        private TableRelations BuildTableRelations(ITableDefinition tableDefinition, IEnumerable<ColumnField> columnFields, Type tableType, ITableDefinition parentTable,
-            ColumnField parentColumnField, Type parentType, TypeHierarchyNode node, Func<ColumnField, bool, bool> columnFilter)
-        {
-            var columnsWithTables = 
-                columnFields.Select(p => new {Column = p, IsTable = this.IsTableOrTableProjection(p.Type)});
-            var viaRelationColumns = columnsWithTables.Where(c => ColumnFilters.ViaRelation(c.Column, c.IsTable)).ToList();
-            
-            columnsWithTables = columnsWithTables.Except(viaRelationColumns).ToList();
-            var columnDescriptions = columnsWithTables.Where(c => columnFilter(c.Column, c.IsTable)).ToList();
-            var unprocessedNavigationTables = columnDescriptions.Where(t => t.IsTable && !node.IsDescendentOf(UnwrapCollectionTargetType(t.Column.Type))).ToList();
-            var typeHierarchyNodes = unprocessedNavigationTables.Select(p => 
-                 new
-                 {
-                     ColumnDescription = p,
-                     Node = new TypeHierarchyNode(UnwrapCollectionTargetType(p.Column.Type), node, p.Column.Property)
-                 }).ToList();
-            node.Children.AddRange(typeHierarchyNodes.Select(p => p.Node).ToList());
-            var relations = unprocessedNavigationTables
-                .Select(p =>
-                {
-                    p.Column.Parent = parentColumnField;
-                    return BuildTableRelationsFromType(p.Column.Type, columnFilter,
-                            typeHierarchyNodes.First(n => n.ColumnDescription == p).Node, tableDefinition, p.Column,
-                            tableType);
-                }).ToList();
-            var columns = columnDescriptions.Where(t => !t.IsTable)
-                .Select(d =>
-                {
-                    var columnName = d.Column.Parameter != null ? GetColumnName(d.Column.Parameter) : GetColumnName(d.Column.Property);
-                    var tableColumn = tableDefinition.Columns.FindByName(columnName);
-                    if (tableColumn == null)
-                    {
-                        if (d.Column.Property != null)
-                        {
-                            if (IsColumnType(d.Column.Property.PropertyType))
-                                throw new InvalidIdentifierException(
-                                    $"Unable to identify matching database column for property {GetParentTableClassQualifiedNameForType(tableType)}.{d.Column.Property.Name}. Column {d.Column.Name} does not exist in table {tableDefinition.Name}.");
-                            else
-                                throw new InvalidIdentifierException(
-                                    $"Unable to identify matching database table for property {GetParentTableClassQualifiedNameForType(tableType)}.{d.Column.Property.Name} of type {d.Column.Property.PropertyType}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(d.Column.Property.PropertyType))} does not exist.");
-                        }
-                        else
-                        {
-                            if (IsColumnType(d.Column.Parameter.ParameterType))
-                                throw new InvalidIdentifierException(
-                                    $"Unable to identify matching database column for parameter {d.Column.Parameter.Name}. Column {d.Column.Name} does not exist in table {tableDefinition.Name}.");
-                            else
-                                throw new InvalidIdentifierException(
-                                    $"Unable to identify matching database table for parameter {d.Column.Parameter.Name} of type {d.Column.Parameter.ParameterType}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(d.Column.Parameter.ParameterType))} does not exist.");
-                        }
-                        
-                    }
-                    return d.Column.Parameter != null
-                            ? new ColumnDefinitionWithPath(tableColumn,
-                                d.Column.Parameter)
-                            : new ColumnDefinitionWithPath(tableColumn,
-                                d.Column.Property);
-                }).ToList();
-            
-            var tableRelations = new TableRelations()
-            {
-                ProjectionType = tableType,
-                ParentColumnField = parentColumnField,
-                TargetTable = tableDefinition,
-                NavigationTables = relations,
-                ProjectedColumns = columns,
-                HierarchyNode = node
-            };
-
-
-            foreach (var navigationTable in tableRelations.NavigationTables)
-            {
-                navigationTable.Parent = tableRelations;
-            }
-
-            IEnumerable<IForeignKeyDefinition> foreignKeys = null;
-            if (parentTable != null /*&& (node.Depth != 1 && !TableEqualityComparer.Default.Equals(parentTable, tableDefinition))*/)
-            {
-                var foreignKey = this.FindPrimaryForeignKeyMatchForTables(parentTable, tableDefinition);
-                if (foreignKey == null)
-                {
-                    foreignKeys = FindManyToManyForeignKeyMatchesForTables(parentTable, tableDefinition);
-
-                    if (!(foreignKeys?.Any()).GetValueOrDefault(false))
-                    {
-                        throw new InvalidIdentifierException(
-                            $"Unable to identify matching database foreign key for property {GetParentTableClassQualifiedNameForType(parentType)}.{parentColumnField.Property.Name}. No foreign key between {parentTable.Name} and {tableDefinition.Name} could be found.");
-                    }
-
-                    var oneToManyFk = foreignKeys.First(fk => TableEqualityComparer.Default.Equals(fk.PrimaryKeyTable, tableDefinition));
-                    var manyToOneFk = foreignKeys.Except(new [] { oneToManyFk }).First();
-                    tableRelations.ForeignKeyToParent = oneToManyFk;
-                    tableRelations.ParentColumnField = null;
-                    
-                    var hierarchyNode = new TypeHierarchyNode(typeof(void), node, null);
-                    node.Children.Add(hierarchyNode);
-                    return this.BuildTableRelations(manyToOneFk, parentColumnField, new[] { tableRelations }, hierarchyNode);
-                }
-                else
-                {
-                    tableRelations.ForeignKeyToParent = foreignKey;
-                }
-            }
-            
-            var viaTableRelations = viaRelationColumns.Select(c =>
-            {
-                c.Column.Parent = parentColumnField;
-                IArgument argument = c.Column.AsArgument(this);
-                return BuildTableRelationsFromViaParameter(argument,
-                    argument.GetCustomAttribute<ViaRelationAttribute>().Path);
-            }).ToList();
-
-            var result = MergeTableRelations(viaTableRelations.AppendOne(tableRelations).ToArray());
-            return result;
-        }
-
-        private TableRelations BuildTableRelations(IForeignKeyDefinition foreignKeyDefinition, ColumnField parentColumnField, IEnumerable<TableRelations> relations, TypeHierarchyNode node)
+        //private TableRelations BuildTableRelations(TableFromType tableType, TypeHierarchyNode node, ITableDefinition parentTable, ColumnField parentColumnField, Type parentType, TableRelationsFilter filter)
+        //{
+        //    var tableDefinition = this.DetectTable(tableType.Type);
+        //    return BuildTableRelations(tableDefinition, tableType.ColumnFields, tableType.Type, parentTable,
+        //        parentColumnField, parentType, node, filter);
+        //}
+        
+        private TableRelations BuildTableRelations(IForeignKeyDefinition foreignKeyDefinition, /*ColumnField parentColumnField,*/ IEnumerable<TableRelations> relations)
         {
             var tableDefinition = foreignKeyDefinition.KeyPairs.First().ForeignTableColumn.Table;
             
             return new TableRelations()
             {
-                ProjectionType = null,
-                ParentColumnField = parentColumnField,
+                //ProjectionType = null,
+                //ParentColumnField = parentColumnField,
                 TargetTable = tableDefinition,
                 NavigationTables = relations,
-                ProjectedColumns = new List<ColumnDefinitionWithPath>(),
-                ForeignKeyToParent = foreignKeyDefinition, 
-                HierarchyNode = node
+                ProjectedColumns = new List<TableRelationColumnDefinition>(),
+                ForeignKeyToParent = foreignKeyDefinition
             };
         }
 
-        public TableRelations BuildTableRelations(Type projectionType, IEnumerable<ParameterInfo> methodParameters, Func<ColumnField, bool, bool> columnFilter)
-        {
-            var node = new TypeHierarchyNode(this.UnwrapCollectionTargetType(projectionType));
-            var filteredMethodParameters = methodParameters.ToList();
-            // method parameters can use a filter that represents the projection table. We don't want
-            // to include the output table twice, so set that aside and merge it at the end instead
-            var projectionTypeTableFilterParameters = methodParameters.Where(p =>
-                IsTableOrTableProjection(p.ParameterType) && TableEqualityComparer.Default.Equals(DetectTable(p.ParameterType), DetectTable(projectionType))).ToList();
-            if (projectionTypeTableFilterParameters.Any())
-            {
-                filteredMethodParameters.RemoveAll(p => projectionTypeTableFilterParameters.Any(p2 => p == p2));
-            }
-            var tableType = new TableFromType()
-            {
-                Type = projectionType,
-                ColumnFields = filteredMethodParameters.Select(p => new ColumnField()
-                {
-                    Name = this.GetColumnName(p),
-                    Type = p.ParameterType,
-                    Parameter = p
-                }).ToList()
-            };
-            var tableTypeWithProjections = new TableFromType()
-            {
-                Type = projectionType,
-                ColumnFields = projectionTypeTableFilterParameters.Select(p => new ColumnField()
-                {
-                    Name = this.GetColumnName(p),
-                    Type = p.ParameterType,
-                    Parameter = p
-                }).ToList()
-            };
+        //public TableRelations BuildTableRelations(Type projectionType, IEnumerable<IArgument> methodArguments, TableRelationsFilter filter)
+        //{
+        //    var node = new TypeHierarchyNode(this.UnwrapCollectionTargetType(projectionType));
+        //    var filteredMethodParameters = methodArguments.ToList();
+        //    // method parameters can use a filter that represents the projection table. We don't want
+        //    // to include the output table twice, so set that aside and merge it at the end instead
+        //    var projectionTypeTableFilterParameters = methodArguments.Where(p =>
+        //        IsTableOrTableProjection(p.Type) && TableEqualityComparer.Default.Equals(DetectTable(p.Type), DetectTable(projectionType))).ToList();
+        //    if (projectionTypeTableFilterParameters.Any())
+        //    {
+        //        filteredMethodParameters.RemoveAll(p => projectionTypeTableFilterParameters.Any(p2 => p == p2));
+        //    }
+        //    var tableType = new TableFromType()
+        //    {
+        //        Type = projectionType,
+        //        ColumnFields = filteredMethodParameters.Select(p => new ColumnField()
+        //        {
+        //            Name = this.GetColumnName(p),
+        //            Type = p.Type,
+        //            Argument = p
+        //        }).ToList()
+        //    };
+        //    var tableTypeWithProjections = new TableFromType()
+        //    {
+        //        Type = projectionType,
+        //        ColumnFields = projectionTypeTableFilterParameters.Select(p => new ColumnField()
+        //        {
+        //            Name = this.GetColumnName(p),
+        //            Type = p.Type,
+        //            Argument = p
+        //        }).ToList()
+        //    };
             
 
 
-            var projectionTypeFilterTableRelations = tableTypeWithProjections.ColumnFields.Select(p => this.BuildTableRelationsFromType(p.Parameter.ParameterType, columnFilter, node, parentColumnField: p)).ToList();
-            projectionTypeFilterTableRelations.Add(BuildTableRelations(tableType, node, null, null, null, columnFilter));
-            return MergeTableRelations(projectionTypeFilterTableRelations.ToArray());
-        }
+        //    var projectionTypeFilterTableRelations = tableTypeWithProjections.ColumnFields.Select(p => this.BuildTableRelations(p.Type, columnFilter, node, parentColumnField: p)).ToList();
+        //    projectionTypeFilterTableRelations.Add(BuildTableRelations(tableType, node, null, null, null, filter));
+        //    return MergeTableRelations(projectionTypeFilterTableRelations.ToArray());
+        //}
 
         private IEnumerable<DetectedParameter> BuildViaRelationParameters(ITableDefinition primaryTableDefinition,
-            IEnumerable<ParameterInfo> parameters)
+            IEnumerable<IArgument> arguments)
         {
-            var arguments = parameters.AsArguments(this);
             var viaRelationArgs = FindMatchingArguments(arguments, a => a.GetCustomAttribute<ViaRelationAttribute>() != null);
             var detectedParameters = viaRelationArgs.Select(a =>
                 new DetectedParameter(a.Name, a.Type, a.PathToRoot().Reverse().First().GetParameterInfo())
@@ -462,15 +340,16 @@ namespace SigQL
             return matches;
         }
 
-        public IEnumerable<DetectedParameter> BuildDetectedParameters(ITableDefinition primaryTableDefinition, IEnumerable<ParameterInfo> parameters)
+        public IEnumerable<DetectedParameter> BuildDetectedParameters(Type projectionType, IEnumerable<IArgument> parameters)
         {
             var columnFilter = ColumnFilters.WhereClause;
             var allDetectedParameters = new List<DetectedParameter>();
+            var primaryTableDefinition = this.GetTable(projectionType);
             var viaRelationParameters = this.BuildViaRelationParameters(primaryTableDefinition, parameters);
             foreach (var parameter in parameters.Where(IsWhereClauseParameter))
             {
                 var hasViaRelationAttribute =
-                    parameter.CustomAttributes.Any(a => a.AttributeType == typeof(ViaRelationAttribute));
+                    parameter.GetCustomAttribute<ViaRelationAttribute>() != null;
                 if (hasViaRelationAttribute)
                 {
                 }
@@ -487,13 +366,13 @@ namespace SigQL
                 }
                 else
                 {
-                    var node = new TypeHierarchyNode(UnwrapCollectionTargetType(parameter.ParameterType));
-                    var detectedParameter = new DetectedParameter(GetColumnName(parameter), parameter.ParameterType, parameter)
+                    var node = new TypeHierarchyNode(UnwrapCollectionTargetType(parameter.Type));
+                    var detectedParameter = new DetectedParameter(GetColumnName(parameter), parameter.Type, parameter.RootToPath().First().GetParameterInfo())
                     {
                         TableRelations =
-                            IsTableOrTableProjection(parameter.ParameterType) && !TableEqualityComparer.Default.Equals(DetectTable(parameter.ParameterType), primaryTableDefinition)
-                                ? BuildTableRelationsWithMethodParams(primaryTableDefinition, parameter.AsEnumerable(), columnFilter, node) 
-                                : IsTableOrTableProjection(parameter.ParameterType) ? BuildTableRelationsFromType(parameter.ParameterType, columnFilter, node)
+                            IsTableOrTableProjection(parameter.Type) && !TableEqualityComparer.Default.Equals(DetectTable(parameter.Type), primaryTableDefinition)
+                                ? BuildTableRelations(this.ToArgumentContainer(projectionType), TableRelationsColumnSource.Parameters) 
+                                : IsTableOrTableProjection(parameter.Type) ? BuildTableRelations(this.ToArgumentContainer(parameter.Type), TableRelationsColumnSource.Parameters)
                                     : null
                     };
 
@@ -513,15 +392,15 @@ namespace SigQL
             return allDetectedParameters;
         }
         
-        public static bool IsWhereClauseParameter(ParameterInfo p)
+        public static bool IsWhereClauseParameter(IArgument p)
         {
             return
                 ((p.GetCustomAttribute<OffsetAttribute>() == null) &&
                  (p.GetCustomAttribute<FetchAttribute>() == null) &&
-                 (p.ParameterType != typeof(OrderByDirection)) &&
-                 (!p.ParameterType.IsAssignableFrom(typeof(IEnumerable<IOrderBy>)))) &&
-                 (!p.ParameterType.IsAssignableFrom(typeof(IOrderBy))) ||
-                (p.ParameterType.Namespace == typeof(Like).Namespace && p.ParameterType.GetInterfaces().Any(i => i == typeof(IWhereClauseFilterParameter)));
+                 (p.Type != typeof(OrderByDirection)) &&
+                 (!p.Type.IsAssignableFrom(typeof(IEnumerable<IOrderBy>)))) &&
+                 (!p.Type.IsAssignableFrom(typeof(IOrderBy))) ||
+                (p.Type.Namespace == typeof(Like).Namespace && p.Type.GetInterfaces().Any(i => i == typeof(IWhereClauseFilterParameter)));
         }
 
         private static bool HasLikeAttribute(ParameterInfo p)
@@ -561,7 +440,7 @@ namespace SigQL
                 var tableRelations = new TableRelations()
                 {
                     TargetTable = targetTable,
-                    ProjectedColumns = new List<ColumnDefinitionWithPath>(),
+                    ProjectedColumns = new List<TableRelationColumnDefinition>(),
                     NavigationTables = new List<TableRelations>()
                 };
 
@@ -573,9 +452,9 @@ namespace SigQL
                         throw new InvalidIdentifierException(
                             $"Unable to identify matching database column for parameter {argument.Name} with ViaRelation[\"{viaRelationPath}\"]. Column {columnName} does not exist in table {targetTable.Name}.");
                     }
-                    tableRelations.ProjectedColumns = new List<ColumnDefinitionWithPath>()
+                    tableRelations.ProjectedColumns = new List<TableRelationColumnDefinition>()
                     {
-                         argument.WhenParameter(p => new ColumnDefinitionWithPath(column, p), p => new ColumnDefinitionWithPath(column, p)) 
+                        new TableRelationColumnDefinition(column, argument, TableRelationsColumnSource.Parameters)
                     };
                 }
 
@@ -620,43 +499,49 @@ namespace SigQL
         {
             return new TableRelations()
             {
-                ProjectionType = tableRelationsCollection.Where(p => p.ProjectionType != null).Select(p => p.ProjectionType).FirstOrDefault(),
+                Argument = tableRelationsCollection.Where(t => t.Argument != null).Select(t => t.Argument).First(),
+                //ProjectionType = tableRelationsCollection.Where(p => p.ProjectionType != null).Select(p => p.ProjectionType).FirstOrDefault(),
                 TargetTable = tableRelationsCollection.First().TargetTable,
                 NavigationTables = tableRelationsCollection.SelectMany(t => t.NavigationTables).GroupBy(nt => nt.TargetTable, nt => nt, TableEqualityComparer.Default).Select(nt => MergeTableRelations(nt.ToArray())).ToList(),
                 ProjectedColumns = tableRelationsCollection.SelectMany(t => t.ProjectedColumns)
-                    //.Zip(tableRelationsCollection.SelectMany(t => t.ProjectedColumns),
-                    //(cd1, cd2) =>
-                    //{
-                    //    if (ColumnEqualityComparer.Default.Equals(cd1, cd2))
+                    //.Join(
+                    //    tableRelationsCollection.SelectMany(t => t.ProjectedColumns),
+                    //    t => t.Name,
+                    //    t => t.Name,
+                    //    (cd1, cd2) =>
                     //    {
-                    //        cd1.Parameter ??= cd2.Parameter;
-                    //    }
-                    //    return cd1;
-                    //})
-                    .Distinct(ColumnEqualityComparer.Default).Cast<ColumnDefinitionWithPath>().ToList(),
+                    //        if (ColumnEqualityComparer.Default.Equals(cd1, cd2))
+                    //        {
+                    //            cd1.Source |= cd2.Source;
+                    //        }
+                    //        return cd1;
+                    //    })
+                    //.Distinct(ColumnEqualityComparer.Default)
+                    //.Cast<TableRelationColumnDefinition>()
+                    .ToList(),
                 ForeignKeyToParent = tableRelationsCollection.Where(t => t.ForeignKeyToParent != null).Select(t => t.ForeignKeyToParent).Distinct(ForeignKeyDefinitionEqualityComparer.Default).FirstOrDefault(),
-                ParentColumnField = tableRelationsCollection.Select(p => p.ParentColumnField).FirstOrDefault(c => c != null),
-                Parent = tableRelationsCollection.Select(p => p.Parent).FirstOrDefault(parent => parent != null)
+                //ParentColumnField = tableRelationsCollection.Select(p => p.ParentColumnField).FirstOrDefault(c => c != null),
+                Parent = tableRelationsCollection.Select(p => p.Parent).FirstOrDefault(parent => parent != null),
             };
         }
 
-        public void InsertNavigationTable(TableRelations primaryTableRelations,
-            TableRelations foreignTableRelations)
-        {
-            var existingForeignTable = primaryTableRelations.NavigationTables.FirstOrDefault(t =>
-                TableEqualityComparer.Default.Equals(t.TargetTable, foreignTableRelations.TargetTable));
-            if (existingForeignTable != null)
-            {
-                primaryTableRelations.NavigationTables = primaryTableRelations.NavigationTables
-                    .Where(t => !TableEqualityComparer.Default.Equals(t.TargetTable, existingForeignTable.TargetTable))
-                    .Concat(new [] { this.MergeTableRelations(existingForeignTable, foreignTableRelations) }).ToList();
-            }
-            else
-            {
-                primaryTableRelations.NavigationTables = primaryTableRelations.NavigationTables                                                                    
-                    .Concat(new [] { foreignTableRelations }).ToList();
-            }
-        }
+        //public void InsertNavigationTable(TableRelations primaryTableRelations,
+        //    TableRelations foreignTableRelations)
+        //{
+        //    var existingForeignTable = primaryTableRelations.NavigationTables.FirstOrDefault(t =>
+        //        TableEqualityComparer.Default.Equals(t.TargetTable, foreignTableRelations.TargetTable));
+        //    if (existingForeignTable != null)
+        //    {
+        //        primaryTableRelations.NavigationTables = primaryTableRelations.NavigationTables
+        //            .Where(t => !TableEqualityComparer.Default.Equals(t.TargetTable, existingForeignTable.TargetTable))
+        //            .Concat(new [] { this.MergeTableRelations(existingForeignTable, foreignTableRelations) }).ToList();
+        //    }
+        //    else
+        //    {
+        //        primaryTableRelations.NavigationTables = primaryTableRelations.NavigationTables                                                                    
+        //            .Concat(new [] { foreignTableRelations }).ToList();
+        //    }
+        //}
 
         public class PropertyPath
         {
@@ -682,68 +567,60 @@ namespace SigQL
                 tableRelations.NavigationTables.SelectMany(FindAllForeignKeys));
         }
 
-        public ColumnSpec GetColumnSpec(Type methodParameterType,
-            IEnumerable<CustomAttributeData> customAttributes)
+        public ColumnSpec GetColumnSpec(IArgument argument)
         {
             var specInfo = new ColumnSpec()
             {
-                ComparisonType = methodParameterType
+                ComparisonType = argument.Type
             };
-
-            if (customAttributes != null && customAttributes.Any())
-            {
-                specInfo.IgnoreIfNull = customAttributes.Any(c => c.AttributeType == typeof(IgnoreIfNullAttribute));
-                specInfo.IgnoreIfNullOrEmpty = customAttributes.Any(c => c.AttributeType == typeof(IgnoreIfNullOrEmptyAttribute));
-                // pull this from ViaRelation as well, if it has a . near the end OR decorate with both
-                specInfo.ColumnName = customAttributes.Where(c => c.AttributeType == typeof(ColumnAttribute)).Select(c => c.ConstructorArguments.First().Value as string).FirstOrDefault() ??
-                                      customAttributes.Where(c => c.AttributeType == typeof(ViaRelationAttribute)).Select(c => (c.ConstructorArguments.First().Value as string).Split('.').Last()).FirstOrDefault();
-                specInfo.Not = customAttributes.Any(c => c.AttributeType == typeof(NotAttribute));
-                specInfo.GreaterThan = customAttributes.Any(c => c.AttributeType == typeof(GreaterThanAttribute));
-                specInfo.GreaterThanOrEqual = customAttributes.Any(c => c.AttributeType == typeof(GreaterThanOrEqualAttribute));
-                specInfo.LessThan = customAttributes.Any(c => c.AttributeType == typeof(LessThanAttribute));
-                specInfo.LessThanOrEqual = customAttributes.Any(c => c.AttributeType == typeof(LessThanOrEqualAttribute));
-                specInfo.StartsWith = customAttributes.Any(c => c.AttributeType == typeof(StartsWithAttribute));
-                specInfo.Contains = customAttributes.Any(c => c.AttributeType == typeof(ContainsAttribute));
-                specInfo.EndsWith = customAttributes.Any(c => c.AttributeType == typeof(EndsWithAttribute));
-            }
+            
+            specInfo.IgnoreIfNull = argument.GetCustomAttribute<IgnoreIfNullAttribute>() != null;
+            specInfo.IgnoreIfNullOrEmpty = argument.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null;
+            // pull this from ViaRelation as well, if it has a . near the end OR decorate with both
+            specInfo.ColumnName = argument.GetCustomAttribute<ColumnAttribute>()?.ColumnName ??
+                                  argument.GetCustomAttribute<ViaRelationAttribute>()?.Path.Split('.').Last();
+            specInfo.Not = argument.GetCustomAttribute<NotAttribute>() != null;
+            specInfo.GreaterThan = argument.GetCustomAttribute<GreaterThanAttribute>() != null;
+            specInfo.GreaterThanOrEqual = argument.GetCustomAttribute<GreaterThanOrEqualAttribute>() != null;
+            specInfo.LessThan = argument.GetCustomAttribute<LessThanAttribute>() != null;
+            specInfo.LessThanOrEqual = argument.GetCustomAttribute<LessThanOrEqualAttribute>() != null;
+            specInfo.StartsWith = argument.GetCustomAttribute<StartsWithAttribute>() != null;
+            specInfo.Contains = argument.GetCustomAttribute<ContainsAttribute>() != null;
+            specInfo.EndsWith = argument.GetCustomAttribute<EndsWithAttribute>() != null;
 
             return specInfo;
         }
 
-        public IEnumerable<ParameterPath> ProjectedColumnsToParameterPaths(TableRelations tableRelations, List<PropertyInfo> parentPropertyPath)
+        public IEnumerable<ParameterPath> ProjectedColumnsToParameterPaths(TableRelations tableRelations)
         {
             var tableParameterPaths = tableRelations.ProjectedColumns
                 .Select(p => 
-                    new ParameterPath()
-                    {
-                        Parameter = !parentPropertyPath.Any() ? tableRelations.ParentColumnField?.Parameter ?? p.Parameter : null,
-                        Properties = p.Property != null ? parentPropertyPath.AppendOne(p.Property).ToList() : parentPropertyPath
-                    }).ToList();
+                    p.Argument.ToParameterPath()).ToList();
             var navigationParameterPaths = tableRelations.NavigationTables.SelectMany(t =>
-                ProjectedColumnsToParameterPaths(t,
-                    t.ParentColumnField != null ? parentPropertyPath.AppendOne(t.ParentColumnField.Property).ToList() : parentPropertyPath));
+                ProjectedColumnsToParameterPaths(t));
 
             return tableParameterPaths.Concat(navigationParameterPaths).ToList();
         }
         
-        internal int GetOrdinal(ParameterInfo[] methodParameters, ParameterPath path)
+        internal int GetOrdinal(IEnumerable<IArgument> arguments, ParameterPath path)
         {
-            var parameterList = methodParameters.ToList();
-            return parameterList.IndexOf(path.Parameter);
+            throw new NotImplementedException("implement ordinals");
+            //var parameterList = arguments.ToList();
+            //return parameterList.IndexOf(path.Parameter);
         }
     }
     
-    public class TypeHierarchyNode
+    internal class TypeHierarchyNode
     {
-        private readonly PropertyInfo propertyInfo;
+        private readonly IArgument argument;
 
         public TypeHierarchyNode(Type type) : this(type, null, null)
         {
         }
 
-        public TypeHierarchyNode(Type type, TypeHierarchyNode parent, PropertyInfo propertyInfo)
+        public TypeHierarchyNode(Type type, TypeHierarchyNode parent, IArgument argument)
         {
-            this.propertyInfo = propertyInfo;
+            this.argument = argument;
             Type = type;
             this.Children = new List<TypeHierarchyNode>();
             this.Parent = parent;
@@ -755,7 +632,7 @@ namespace SigQL
         public int Depth => this.Parent == null ? 0 : this.Parent.Depth + 1;
         public int Ordinal => this.Parent == null ? 0 : this.Parent.Children.IndexOf(this);
 
-        public string Path => propertyInfo?.Name;
+        public string Path => argument?.Name;
 
         public string QualifiedPath => Parent == null ? Type.Name : string.Join(".", new [] { Parent.QualifiedPath, Path }.Where(p => !string.IsNullOrEmpty(p)));
 
@@ -797,29 +674,34 @@ namespace SigQL
 
     internal class ColumnFilters
     {
-        public static Func<ColumnField, bool, bool> WhereClause = (column, isTable) =>
-            !ColumnAttributes.IsDecoratedNonColumn(column.Property);
+        public static TableRelationsFilter WhereClause = 
+            new TableRelationsFilter((column, isTable) => 
+                !ColumnAttributes.IsDecoratedNonColumn(column));
 
-        public static Func<ColumnField, bool, bool> SelectClause = (column, isTable) =>
-            !ColumnAttributes.IsDecoratedNonColumn(column.Property);
+        public static TableRelationsFilter SelectClause = 
+            new TableRelationsFilter((column, isTable) =>
+                !ColumnAttributes.IsDecoratedNonColumn(column));
 
-        public static Func<ColumnField, bool, bool> FromClause = (column, isTable) =>
-            !ColumnAttributes.IsDecoratedNonColumn(column.Property);
+        public static TableRelationsFilter FromClause = 
+            new TableRelationsFilter(
+            (column, isTable) =>
+            !ColumnAttributes.IsDecoratedNonColumn(column));
 
-        public static Func<ColumnField, bool, bool> OrderBy = (column, isTable) =>
+        public static TableRelationsFilter OrderBy = 
+            new TableRelationsFilter(
+            (column, isTable) =>
             isTable ||
-            ColumnAttributes.IsOrderBy(column.Property) || 
-            ColumnAttributes.IsOrderBy(column.Parameter);
+            ColumnAttributes.IsOrderBy(column));
 
-        public static Func<ColumnField, bool, bool> ViaRelation = (column, isTable) =>
-            ColumnAttributes.IsViaRelation(column.Property) || 
-            ColumnAttributes.IsViaRelation(column.Parameter);
+        public static TableRelationsFilter ViaRelation = 
+            new TableRelationsFilter((column, isTable) =>
+                ColumnAttributes.IsViaRelation(column));
     }
 
     internal class ColumnAttributes
     {
 
-        public static bool IsDecoratedNonColumn(PropertyInfo property)
+        public static bool IsDecoratedNonColumn(IArgument property)
         {
             return
                 property.GetCustomAttribute<OffsetAttribute>() != null ||
@@ -830,62 +712,24 @@ namespace SigQL
                 IsDynamicOrderBy(property)
                 ;
         }
-        public static bool IsDecoratedNonColumn(ParameterInfo parameter)
-        {
-            return
-                parameter?.GetCustomAttribute<OffsetAttribute>() != null ||
-                parameter?.GetCustomAttribute<FetchAttribute>() != null ||
-                parameter?.GetCustomAttribute<ClrOnlyAttribute>() != null ||
-                parameter?.GetCustomAttribute<ViaRelationAttribute>() != null ||
-                IsOrderBy(parameter) ||
-                IsDynamicOrderBy(parameter);
-        }
 
-        public static bool IsViaRelation(ParameterInfo parameter)
-        {
-            return parameter?.GetCustomAttribute<ViaRelationAttribute>() != null;
-        }
-
-        public static bool IsViaRelation(PropertyInfo property)
+        public static bool IsViaRelation(IArgument property)
         {
             return property?.GetCustomAttribute<ViaRelationAttribute>() != null;
         }
 
-        public static bool IsOrderBy(PropertyInfo property)
+        public static bool IsOrderBy(IArgument property)
         {
             return 
-                property?.PropertyType == typeof(OrderByDirection) 
-                //||
-                //(((property?.PropertyType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
-                //  ((property?.PropertyType)?.IsAssignableFrom(
-                //      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false))
+                property?.Type == typeof(OrderByDirection)
                 ;
         }
 
-        public static bool IsOrderBy(ParameterInfo parameter)
-        {
-            return 
-                parameter?.ParameterType == typeof(OrderByDirection) 
-                //||
-                //(((parameter?.ParameterType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
-                //  ((parameter?.ParameterType)?.IsAssignableFrom(
-                //      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false))
-                ;
-        }
-
-        public static bool IsDynamicOrderBy(PropertyInfo property)
+        public static bool IsDynamicOrderBy(IArgument property)
         {
             return
-                (((property?.PropertyType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
-                  ((property?.PropertyType)?.IsAssignableFrom(
-                      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
-        }
-
-        public static bool IsDynamicOrderBy(ParameterInfo parameter)
-        {
-            return
-                (((parameter?.ParameterType)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
-                  ((parameter?.ParameterType)?.IsAssignableFrom(
+                (((property?.Type)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
+                  ((property?.Type)?.IsAssignableFrom(
                       typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
         }
     }
