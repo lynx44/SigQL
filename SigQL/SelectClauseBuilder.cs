@@ -55,7 +55,7 @@ namespace SigQL
         {
             var columnAliasForeignKeyDefinitions = this.databaseResolver.FindAllForeignKeys(fromClauseRelations)
                 .ToColumnAliasForeignKeyDefinitions().ToList();
-            var columnDefinitions = databaseResolver.ResolveColumnsForSelectStatement(fromClauseRelations, new List<string>(),
+            var columnDefinitions = databaseResolver.ResolveColumnsForSelectStatement(fromClauseRelations, 
                 columnAliasForeignKeyDefinitions, tablePrimaryKeyDefinitions);
             //foreach (var columnDefinition in columnDefinitions)
             //{

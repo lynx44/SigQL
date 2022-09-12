@@ -73,7 +73,8 @@ namespace SigQL
                 TableRelationsColumnSource.Parameters));
 
             var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
-            var resolvedSelectClause = selectClauseBuilder.Build(allTableRelations);
+            var selectTableRelations = allTableRelations.Filter(TableRelationsColumnSource.ReturnType, ColumnFilters.SelectClause);
+            var resolvedSelectClause = selectClauseBuilder.Build(selectTableRelations);
             
             var tablePrimaryKeyDefinitions = resolvedSelectClause.TableKeyDefinitions;
             
@@ -206,10 +207,10 @@ namespace SigQL
             }
 
             // remove IN parameters - these are converted to separate parameters
-            parameterPaths.RemoveAll(p =>
-                (p.Properties?.Any()).GetValueOrDefault(false)
-                    ? p.Properties.Select(pp => pp.PropertyType).Last().IsCollectionType()
-                    : p.Parameter.ParameterType.IsCollectionType());
+            //parameterPaths.RemoveAll(p =>
+            //    (p.Properties?.Any()).GetValueOrDefault(false)
+            //        ? p.Properties.Select(pp => pp.PropertyType).Last().IsCollectionType()
+            //        : p.Parameter.ParameterType.IsCollectionType());
 
             if (isCountResult)
             {
@@ -1226,13 +1227,11 @@ namespace SigQL
     {
         internal IArgument Argument { get; }
         public string SqlParameterName { get; set; }
-        public ParameterInfo Parameter => this.Argument.RootToPath().First().GetParameterInfo();
+        public ParameterInfo Parameter => Argument.FindParameter().GetParameterInfo();
 
         public IEnumerable<PropertyInfo> Properties =>
-            this.Argument.WhenParameter(
-                p => this.Argument.RootToPath().Skip(1).Select(p => p.GetPropertyInfo()).ToList(),
-                p => this.Argument.RootToPath().Select(p => p.GetPropertyInfo()).ToList());
-            
+            this.Argument.FindPropertiesFromRoot().Select(a => a.GetPropertyInfo()).ToList();
+
 
         internal ParameterPath(IArgument argument)
         {
@@ -1281,12 +1280,10 @@ namespace SigQL
             Argument = argument;
         }
 
-        public ParameterInfo Parameter => Argument.RootToPath().First().GetParameterInfo();
+        public ParameterInfo Parameter => Argument.FindParameter().GetParameterInfo();
 
         public IEnumerable<PropertyInfo> Properties =>
-            this.Argument.WhenParameter(
-                p => this.Argument.RootToPath().Skip(1).Select(p => p.GetPropertyInfo()).ToList(),
-                p => this.Argument.RootToPath().Select(p => p.GetPropertyInfo()).ToList());
+            this.Argument.FindPropertiesFromRoot().Select(a => a.GetPropertyInfo()).ToList();
         public string SqlParameterName { get; set; }
         internal IArgument Argument { get; set; }
         public Func<object, TokenPath, IDictionary<string, object>> UpdateNodeFunc { get; set; }
@@ -1393,6 +1390,7 @@ namespace SigQL
         PropertyInfo GetPropertyInfo();
 
         TResult WhenParameter<TResult>(Func<ParameterInfo, TResult> parameterAction, Func<PropertyInfo, TResult> propertyAction);
+        
     }
 
     internal class TableArgument : IArgument
@@ -1499,6 +1497,18 @@ namespace SigQL
         public static IEnumerable<IArgument> RootToPath(this IArgument argument)
         {
             return argument.PathToRoot().Reverse().ToList();
+        }
+
+        public static IArgument FindParameter(this IArgument argument)
+        {
+            return 
+                argument.RootToPath().Take(1).FirstOrDefault(arg => arg is ParameterArgument);
+        }
+
+        public static IEnumerable<IArgument> FindPropertiesFromRoot(this IArgument argument)
+        {
+            return
+                argument.RootToPath().Where(arg => arg is PropertyArgument).ToList();
         }
 
         public static string FullyQualifiedName(this IArgument argument)

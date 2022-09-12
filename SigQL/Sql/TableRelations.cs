@@ -36,7 +36,7 @@ namespace SigQL.Sql
 
         public TableRelations Filter(TableRelationsColumnSource source, TableRelationsFilter filter)
         {
-            var matchingColumns = this.ProjectedColumns.Where(c => c.Source.HasFlag(source) && c.Arguments.All.Any(arg => filter.IsMatch(arg, false))).ToList();
+            var matchingColumns = this.ProjectedColumns.Where(c => c.Source == source && c.Arguments.All.Any(arg => filter.IsMatch(arg, false))).ToList();
             var filteredTableRelations = new TableRelations()
             {
                 Argument = this.Argument,
@@ -44,7 +44,7 @@ namespace SigQL.Sql
                 ProjectedColumns = matchingColumns,
                 TargetTable = this.TargetTable
             };
-            var matchingNavigationTables = this.NavigationTables.Select(t => Filter(source, filter)).Where(t => t != null).ToList();
+            var matchingNavigationTables = this.NavigationTables.Select(t => t.Filter(source, filter)).ToList();
             matchingNavigationTables.ForEach(t => t.Parent = filteredTableRelations);
             filteredTableRelations.NavigationTables = matchingNavigationTables;
             
@@ -130,7 +130,7 @@ namespace SigQL.Sql
 
         public ITableDefinition Table => columnDefinition.Table;
 
-        public TableRelationsColumnSource Source { get; set; }
+        public TableRelationsColumnSource Source { get; }
 
         public TableRelationColumnDefinition(IColumnDefinition columnDefinition, IArgument argument, TableRelationsColumnSource source)
         {
@@ -176,8 +176,7 @@ namespace SigQL.Sql
 
         public IEnumerable<IArgument> All => Arguments.Select(a => a.Argument).ToList();
     }
-
-    [Flags]
+    
     internal enum TableRelationsColumnSource
     {
         ReturnType,

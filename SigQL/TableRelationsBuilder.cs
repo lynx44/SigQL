@@ -42,7 +42,7 @@ namespace SigQL
         }
 
         public TableRelations BuildTableRelations(ITableDefinition tableDefinition, IArgument argument, TableRelationsColumnSource source)
-        {;
+        {
             var columnFields = argument.ClassProperties.Where(p => !IsClrOnly(p)).Select(p => new ColumnField()
             {
                 Name = this.GetColumnName(p),
@@ -56,11 +56,7 @@ namespace SigQL
             columnsWithTables = columnsWithTables.Except(viaRelationColumns).ToList();
             var columnDescriptions = columnsWithTables.ToList();
             var unprocessedNavigationTables = columnDescriptions.Where(t => t.IsTable && !t.Column.Argument.IsDescendentOf(UnwrapCollectionTargetType(t.Column.Type))).ToList();
-            var typeHierarchyNodes = unprocessedNavigationTables.Select(p =>
-                 new
-                 {
-                     ColumnDescription = p
-                 }).ToList();
+            
             var relations = unprocessedNavigationTables
                 .Select(p =>
                 {

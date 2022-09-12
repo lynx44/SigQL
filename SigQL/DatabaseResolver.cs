@@ -23,7 +23,7 @@ namespace SigQL
         }
 
         public IEnumerable<ColumnDefinitionWithPropertyPath> ResolveColumnsForSelectStatement(
-            TableRelations tableRelations, IEnumerable<string> propertyPath,
+            TableRelations tableRelations, 
             IEnumerable<ColumnAliasForeignKeyDefinition> allForeignKeys,
             ConcurrentDictionary<string, ITableKeyDefinition> tableKeyDefinitions)
         {
@@ -31,63 +31,93 @@ namespace SigQL
             table = tableRelations.TargetTable;
             //if (tableRelations.ProjectionType != null)
             //{
-                var classProperties = tableRelations.Argument.ClassProperties;
-                var columns = classProperties.SelectMany(p =>
-                {
-                    var currentPaths = propertyPath.ToList();
-                    currentPaths.Add(p.Name);
-                    var propertyType = p.Type;
-                    if (!IsClrOnly(p))
-                    {
-                        if (IsColumnType(propertyType))
-                        {
-                            var targetColumn = table.Columns.FindByName(p.Name);
-                            if (targetColumn == null)
-                            {
-                                throw new InvalidIdentifierException(
-                                    $"Unable to identify matching database column for property {p.FullyQualifiedName()}. Column {p.Name} does not exist in table {table.Name}.");
-                            }
-                            return new ColumnDefinitionWithPropertyPath()
-                            {
-                                ColumnDefinition = new ColumnAliasColumnDefinition(targetColumn, tableRelations),
-                                PropertyPath = new PropertyPath() { PropertyPaths = currentPaths }
-                            }.AsEnumerable();
-                        }
-                        else
-                        if (IsTableOrTableProjection(propertyType))
-                        {
+                //var classProperties = tableRelations.ProjectedColumns;
 
-                            var navigationTableRelations = tableRelations.NavigationTables.SingleOrDefault(t => t.Argument == p);
-                            if (navigationTableRelations != null)
-                            {
-                                return ResolveColumnsForSelectStatement(navigationTableRelations, currentPaths, allForeignKeys, tableKeyDefinitions);
-                            }
-                        }
-                        else
-                        {
-                            throw new InvalidIdentifierException($"Unable to identify matching database table for property {p.FullyQualifiedName()} of type {propertyType}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(propertyType))} does not exist.");
-                        }
+            var columns = tableRelations.ProjectedColumns.SelectMany(p =>
+                {
+                    //var currentPaths = propertyPath.ToList();
+                    //currentPaths.Add(p.Name);
+                    var targetColumn = table.Columns.FindByName(p.Name);
+                    var argument = p.Arguments.GetArguments(TableRelationsColumnSource.ReturnType).First();
+                    if (targetColumn == null)
+                    {
+                        throw new InvalidIdentifierException(
+                            $"Unable to identify matching database column for property {argument.FullyQualifiedName()}. Column {p.Name} does not exist in table {table.Name}.");
                     }
 
-                    return new ColumnDefinitionWithPropertyPath[0];
-                }).Where(c => c != null).ToList();
+                    return new ColumnDefinitionWithPropertyPath()
+                    {
+                        ColumnDefinition = new ColumnAliasColumnDefinition(targetColumn, tableRelations),
+                        PropertyPath = new PropertyPath() { PropertyPaths = argument.FindPropertiesFromRoot().Select(arg => arg.Name).ToList() }
+                    }.AsEnumerable();
+                }).ToList();
 
-                tableKeyDefinitions[string.Join(".", propertyPath.ToList())] = table.PrimaryKey;
+                columns.AddRange(tableRelations.NavigationTables.SelectMany(p =>
+                {
+                    return ResolveColumnsForSelectStatement(p, allForeignKeys, tableKeyDefinitions);
+                }));
+
+            //var columns = classProperties.SelectMany(p =>
+            //    {
+            //        var currentPaths = propertyPath.ToList();
+            //        currentPaths.Add(p.Name);
+            //        var propertyType = p.Type;
+            //        if (!IsClrOnly(p))
+            //        {
+            //            if (IsColumnType(propertyType))
+            //            {
+            //                var targetColumn = table.Columns.FindByName(p.Name);
+            //                if (targetColumn == null)
+            //                {
+            //                    throw new InvalidIdentifierException(
+            //                        $"Unable to identify matching database column for property {p.FullyQualifiedName()}. Column {p.Name} does not exist in table {table.Name}.");
+            //                }
+            //                return new ColumnDefinitionWithPropertyPath()
+            //                {
+            //                    ColumnDefinition = new ColumnAliasColumnDefinition(targetColumn, tableRelations),
+            //                    PropertyPath = new PropertyPath() { PropertyPaths = currentPaths }
+            //                }.AsEnumerable();
+            //            }
+            //            else
+            //            if (IsTableOrTableProjection(propertyType))
+            //            {
+
+            //                var navigationTableRelations = tableRelations.NavigationTables.SingleOrDefault(t => t.Argument == p);
+            //                if (navigationTableRelations != null)
+            //                {
+            //                    return ResolveColumnsForSelectStatement(navigationTableRelations, currentPaths, allForeignKeys, tableKeyDefinitions);
+            //                }
+            //            }
+            //            else
+            //            {
+            //                throw new InvalidIdentifierException($"Unable to identify matching database table for property {p.FullyQualifiedName()} of type {propertyType}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(propertyType))} does not exist.");
+            //            }
+            //        }
+
+            //        return new ColumnDefinitionWithPropertyPath[0];
+            //    }).Where(c => c != null).ToList();
+
+            var currentPaths = tableRelations.Argument.FindPropertiesFromRoot().Select(p => p.Name).ToList();
+            
 
                 if (table.PrimaryKey.Columns.Any())
                 {
                     var primaryColumns = table.PrimaryKey.Columns
                         .Select(c =>
                         {
-                            var currentPaths = propertyPath.ToList();
-                            currentPaths.Add(c.Name);
                             return new ColumnDefinitionWithPropertyPath()
                             {
                                 ColumnDefinition = new ColumnAliasColumnDefinition(c, tableRelations),
-                                PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.ToList()}
+                                PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.AppendOne(c.Name).ToList()}
                             };
                         }).ToList();
+
+                    foreach (var primaryColumn in primaryColumns)
+                    {
+                        tableKeyDefinitions[string.Join(".", currentPaths.AppendOne(primaryColumn.ColumnDefinition.Name))] = table.PrimaryKey;
+                    }
                 
+
                     primaryColumns.AddRange(columns);
                     columns = primaryColumns.ToList();
                 }
@@ -269,6 +299,7 @@ namespace SigQL
             {
                 //ProjectionType = null,
                 //ParentColumnField = parentColumnField,
+                Argument = new TypeArgument(typeof(void), this),
                 TargetTable = tableDefinition,
                 NavigationTables = relations,
                 ProjectedColumns = new List<TableRelationColumnDefinition>(),
