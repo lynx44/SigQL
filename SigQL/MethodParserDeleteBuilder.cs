@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using SigQL.Extensions;
@@ -12,37 +13,38 @@ namespace SigQL
     {
         private MethodSqlStatement BuildDeleteStatement(DeleteSpec deleteSpec)
         {
-            var tokens = new List<TokenPath>();
-            var parameterPaths = new List<ParameterPath>();
-            var methodInfo = deleteSpec.RootMethodInfo;
+            throw new NotImplementedException();
+            //var tokens = new List<TokenPath>();
+            //var parameterPaths = new List<ParameterPath>();
+            //var methodInfo = deleteSpec.RootMethodInfo;
             
-            var tableRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.ToArgumentContainer(deleteSpec.Table,
-                methodInfo.GetParameters().AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters);
-            var primaryTable = tableRelations.TargetTable;
-            var whereClause = BuildWhereClauseFromTargetTablePerspective(
-                new RelationalTable() {Label = primaryTable.Name}, tableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause), parameterPaths,
-                tokens);
+            //var tableRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.ToArgumentContainer(deleteSpec.Table,
+            //    methodInfo.GetParameters().AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters);
+            //var primaryTable = tableRelations.TargetTable;
+            //var whereClause = BuildWhereClauseFromTargetTablePerspective(
+            //    new RelationalTable() {Label = primaryTable.Name}, tableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause), parameterPaths,
+            //    tokens);
 
-            var statement = new Delete()
-            {
-                FromClause = new FromClause().SetArgs(new FromClauseNode().SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = primaryTable.Name }))),
-                WhereClause = whereClause
-            };
+            //var statement = new Delete()
+            //{
+            //    FromClause = new FromClause().SetArgs(new FromClauseNode().SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = primaryTable.Name }))),
+            //    WhereClause = whereClause
+            //};
 
-            var sqlStatement = new MethodSqlStatement()
-            {
-                CommandAst = statement.AsEnumerable(),
-                SqlBuilder = this.builder,
-                ReturnType = methodInfo.ReturnType,
-                UnwrappedReturnType = null,
-                Parameters = parameterPaths,
-                Tokens = tokens,
-                // ColumnAliasRelations = columnAliasForeignKeyDefinitions,
-                TargetTablePrimaryKey = null,
-                TablePrimaryKeyDefinitions = null
-            };
+            //var sqlStatement = new MethodSqlStatement()
+            //{
+            //    CommandAst = statement.AsEnumerable(),
+            //    SqlBuilder = this.builder,
+            //    ReturnType = methodInfo.ReturnType,
+            //    UnwrappedReturnType = null,
+            //    Parameters = parameterPaths,
+            //    Tokens = tokens,
+            //    // ColumnAliasRelations = columnAliasForeignKeyDefinitions,
+            //    TargetTablePrimaryKey = null,
+            //    TablePrimaryKeyDefinitions = null
+            //};
 
-            return sqlStatement;
+            //return sqlStatement;
         }
 
         private bool IsDeleteMethod(MethodInfo methodInfo)

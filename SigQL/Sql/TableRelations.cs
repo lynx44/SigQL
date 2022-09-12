@@ -24,9 +24,19 @@ namespace SigQL.Sql
         public string TableName => TargetTable.Name;
         public TableRelations Parent { get; set; }
 
+        //public void AddArgument(IArgument argument, TableRelationsColumnSource source)
+        //{
+        //    Arguments.Add();
+        //}
+
+        //public IArgument GetArguments(TableRelationsColumnSource source)
+        //{
+
+        //}
+
         public TableRelations Filter(TableRelationsColumnSource source, TableRelationsFilter filter)
         {
-            var matchingColumns = this.ProjectedColumns.Where(c => c.Source.HasFlag(source) && filter.IsMatch(c.Argument, false)).ToList();
+            var matchingColumns = this.ProjectedColumns.Where(c => c.Source.HasFlag(source) && c.Arguments.All.Any(arg => filter.IsMatch(arg, false))).ToList();
             var filteredTableRelations = new TableRelations()
             {
                 Argument = this.Argument,
@@ -113,7 +123,7 @@ namespace SigQL.Sql
     {
         private readonly IColumnDefinition columnDefinition;
         
-        public IArgument Argument { get; set; }
+        public ArgumentCollection Arguments { get; set; }
 
         public string Name => columnDefinition.Name;
         public string DataTypeDeclaration => columnDefinition.DataTypeDeclaration;
@@ -125,9 +135,46 @@ namespace SigQL.Sql
         public TableRelationColumnDefinition(IColumnDefinition columnDefinition, IArgument argument, TableRelationsColumnSource source)
         {
             this.columnDefinition = columnDefinition;
-            this.Argument = argument;
+            this.Arguments = new ArgumentCollection();
+            this.Arguments.AddArgument(argument, source);
             this.Source = source;
         }
+    }
+
+    internal class ArgumentCollection
+    {
+        private class ArgumentWithSource
+        {
+            public ArgumentWithSource(IArgument argument, TableRelationsColumnSource source)
+            {
+                Argument = argument;
+                Source = source;
+            }
+
+            public IArgument Argument { get; set; }
+            public TableRelationsColumnSource Source { get; set; }
+        }
+
+        private List<ArgumentWithSource> Arguments { get; set; }
+
+        public ArgumentCollection()
+        {
+            this.Arguments = new List<ArgumentWithSource>();
+        }
+
+        public void AddArgument(IArgument argument, TableRelationsColumnSource source)
+        {
+            Arguments.Add(new ArgumentWithSource(argument, source));
+        }
+
+        public IEnumerable<IArgument> GetArguments(TableRelationsColumnSource source)
+        {
+            return Arguments.Where(a => a.Source == source)
+                .Select(a => a.Argument)
+                .ToList();
+        }
+
+        public IEnumerable<IArgument> All => Arguments.Select(a => a.Argument).ToList();
     }
 
     [Flags]

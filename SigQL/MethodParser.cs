@@ -65,10 +65,11 @@ namespace SigQL
             var methodParameters = methodInfo.GetParameters();
             var arguments = methodParameters.AsArguments(this.databaseResolver);
 
+            var tableDefinition = this.databaseResolver.DetectTable(projectionType);
             var allTableRelations = this.databaseResolver.MergeTableRelations(
-                this.databaseResolver.BuildTableRelations(this.databaseResolver.ToArgumentContainer(projectionType),
+                this.databaseResolver.BuildTableRelations(tableDefinition, new TypeArgument(projectionType, this.databaseResolver),
                     TableRelationsColumnSource.ReturnType), 
-                this.databaseResolver.BuildTableRelations(this.databaseResolver.ToArgumentContainer(projectionType, arguments),
+                this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, arguments),
                 TableRelationsColumnSource.Parameters));
 
             var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
@@ -453,18 +454,22 @@ namespace SigQL
         {
             var andOperator = new AndOperator().SetArgs(whereClauseTableRelations.ProjectedColumns.SelectMany(column =>
                 {
-                    var argument = column.Argument.GetEndpoint();
-                    var parameterName = argument.Name;
-                    var dbColumn = GetColumnForParameterName(whereClauseTableRelations.TargetTable, parameterName);
+                    return column.Arguments.GetArguments(TableRelationsColumnSource.Parameters).SelectMany(arg =>
+                    {
+                        var argument = arg.GetEndpoint();
+                        var parameterName = argument.Name;
+                        var dbColumn = GetColumnForParameterName(whereClauseTableRelations.TargetTable, parameterName);
 
-                    
-                    var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
-                        .SetArgs(primaryTableReference,
-                            new RelationalColumn()
-                            {
-                                Label = column.Name
-                            }), parameterName, argument, parameterPaths, tokens);
-                    return comparisonNode.AsEnumerable().ToList();
+
+                        var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
+                            .SetArgs(primaryTableReference,
+                                new RelationalColumn()
+                                {
+                                    Label = column.Name
+                                }), parameterName, argument, parameterPaths, tokens);
+                        return comparisonNode.AsEnumerable().ToList();
+                    });
+
                 }
             ));
 
@@ -593,13 +598,16 @@ namespace SigQL
                                 new TableIdentifier().SetArgs(primaryTableReference, new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = primaryTableColumn.Name })));
                         }).ToList()
                         .Concat(
-                            navigationTableRelations.ProjectedColumns.Select(c =>
+                            navigationTableRelations.ProjectedColumns.SelectMany(c =>
                             {
                                 var sqlParameterName = $"{navigationTableAlias}{c.Name}";
-                                return BuildComparisonNode(
-                                    new ColumnIdentifier().SetArgs(new Alias() { Label = navigationTableAlias },
-                                        new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Name })),
-                                    sqlParameterName, c.Argument, parameterPaths, tokens);
+                                return
+                                    c.Arguments.GetArguments(TableRelationsColumnSource.Parameters).Select(arg =>
+                                        BuildComparisonNode(
+                                            new ColumnIdentifier().SetArgs(new Alias() { Label = navigationTableAlias },
+                                                new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Name })),
+                                            sqlParameterName, arg, parameterPaths, tokens)).ToList();
+
                             }).ToList()
                         )
                         .Concat(

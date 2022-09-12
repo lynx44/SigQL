@@ -41,10 +41,9 @@ namespace SigQL
             };
         }
 
-        public TableRelations BuildTableRelations(ArgumentContainer arguments, TableRelationsColumnSource source)
-        {
-            var tableDefinition = arguments.TargetTable;
-            var columnFields = arguments.Arguments.Where(p => !IsClrOnly(p)).Select(p => new ColumnField()
+        public TableRelations BuildTableRelations(ITableDefinition tableDefinition, IArgument argument, TableRelationsColumnSource source)
+        {;
+            var columnFields = argument.ClassProperties.Where(p => !IsClrOnly(p)).Select(p => new ColumnField()
             {
                 Name = this.GetColumnName(p),
                 Type = p.Type,
@@ -65,7 +64,8 @@ namespace SigQL
             var relations = unprocessedNavigationTables
                 .Select(p =>
                 {
-                    return BuildTableRelations(this.ToArgumentContainer(p.Column.Type), source);
+                    var navigationTableRelations = BuildTableRelations(this.DetectTable(p.Column.Argument.Type), p.Column.Argument, source);
+                    return navigationTableRelations;
                 }).ToList();
             var columns = columnDescriptions.Where(t => !t.IsTable)
                 .Select(d =>
@@ -90,7 +90,7 @@ namespace SigQL
             {
                 //ProjectionType = arguments.ProjectionType,
                 //ParentColumnField = parentColumnField,
-                Argument = new TableArgument(tableDefinition, arguments.Arguments),
+                Argument = argument,
                 TargetTable = tableDefinition,
                 NavigationTables = relations,
                 ProjectedColumns = columns
@@ -105,27 +105,37 @@ namespace SigQL
             IEnumerable<IForeignKeyDefinition> foreignKeys = null;
             foreach (var navigationTableRelations in tableRelations.NavigationTables)
             {
-                var foreignKey = this.FindPrimaryForeignKeyMatchForTables(tableDefinition, navigationTableRelations.TargetTable);
-                if (foreignKey == null)
+                if (!TableEqualityComparer.Default.Equals(navigationTableRelations.TargetTable,
+                        tableRelations.TargetTable))
                 {
-                    foreignKeys = FindManyToManyForeignKeyMatchesForTables(tableDefinition, navigationTableRelations.TargetTable);
-
-                    if (!(foreignKeys?.Any()).GetValueOrDefault(false))
+                    var foreignKey = this.FindPrimaryForeignKeyMatchForTables(tableDefinition, navigationTableRelations.TargetTable);
+                    if (foreignKey == null)
                     {
-                        throw new InvalidIdentifierException(
-                            $"Unable to identify matching database foreign key for property {navigationTableRelations.Argument.FullyQualifiedName()}. No foreign key between {tableDefinition.Name} and {navigationTableRelations.TargetTable.Name} could be found.");
-                    }
+                        foreignKeys = FindManyToManyForeignKeyMatchesForTables(tableDefinition, navigationTableRelations.TargetTable);
 
-                    var oneToManyFk = foreignKeys.First(fk => TableEqualityComparer.Default.Equals(fk.PrimaryKeyTable, navigationTableRelations.TargetTable));
-                    var manyToOneFk = foreignKeys.Except(new[] { oneToManyFk }).First();
-                    tableRelations.ForeignKeyToParent = oneToManyFk;
-                    //tableRelations.ParentColumnField = null;
-                    
-                    return this.BuildTableRelations(manyToOneFk, new[] { tableRelations });
+                        if (!(foreignKeys?.Any()).GetValueOrDefault(false))
+                        {
+                            throw new InvalidIdentifierException(
+                                $"Unable to identify matching database foreign key for property {navigationTableRelations.Argument.FullyQualifiedName()}. No foreign key between {tableDefinition.Name} and {navigationTableRelations.TargetTable.Name} could be found.");
+                        }
+
+                        var oneToManyFk = foreignKeys.First(fk => TableEqualityComparer.Default.Equals(fk.PrimaryKeyTable, navigationTableRelations.TargetTable));
+                        var manyToOneFk = foreignKeys.Except(new[] { oneToManyFk }).First();
+                        tableRelations.ForeignKeyToParent = oneToManyFk;
+                        //tableRelations.ParentColumnField = null;
+
+                        return this.BuildTableRelations(manyToOneFk, new[] { tableRelations });
+                    }
+                    else
+                    {
+                        navigationTableRelations.ForeignKeyToParent = foreignKey;
+                    }
                 }
                 else
                 {
-                    navigationTableRelations.ForeignKeyToParent = foreignKey;
+                    ;
+                    tableRelations.NavigationTables = tableRelations.NavigationTables.Except(new [] { navigationTableRelations}).ToList();
+                    tableRelations = MergeTableRelations(tableRelations, navigationTableRelations);
                 }
             }
 

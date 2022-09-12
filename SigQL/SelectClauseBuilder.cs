@@ -25,7 +25,7 @@ namespace SigQL
         {
             var projectionType = OutputFactory.UnwrapType(outputType);
 
-            var fromClauseRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.ToArgumentContainer(projectionType), TableRelationsColumnSource.ReturnType);
+            var fromClauseRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.DetectTable(outputType), new TypeArgument(outputType, databaseResolver), TableRelationsColumnSource.ReturnType);
 
             return Build(fromClauseRelations);
         }

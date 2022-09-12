@@ -340,57 +340,57 @@ namespace SigQL
             return matches;
         }
 
-        public IEnumerable<DetectedParameter> BuildDetectedParameters(Type projectionType, IEnumerable<IArgument> parameters)
-        {
-            var columnFilter = ColumnFilters.WhereClause;
-            var allDetectedParameters = new List<DetectedParameter>();
-            var primaryTableDefinition = this.GetTable(projectionType);
-            var viaRelationParameters = this.BuildViaRelationParameters(primaryTableDefinition, parameters);
-            foreach (var parameter in parameters.Where(IsWhereClauseParameter))
-            {
-                var hasViaRelationAttribute =
-                    parameter.GetCustomAttribute<ViaRelationAttribute>() != null;
-                if (hasViaRelationAttribute)
-                {
-                }
-                else if (parameter.GetCustomAttribute<ParameterAttribute>() != null)
-                {
-                    // skip
+        //public IEnumerable<DetectedParameter> BuildDetectedParameters(Type projectionType, IEnumerable<IArgument> parameters)
+        //{
+        //    var columnFilter = ColumnFilters.WhereClause;
+        //    var allDetectedParameters = new List<DetectedParameter>();
+        //    var primaryTableDefinition = this.GetTable(projectionType);
+        //    var viaRelationParameters = this.BuildViaRelationParameters(primaryTableDefinition, parameters);
+        //    foreach (var parameter in parameters.Where(IsWhereClauseParameter))
+        //    {
+        //        var hasViaRelationAttribute =
+        //            parameter.GetCustomAttribute<ViaRelationAttribute>() != null;
+        //        if (hasViaRelationAttribute)
+        //        {
+        //        }
+        //        else if (parameter.GetCustomAttribute<ParameterAttribute>() != null)
+        //        {
+        //            // skip
 
-                    //var detectedParameter = new DetectedParameter(parameter.Name, parameter.ParameterType, parameter)
-                    //{
-                    //    TableRelations = null
-                    //};
-                    //allDetectedParameters.Add(
-                    //    detectedParameter);
-                }
-                else
-                {
-                    var node = new TypeHierarchyNode(UnwrapCollectionTargetType(parameter.Type));
-                    var detectedParameter = new DetectedParameter(GetColumnName(parameter), parameter.Type, parameter.RootToPath().First().GetParameterInfo())
-                    {
-                        TableRelations =
-                            IsTableOrTableProjection(parameter.Type) && !TableEqualityComparer.Default.Equals(DetectTable(parameter.Type), primaryTableDefinition)
-                                ? BuildTableRelations(this.ToArgumentContainer(projectionType), TableRelationsColumnSource.Parameters) 
-                                : IsTableOrTableProjection(parameter.Type) ? BuildTableRelations(this.ToArgumentContainer(parameter.Type), TableRelationsColumnSource.Parameters)
-                                    : null
-                    };
+        //            //var detectedParameter = new DetectedParameter(parameter.Name, parameter.ParameterType, parameter)
+        //            //{
+        //            //    TableRelations = null
+        //            //};
+        //            //allDetectedParameters.Add(
+        //            //    detectedParameter);
+        //        }
+        //        else
+        //        {
+        //            var node = new TypeHierarchyNode(UnwrapCollectionTargetType(parameter.Type));
+        //            var detectedParameter = new DetectedParameter(GetColumnName(parameter), parameter.Type, parameter.RootToPath().First().GetParameterInfo())
+        //            {
+        //                TableRelations =
+        //                    IsTableOrTableProjection(parameter.Type) && !TableEqualityComparer.Default.Equals(DetectTable(parameter.Type), primaryTableDefinition)
+        //                        ? BuildTableRelations(this.ToArgumentContainer(projectionType), TableRelationsColumnSource.Parameters) 
+        //                        : IsTableOrTableProjection(parameter.Type) ? BuildTableRelations(this.ToArgumentContainer(parameter.Type), TableRelationsColumnSource.Parameters)
+        //                            : null
+        //            };
 
-                    if (detectedParameter.TableRelations == null && primaryTableDefinition.Columns.FindByName(detectedParameter.Name) == null)
-                    {
-                        throw new InvalidIdentifierException(
-                            $"Unable to identify matching database column for parameter {parameter.Name}. Column {detectedParameter.Name} does not exist in table {primaryTableDefinition.Name}.");
-                    }
+        //            if (detectedParameter.TableRelations == null && primaryTableDefinition.Columns.FindByName(detectedParameter.Name) == null)
+        //            {
+        //                throw new InvalidIdentifierException(
+        //                    $"Unable to identify matching database column for parameter {parameter.Name}. Column {detectedParameter.Name} does not exist in table {primaryTableDefinition.Name}.");
+        //            }
 
-                    allDetectedParameters.Add(
-                        detectedParameter);
-                }
-            }
+        //            allDetectedParameters.Add(
+        //                detectedParameter);
+        //        }
+        //    }
 
-            allDetectedParameters.AddRange(viaRelationParameters);
+        //    allDetectedParameters.AddRange(viaRelationParameters);
            
-            return allDetectedParameters;
-        }
+        //    return allDetectedParameters;
+        //}
         
         public static bool IsWhereClauseParameter(IArgument p)
         {
@@ -594,8 +594,8 @@ namespace SigQL
         public IEnumerable<ParameterPath> ProjectedColumnsToParameterPaths(TableRelations tableRelations)
         {
             var tableParameterPaths = tableRelations.ProjectedColumns
-                .Select(p => 
-                    p.Argument.ToParameterPath()).ToList();
+                .SelectMany(p => 
+                    p.Arguments.GetArguments(TableRelationsColumnSource.ReturnType)).Select(a => a.ToParameterPath()).ToList();
             var navigationParameterPaths = tableRelations.NavigationTables.SelectMany(t =>
                 ProjectedColumnsToParameterPaths(t));
 

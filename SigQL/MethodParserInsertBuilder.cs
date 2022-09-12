@@ -326,68 +326,71 @@ namespace SigQL
 
         private InsertSpec GetInsertSpec(MethodInfo methodInfo)
         {
-            var insertAttribute = methodInfo.GetCustomAttributes(typeof(InsertAttribute), false).Cast<InsertAttribute>().FirstOrDefault();
-            if (insertAttribute != null)
-            {
-                var insertSpec = new InsertSpec();
-                if (!string.IsNullOrEmpty(insertAttribute.TableName))
-                {
-                    insertSpec.Table = this.databaseConfiguration.Tables.FindByName(insertAttribute.TableName);
-                }
+            throw new NotImplementedException();
+            //var insertAttribute = methodInfo.GetCustomAttributes(typeof(InsertAttribute), false).Cast<InsertAttribute>().FirstOrDefault();
+            //if (insertAttribute != null)
+            //{
+            //    var insertSpec = new InsertSpec();
+            //    if (!string.IsNullOrEmpty(insertAttribute.TableName))
+            //    {
+            //        insertSpec.Table = this.databaseConfiguration.Tables.FindByName(insertAttribute.TableName);
+            //    }
                
-                var methodParameters = methodInfo.GetParameters();
-                var tableTypeParameters = methodParameters.Where(p => this.databaseResolver.IsTableOrTableProjection(OutputFactory.UnwrapType(p.ParameterType)));
-                if (tableTypeParameters.Any())
-                {
-                    if (methodParameters.Length > 1 || tableTypeParameters.Count() > 1)
-                    {
-                        throw new InvalidOperationException("Only one table representation parameter is supported.");
-                    }
+            //    var methodParameters = methodInfo.GetParameters();
+            //    var tableTypeParameters = methodParameters.Where(p => this.databaseResolver.IsTableOrTableProjection(OutputFactory.UnwrapType(p.ParameterType)));
+            //    if (tableTypeParameters.Any())
+            //    {
+            //        if (methodParameters.Length > 1 || tableTypeParameters.Count() > 1)
+            //        {
+            //            throw new InvalidOperationException("Only one table representation parameter is supported.");
+            //        }
                     
-                    var parameterInfo = tableTypeParameters.Single();
-                    var tableRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.ToArgumentContainer(parameterInfo.ParameterType), TableRelationsColumnSource.Parameters);
-                    insertSpec.ColumnParameters = tableRelations.ProjectedColumns.Select(pc =>
-                        new InsertColumnParameter()
-                        {
-                            Column = pc,
-                            ParameterPath = new ParameterPath(pc.Argument)
-                            {
-                                SqlParameterName = pc.Name
-                            }
-                        }).ToList();
-                    if (insertSpec.Table == null)
-                    {
-                        insertSpec.Table = tableRelations.TargetTable;
-                    }
+            //        var parameterInfo = tableTypeParameters.Single();
+            //        var tableRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.ToArgumentContainer(parameterInfo.ParameterType), TableRelationsColumnSource.Parameters);
+            //        insertSpec.ColumnParameters = tableRelations.ProjectedColumns.SelectMany(pc =>
+            //            pc.Arguments.All.Select(arg =>
+            //                new InsertColumnParameter()
+            //                {
+            //                    Column = pc,
+            //                    ParameterPath = new ParameterPath(arg)
+            //                    {
+            //                        SqlParameterName = pc.Name
+            //                    }
+            //                })
+            //            ).ToList();
+            //        if (insertSpec.Table == null)
+            //        {
+            //            insertSpec.Table = tableRelations.TargetTable;
+            //        }
 
-                    insertSpec.TableRelations = tableRelations;
-                }
-                else
-                {
-                    insertSpec.ColumnParameters = 
-                        methodParameters.AsArguments(this.databaseResolver)
-                            .Select(p => 
-                                new InsertColumnParameter()
-                                {
-                                    Column = insertSpec.Table.Columns.FindByName(p.Name),
-                                    ParameterPath = new ParameterPath(p)
-                                    {
-                                        SqlParameterName = p.Name
-                                    }
-                                }
-                            ).ToList();
-                }
+            //        insertSpec.TableRelations = tableRelations;
+            //    }
+            //    else
+            //    {
+            //        insertSpec.ColumnParameters = 
+            //            methodParameters.AsArguments(this.databaseResolver)
+            //                .Select(p => 
+            //                    new InsertColumnParameter()
+            //                    {
+            //                        Column = insertSpec.Table.Columns.FindByName(p.Name),
+            //                        ParameterPath = new ParameterPath(p)
+            //                        {
+            //                            SqlParameterName = p.Name
+            //                        }
+            //                    }
+            //                ).ToList();
+            //    }
 
-                insertSpec.ReturnType = methodInfo.ReturnType;
-                insertSpec.UnwrappedReturnType = OutputFactory.UnwrapType(methodInfo.ReturnType);
-                insertSpec.RootMethodInfo = methodInfo;
+            //    insertSpec.ReturnType = methodInfo.ReturnType;
+            //    insertSpec.UnwrappedReturnType = OutputFactory.UnwrapType(methodInfo.ReturnType);
+            //    insertSpec.RootMethodInfo = methodInfo;
 
-                return insertSpec;
-            }
+            //    return insertSpec;
+            //}
 
              
             
-            return null;
+            //return null;
         }
 
 
