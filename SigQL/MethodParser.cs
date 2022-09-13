@@ -278,17 +278,17 @@ namespace SigQL
                 var isClass = p.Type.IsClass || p.Type.IsInterface;
                 if (isClass)
                 {
-                    var propsWithAttr = p.ClassProperties.Where(p => p.GetCustomAttribute<TAttribute>() != null).Select(a => a.GetPropertyInfo()).ToList();
+                    var propsWithAttr = p.ClassProperties.Where(p => p.GetCustomAttribute<TAttribute>() != null).ToList();
                     if (propsWithAttr.Count() >= 2)
                     {
-                        throw new InvalidAttributeException(typeof(TAttribute), propsWithAttr,
+                        throw new InvalidAttributeException(typeof(TAttribute), propsWithAttr.Select(a => a.GetPropertyInfo()),
                             $"Attribute [{typeof(TAttribute).Name}] is specified more than once.");
                     }
 
                     if (propsWithAttr.Any())
                     {
                         return
-                            new ParameterPath(p);
+                            new ParameterPath(propsWithAttr.First());
                     }
                 }
 

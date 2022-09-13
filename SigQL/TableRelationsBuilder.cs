@@ -43,7 +43,7 @@ namespace SigQL
 
         public TableRelations BuildTableRelations(ITableDefinition tableDefinition, IArgument argument, TableRelationsColumnSource source)
         {
-            var columnFields = argument.ClassProperties.Where(p => !IsClrOnly(p)).Select(p => new ColumnField()
+            var columnFields = argument.ClassProperties.Where(p => !ColumnAttributes.IsDecoratedNonColumn(p)).Select(p => new ColumnField()
             {
                 Name = this.GetColumnName(p),
                 Type = p.Type,
