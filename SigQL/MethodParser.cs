@@ -66,11 +66,16 @@ namespace SigQL
             var arguments = methodParameters.AsArguments(this.databaseResolver);
 
             var tableDefinition = this.databaseResolver.DetectTable(projectionType);
-            var allTableRelations = this.databaseResolver.MergeTableRelations(
-                this.databaseResolver.BuildTableRelations(tableDefinition, new TypeArgument(projectionType, this.databaseResolver),
-                    TableRelationsColumnSource.ReturnType), 
-                this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, arguments),
-                TableRelationsColumnSource.Parameters));
+            TableRelations allTableRelations;
+            {
+                var projectionTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TypeArgument(projectionType, this.databaseResolver),
+                    TableRelationsColumnSource.ReturnType);
+                var parametersTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, arguments),
+                    TableRelationsColumnSource.Parameters);
+                allTableRelations = this.databaseResolver.MergeTableRelations(
+                    projectionTableRelations,
+                    parametersTableRelations);
+            }
 
             var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
             var selectTableRelations = allTableRelations.Filter(TableRelationsColumnSource.ReturnType, ColumnFilters.SelectClause);
@@ -84,7 +89,7 @@ namespace SigQL
             var parameterPaths = new List<ParameterPath>();
             var tokens = new List<TokenPath>();
             
-            var allJoinRelations = allTableRelations;
+            var allJoinRelations = selectTableRelations;
 
             var functionParameters = arguments.Where(p => IsFunctionParameter(p)).ToList();
             parameterPaths.AddRange(functionParameters.Select(p => new ParameterPath(p)
@@ -474,8 +479,9 @@ namespace SigQL
                 }
             ));
 
+            andOperator.Args = andOperator.Args.Concat(
             whereClauseTableRelations.NavigationTables.Select(nt =>
-                BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths, tokens));
+                BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths, tokens)));
 
             //var andOperator = new AndOperator().SetArgs(parameters.SelectMany<DetectedParameter, AstNode>(
             //        parameter =>

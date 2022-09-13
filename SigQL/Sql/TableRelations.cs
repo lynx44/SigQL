@@ -47,9 +47,39 @@ namespace SigQL.Sql
             var matchingNavigationTables = this.NavigationTables.Select(t => t.Filter(source, filter)).ToList();
             matchingNavigationTables.ForEach(t => t.Parent = filteredTableRelations);
             filteredTableRelations.NavigationTables = matchingNavigationTables;
+
+            filteredTableRelations = PruneBranchesWithoutColumns(filteredTableRelations);
             
             return filteredTableRelations;
         }
+
+        private static TableRelations PruneBranchesWithoutColumns(TableRelations tableRelations)
+        {
+            foreach (var navigationTable in tableRelations.NavigationTables)
+            {
+                PruneBranchesWithoutColumns(navigationTable);
+            }
+
+            tableRelations.NavigationTables = tableRelations.NavigationTables.Where(nt => 
+                
+                nt.ProjectedColumns.Any() || nt.NavigationTables.Any()).ToList();
+
+            return tableRelations;
+        }
+
+        //private static bool HasAnyParent(TableRelations tableRelations, Func<TableRelations, bool> condition)
+        //{
+        //    while (tableRelations.Parent != null)
+        //    {
+        //        var conditionMet = condition(tableRelations);
+        //        if (conditionMet)
+        //        {
+        //            return true;
+        //        }
+        //    }
+
+        //    return false;
+        //}
 
         public bool RelationTreeHasAnyTableDefinedMultipleTimes()
         {
