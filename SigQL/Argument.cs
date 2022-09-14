@@ -177,6 +177,14 @@ namespace SigQL
 
             return false;
         }
+
+        internal static int GetOrdinal(this IEnumerable<IArgument> arguments, IArgument argument)
+        {
+            return arguments.ToList().IndexOf(argument);
+            //throw new NotImplementedException("implement ordinals");
+            //var parameterList = arguments.ToList();
+            //return parameterList.IndexOf(path.Parameter);
+        }
     }
 
     internal class ArgumentContainer

@@ -361,21 +361,21 @@ namespace SigQL
             ITableDefinition primaryTable, TableRelations primaryTableRelations)
         {
             var matchingArgs = this.databaseResolver.ProjectedColumnsToArguments(orderByTableRelations);
-            return matchingArgs.Select(p => ConvertToOrderBySpec(p.ToParameterPath(), this.databaseResolver.GetOrdinal(arguments, p),  primaryTable, primaryTableRelations)).ToList();
+            return matchingArgs.Select(p => ConvertToOrderBySpec(p.ToParameterPath(), arguments.GetOrdinal(p),  primaryTable, primaryTableRelations)).ToList();
         }
         
         private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<IArgument> arguments, IEnumerable<IArgument> dynamicOrderByParameterPaths, ITableDefinition primaryTable, TableRelations primaryTableRelations)
         {
             Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
 
-            return dynamicOrderByParameterPaths.Select(parameterPath =>
+            return dynamicOrderByParameterPaths.Select(argument =>
             {
                 return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindViaRelations)
                 {
-                    ParameterPath = parameterPath.ToParameterPath(),
+                    ParameterPath = argument.ToParameterPath(),
                     IsDynamic = true,
-                    IsCollection = parameterPath.ToParameterPath().GetEndpointType().IsCollectionType(),
-                    Ordinal = this.databaseResolver.GetOrdinal(arguments, parameterPath)
+                    IsCollection = argument.ToParameterPath().GetEndpointType().IsCollectionType(),
+                    Ordinal = arguments.GetOrdinal(argument)
                 };
             }).ToList();
         }

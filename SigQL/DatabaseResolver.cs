@@ -642,13 +642,7 @@ namespace SigQL
             return tableParameterPaths.Concat(navigationParameterPaths).ToList();
         }
         
-        internal int GetOrdinal(IEnumerable<IArgument> arguments, IArgument argument)
-        {
-            return arguments.ToList().IndexOf(argument);
-            //throw new NotImplementedException("implement ordinals");
-            //var parameterList = arguments.ToList();
-            //return parameterList.IndexOf(path.Parameter);
-        }
+        
     }
     
     internal class TypeHierarchyNode
