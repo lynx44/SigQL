@@ -100,7 +100,7 @@ namespace SigQL
             var currentPaths = tableRelations.Argument.FindPropertiesFromRoot().Select(p => p.Name).ToList();
             
 
-                if (table.PrimaryKey.Columns.Any())
+                if ((table.PrimaryKey?.Columns.Any()).GetValueOrDefault(false))
                 {
                     var primaryColumns = table.PrimaryKey.Columns
                         .Select(c =>
@@ -291,20 +291,29 @@ namespace SigQL
         //        parentColumnField, parentType, node, filter);
         //}
         
-        private TableRelations BuildTableRelations(IForeignKeyDefinition foreignKeyDefinition, /*ColumnField parentColumnField,*/ IEnumerable<TableRelations> relations)
+        private void BuildManyToManyTableRelations(IForeignKeyDefinition foreignKeyDefinition, TableRelations tableRelations, TableRelations navigationTableRelations)
         {
             var tableDefinition = foreignKeyDefinition.KeyPairs.First().ForeignTableColumn.Table;
+            var navigationToManyToManyForeignKey = this.FindPrimaryForeignKeyMatchForTables(navigationTableRelations.TargetTable, tableDefinition);
+            navigationTableRelations.ForeignKeyToParent = navigationToManyToManyForeignKey;
+
+            var navigationTables = tableRelations.NavigationTables.ToList();
+            navigationTables.Remove(navigationTableRelations);
             
-            return new TableRelations()
+
+            var manyToManyTableRelations = new TableRelations()
             {
                 //ProjectionType = null,
                 //ParentColumnField = parentColumnField,
                 Argument = new TypeArgument(typeof(void), this),
                 TargetTable = tableDefinition,
-                NavigationTables = relations,
+                NavigationTables = new []{ navigationTableRelations },
                 ProjectedColumns = new List<TableRelationColumnDefinition>(),
                 ForeignKeyToParent = foreignKeyDefinition
             };
+            navigationTables.Add(manyToManyTableRelations);
+
+            tableRelations.NavigationTables = navigationTables;
         }
 
         //public TableRelations BuildTableRelations(Type projectionType, IEnumerable<IArgument> methodArguments, TableRelationsFilter filter)

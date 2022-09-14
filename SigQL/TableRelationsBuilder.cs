@@ -120,7 +120,7 @@ namespace SigQL
                         tableRelations.ForeignKeyToParent = oneToManyFk;
                         //tableRelations.ParentColumnField = null;
 
-                        return this.BuildTableRelations(manyToOneFk, new[] { tableRelations });
+                        this.BuildManyToManyTableRelations(manyToOneFk, tableRelations, navigationTableRelations);
                     }
                     else
                     {
