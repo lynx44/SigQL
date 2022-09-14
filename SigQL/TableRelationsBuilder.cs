@@ -7,6 +7,7 @@ using SigQL.Exceptions;
 using SigQL.Extensions;
 using SigQL.Schema;
 using SigQL.Sql;
+using SigQL.Types;
 using SigQL.Types.Attributes;
 
 namespace SigQL
@@ -187,6 +188,70 @@ namespace SigQL
         public bool IsMatch(IArgument argument, bool isTable)
         {
             return condition(argument, isTable);
+        }
+    }
+
+
+    internal class ColumnFilters
+    {
+        public static TableRelationsFilter WhereClause =
+            new TableRelationsFilter((column, isTable) =>
+                !ColumnAttributes.IsDecoratedNonColumn(column) && !ColumnAttributes.IsOrderBy(column));
+
+        public static TableRelationsFilter SelectClause =
+            new TableRelationsFilter((column, isTable) =>
+                !ColumnAttributes.IsDecoratedNonColumn(column));
+
+        public static TableRelationsFilter FromClause =
+            new TableRelationsFilter(
+            (column, isTable) =>
+            !ColumnAttributes.IsDecoratedNonColumn(column));
+
+        public static TableRelationsFilter OrderBy =
+            new TableRelationsFilter(
+            (column, isTable) =>
+            isTable ||
+            ColumnAttributes.IsOrderBy(column));
+
+        public static TableRelationsFilter ViaRelation =
+            new TableRelationsFilter((column, isTable) =>
+                ColumnAttributes.IsViaRelation(column));
+    }
+
+    internal class ColumnAttributes
+    {
+
+        public static bool IsDecoratedNonColumn(IArgument property)
+        {
+            return
+                property.GetCustomAttribute<OffsetAttribute>() != null ||
+                property.GetCustomAttribute<FetchAttribute>() != null ||
+                property.GetCustomAttribute<ClrOnlyAttribute>() != null ||
+                property.GetCustomAttribute<ViaRelationAttribute>() != null ||
+                property.GetCustomAttribute<ParameterAttribute>() != null //||
+                                                                            //IsOrderBy(property) ||
+                                                                            //IsDynamicOrderBy(property)
+                ;
+        }
+
+        public static bool IsViaRelation(IArgument property)
+        {
+            return property?.GetCustomAttribute<ViaRelationAttribute>() != null;
+        }
+
+        public static bool IsOrderBy(IArgument property)
+        {
+            return
+                property?.Type == typeof(OrderByDirection)
+                ;
+        }
+
+        public static bool IsDynamicOrderBy(IArgument property)
+        {
+            return
+                (((property?.Type)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
+                  ((property?.Type)?.IsAssignableFrom(
+                      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
         }
     }
 }
