@@ -227,7 +227,7 @@ namespace SigQL
                 property.GetCustomAttribute<OffsetAttribute>() != null ||
                 property.GetCustomAttribute<FetchAttribute>() != null ||
                 property.GetCustomAttribute<ClrOnlyAttribute>() != null ||
-                property.GetCustomAttribute<ViaRelationAttribute>() != null ||
+                //property.GetCustomAttribute<ViaRelationAttribute>() != null ||
                 property.GetCustomAttribute<ParameterAttribute>() != null //||
                                                                             //IsOrderBy(property) ||
                                                                             //IsDynamicOrderBy(property)

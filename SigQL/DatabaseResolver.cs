@@ -479,6 +479,7 @@ namespace SigQL
                 //})
                 var tableRelations = new TableRelations()
                 {
+                    Argument = argument,
                     TargetTable = targetTable,
                     ProjectedColumns = new List<TableRelationColumnDefinition>(),
                     NavigationTables = new List<TableRelations>()
