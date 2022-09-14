@@ -221,16 +221,15 @@ namespace SigQL
     internal class ColumnAttributes
     {
 
-        public static bool IsDecoratedNonColumn(IArgument property)
+        public static bool IsDecoratedNonColumn(IArgument argument)
         {
             return
-                property.GetCustomAttribute<OffsetAttribute>() != null ||
-                property.GetCustomAttribute<FetchAttribute>() != null ||
-                property.GetCustomAttribute<ClrOnlyAttribute>() != null ||
+                argument.GetCustomAttribute<OffsetAttribute>() != null ||
+                argument.GetCustomAttribute<FetchAttribute>() != null ||
+                argument.GetCustomAttribute<ClrOnlyAttribute>() != null ||
                 //property.GetCustomAttribute<ViaRelationAttribute>() != null ||
-                property.GetCustomAttribute<ParameterAttribute>() != null //||
-                                                                            //IsOrderBy(property) ||
-                                                                            //IsDynamicOrderBy(property)
+                argument.GetCustomAttribute<ParameterAttribute>() != null ||
+                IsDynamicOrderBy(argument)  
                 ;
         }
 
