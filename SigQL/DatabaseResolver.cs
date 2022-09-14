@@ -622,20 +622,21 @@ namespace SigQL
             return specInfo;
         }
 
-        public IEnumerable<ParameterPath> ProjectedColumnsToParameterPaths(TableRelations tableRelations)
+        internal IEnumerable<IArgument> ProjectedColumnsToArguments(TableRelations tableRelations)
         {
             var tableParameterPaths = tableRelations.ProjectedColumns
                 .SelectMany(p => 
-                    p.Arguments.GetArguments(TableRelationsColumnSource.ReturnType)).Select(a => a.ToParameterPath()).ToList();
+                    p.Arguments.GetArguments(TableRelationsColumnSource.Parameters)).ToList();
             var navigationParameterPaths = tableRelations.NavigationTables.SelectMany(t =>
-                ProjectedColumnsToParameterPaths(t));
+                ProjectedColumnsToArguments(t));
 
             return tableParameterPaths.Concat(navigationParameterPaths).ToList();
         }
         
-        internal int GetOrdinal(IEnumerable<IArgument> arguments, ParameterPath path)
+        internal int GetOrdinal(IEnumerable<IArgument> arguments, IArgument argument)
         {
-            throw new NotImplementedException("implement ordinals");
+            return arguments.ToList().IndexOf(argument);
+            //throw new NotImplementedException("implement ordinals");
             //var parameterList = arguments.ToList();
             //return parameterList.IndexOf(path.Parameter);
         }
@@ -707,7 +708,7 @@ namespace SigQL
     {
         public static TableRelationsFilter WhereClause = 
             new TableRelationsFilter((column, isTable) => 
-                !ColumnAttributes.IsDecoratedNonColumn(column));
+                !ColumnAttributes.IsDecoratedNonColumn(column) && !ColumnAttributes.IsOrderBy(column));
 
         public static TableRelationsFilter SelectClause = 
             new TableRelationsFilter((column, isTable) =>
