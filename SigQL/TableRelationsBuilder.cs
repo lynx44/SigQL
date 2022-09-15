@@ -14,34 +14,6 @@ namespace SigQL
 {
     internal partial class DatabaseResolver
     {
-        public ArgumentContainer ToArgumentContainer(Type outputType)
-        {
-            return new ArgumentContainer()
-            {
-                TargetTable = this.DetectTable(outputType),
-                Arguments = this.UnwrapCollectionTargetType(outputType).GetProperties()
-                    .Select(p => new PropertyArgument(p, null, this)).ToList()
-            };
-        }
-
-        public ArgumentContainer ToArgumentContainer(Type returnType, IEnumerable<IArgument> arguments)
-        {
-            return new ArgumentContainer()
-            {
-                TargetTable = this.DetectTable(returnType),
-                Arguments = arguments
-            };
-        }
-
-        public ArgumentContainer ToArgumentContainer(ITableDefinition table, IEnumerable<IArgument> arguments)
-        {
-            return new ArgumentContainer()
-            {
-                TargetTable = table,
-                Arguments = arguments
-            };
-        }
-
         public TableRelations BuildTableRelations(ITableDefinition tableDefinition, IArgument argument, TableRelationsColumnSource source)
         {
             var columnFields = argument.ClassProperties.Where(p => !ColumnAttributes.IsDecoratedNonColumn(p)).Select(p => new ColumnField()
@@ -85,8 +57,6 @@ namespace SigQL
 
             var tableRelations = new TableRelations()
             {
-                //ProjectionType = arguments.ProjectionType,
-                //ParentColumnField = parentColumnField,
                 Argument = argument,
                 TargetTable = tableDefinition,
                 NavigationTables = relations,
@@ -119,7 +89,6 @@ namespace SigQL
                         var oneToManyFk = foreignKeys.First(fk => TableEqualityComparer.Default.Equals(fk.PrimaryKeyTable, navigationTableRelations.TargetTable));
                         var manyToOneFk = foreignKeys.Except(new[] { oneToManyFk }).First();
                         tableRelations.ForeignKeyToParent = oneToManyFk;
-                        //tableRelations.ParentColumnField = null;
 
                         this.BuildManyToManyTableRelations(manyToOneFk, tableRelations, navigationTableRelations);
                     }
@@ -136,34 +105,6 @@ namespace SigQL
                 }
             }
 
-            //if (parentTable != null /*&& (node.Depth != 1 && !TableEqualityComparer.Default.Equals(parentTable, tableDefinition))*/)
-            //{
-            //    var foreignKey = this.FindPrimaryForeignKeyMatchForTables(parentTable, tableDefinition);
-            //    if (foreignKey == null)
-            //    {
-            //        foreignKeys = FindManyToManyForeignKeyMatchesForTables(parentTable, tableDefinition);
-
-            //        if (!(foreignKeys?.Any()).GetValueOrDefault(false))
-            //        {
-            //            throw new InvalidIdentifierException(
-            //                $"Unable to identify matching database foreign key for property {GetParentTableClassQualifiedNameForType(projectionType)}.{parentColumnField.Property.Name}. No foreign key between {parentTable.Name} and {tableDefinition.Name} could be found.");
-            //        }
-
-            //        var oneToManyFk = foreignKeys.First(fk => TableEqualityComparer.Default.Equals(fk.PrimaryKeyTable, tableDefinition));
-            //        var manyToOneFk = foreignKeys.Except(new[] { oneToManyFk }).First();
-            //        tableRelations.ForeignKeyToParent = oneToManyFk;
-            //        tableRelations.ParentColumnField = null;
-
-            //        var hierarchyNode = new TypeHierarchyNode(typeof(void), node, null);
-            //        node.Children.Add(hierarchyNode);
-            //        return this.BuildTableRelations(manyToOneFk, parentColumnField, new[] { tableRelations }, hierarchyNode);
-            //    }
-            //    else
-            //    {
-            //        tableRelations.ForeignKeyToParent = foreignKey;
-            //    }
-            //}
-
             var viaTableRelations = viaRelationColumns.Select(c =>
             {
                 IArgument argument = c.Column.Argument;
@@ -174,6 +115,99 @@ namespace SigQL
             var result = MergeTableRelations(viaTableRelations.AppendOne(tableRelations).ToArray());
             return result;
         }
+        internal TableRelations BuildTableRelationsFromViaParameter(IArgument argument,
+            string viaRelationPath)
+        {
+            var relations =
+                viaRelationPath.
+                    Split(new[] { "->" }, StringSplitOptions.RemoveEmptyEntries)
+                    .ToList();
+
+            TableRelations previousRelation = null;
+            var relationsReversed = relations.ToList();
+            relationsReversed.Reverse();
+            var allTableRelations = new List<TableRelations>();
+            foreach (var relation in relationsReversed)
+            {
+                var tableName = relation.Split('.').First();
+                var columnName = relation.Split('.').Skip(1).FirstOrDefault();
+
+                var targetTable = this.databaseConfiguration.Tables.FindByName(tableName);
+                if (targetTable == null)
+                {
+                    throw new InvalidIdentifierException(
+                        $"Unable to identify matching database table for parameter {argument.Name} with ViaRelation[\"{viaRelationPath}\"]. Table {tableName} does not exist.");
+                }
+                //if(!allTableRelations.Any() && !TableEqualityComparer.Default.Equals(targetTable, primaryTable)
+                //{
+
+                //})
+                var tableRelations = new TableRelations()
+                {
+                    Argument = argument,
+                    TargetTable = targetTable,
+                    ProjectedColumns = new List<TableRelationColumnDefinition>(),
+                    NavigationTables = new List<TableRelations>()
+                };
+
+                if (!string.IsNullOrEmpty(columnName))
+                {
+                    var column = targetTable.Columns.FindByName(columnName);
+                    if (column == null)
+                    {
+                        throw new InvalidIdentifierException(
+                            $"Unable to identify matching database column for parameter {argument.Name} with ViaRelation[\"{viaRelationPath}\"]. Column {columnName} does not exist in table {targetTable.Name}.");
+                    }
+                    tableRelations.ProjectedColumns = new List<TableRelationColumnDefinition>()
+                    {
+                        new TableRelationColumnDefinition(column, argument, TableRelationsColumnSource.Parameters)
+                    };
+                }
+
+                if (previousRelation != null)
+                {
+                    tableRelations.NavigationTables = new List<TableRelations>()
+                    {
+                        previousRelation
+                    };
+                }
+
+                previousRelation = tableRelations;
+
+                allTableRelations.Add(tableRelations);
+            }
+
+            allTableRelations.Reverse();
+            previousRelation = null;
+            foreach (var tableRelation in allTableRelations)
+            {
+                if (previousRelation != null)
+                {
+                    tableRelation.ForeignKeyToParent =
+                        FindPrimaryForeignKeyMatchForTables(tableRelation.TargetTable, previousRelation.TargetTable);
+                    if (tableRelation.ForeignKeyToParent == null)
+                        throw new InvalidIdentifierException(
+                            $"Unable to identify matching database foreign key for parameter {argument.Name} with ViaRelation[\"{viaRelationPath}\"]. No foreign key between {previousRelation.TargetTable.Name} and {tableRelation.TargetTable.Name} could be found.");
+                }
+                previousRelation = tableRelation;
+            }
+
+            return allTableRelations.First();
+        }
+        
+        internal TableRelations MergeTableRelations(params TableRelations[] tableRelationsCollection)
+        {
+            return new TableRelations()
+            {
+                Argument = tableRelationsCollection.Where(t => t.Argument != null).Select(t => t.Argument).First(),
+                TargetTable = tableRelationsCollection.First().TargetTable,
+                NavigationTables = tableRelationsCollection.SelectMany(t => t.NavigationTables).GroupBy(nt => nt.TargetTable, nt => nt, TableEqualityComparer.Default).Select(nt => MergeTableRelations(nt.ToArray())).ToList(),
+                ProjectedColumns = tableRelationsCollection.SelectMany(t => t.ProjectedColumns).ToList(),
+                ForeignKeyToParent = tableRelationsCollection.Where(t => t.ForeignKeyToParent != null).Select(t => t.ForeignKeyToParent).Distinct(ForeignKeyDefinitionEqualityComparer.Default).FirstOrDefault(),
+                Parent = tableRelationsCollection.Select(p => p.Parent).FirstOrDefault(parent => parent != null),
+            };
+        }
+
     }
 
     internal class TableRelationsFilter
@@ -227,10 +261,8 @@ namespace SigQL
                 argument.GetCustomAttribute<OffsetAttribute>() != null ||
                 argument.GetCustomAttribute<FetchAttribute>() != null ||
                 argument.GetCustomAttribute<ClrOnlyAttribute>() != null ||
-                //property.GetCustomAttribute<ViaRelationAttribute>() != null ||
                 argument.GetCustomAttribute<ParameterAttribute>() != null ||
-                IsDynamicOrderBy(argument)  
-                ;
+                IsDynamicOrderBy(argument);
         }
 
         public static bool IsViaRelation(IArgument property)
@@ -241,8 +273,7 @@ namespace SigQL
         public static bool IsOrderBy(IArgument property)
         {
             return
-                property?.Type == typeof(OrderByDirection)
-                ;
+                property?.Type == typeof(OrderByDirection);
         }
 
         public static bool IsDynamicOrderBy(IArgument property)

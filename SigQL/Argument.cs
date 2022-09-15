@@ -24,8 +24,7 @@ namespace SigQL
 
         ParameterInfo GetParameterInfo();
         PropertyInfo GetPropertyInfo();
-
-        TResult WhenParameter<TResult>(Func<ParameterInfo, TResult> parameterAction, Func<PropertyInfo, TResult> propertyAction);
+        
         string GetCallsiteTypeName();
     }
 
@@ -117,10 +116,6 @@ namespace SigQL
 
     internal static class MethodInfoExtensions
     {
-        public static IEnumerable<IArgument> GetArguments(this MethodInfo method, DatabaseResolver databaseResolver)
-        {
-            return method.GetParameters().Select(p => new ParameterArgument(p, databaseResolver)).ToList();
-        }
         public static IEnumerable<IArgument> AsArguments(this IEnumerable<ParameterInfo> parameters, DatabaseResolver databaseResolver)
         {
             return parameters.Select(p => new ParameterArgument(p, databaseResolver)).ToList();

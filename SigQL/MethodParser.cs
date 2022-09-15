@@ -210,13 +210,7 @@ namespace SigQL
                     new RelationalTable() {Label = allTableRelations.Alias}, whereClauseTableRelations, parameterPaths,
                     tokens);
             }
-
-            // remove IN parameters - these are converted to separate parameters
-            //parameterPaths.RemoveAll(p =>
-            //    (p.Properties?.Any()).GetValueOrDefault(false)
-            //        ? p.Properties.Select(pp => pp.PropertyType).Last().IsCollectionType()
-            //        : p.Parameter.ParameterType.IsCollectionType());
-
+            
             if (isCountResult)
             {
                 var countStatement = new Select();
@@ -237,7 +231,6 @@ namespace SigQL
                 UnwrappedReturnType = projectionType,
                 Parameters = parameterPaths,
                 Tokens = tokens,
-                // ColumnAliasRelations = columnAliasForeignKeyDefinitions,
                 TargetTablePrimaryKey = !isCountResult ? allTableRelations.TargetTable.PrimaryKey : new TableKeyDefinition(),
                 TablePrimaryKeyDefinitions = !isCountResult ? tablePrimaryKeyDefinitions : new Dictionary<string, ITableKeyDefinition>()
             };
@@ -481,85 +474,7 @@ namespace SigQL
             andOperator.Args = andOperator.Args.Concat(
             whereClauseTableRelations.NavigationTables.Select(nt =>
                 BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths, tokens))).ToList();
-
-            //var andOperator = new AndOperator().SetArgs(parameters.SelectMany<DetectedParameter, AstNode>(
-            //        parameter =>
-            //        {
-            //            // if this is a primitive or built in .NET type, just set it equal
-            //            // to the expected value
-            //            //var isTableOrTableProjection = this.databaseResolver.IsTableOrTableProjection(parameter.Type);
-            //            if (!this.databaseResolver.IsClrOnly(parameter.ParameterInfo))
-            //            {
-
-            //                if (!this.databaseResolver.IsTableOrTableProjection(parameter.Type) &&
-            //                    parameter.TableRelations == null)
-            //                {
-            //                    var parameterName = parameter.ParameterInfo.Name;
-            //                    var column = GetColumnForParameterName(primaryTable, parameter.Name);
-
-            //                    var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
-            //                        .SetArgs(primaryTableReference,
-            //                            new RelationalColumn()
-            //                            {
-            //                                Label = column.Name
-            //                            }), parameterName, parameter.Type, parameter.ParameterInfo, new List<PropertyInfo>(), parameterPaths, tokens);
-            //                    return comparisonNode.AsEnumerable().ToList();
-            //                }
-            //                else
-            //                if (this.databaseResolver.IsTableOrTableProjection(parameter.Type) &&
-            //                    TableEqualityComparer.Default.Equals(primaryTable, parameter.TableRelations.TargetTable))
-            //                {
-            //                    var filterComparisons = parameter.Type.GetProperties().Where(p => !this.databaseResolver.IsTableOrTableProjection(p.PropertyType)).SelectMany(property =>
-            //                    {
-            //                        if (!ColumnAttributes.IsDecoratedNonColumn(property))
-            //                        {
-            //                            var parameterName = property.Name;
-
-            //                            var column = GetColumnForParameterName(parameter.TableRelations, this.databaseResolver.GetColumnName(property));
-
-            //                            var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
-            //                                    .SetArgs(primaryTableReference,
-            //                                        new RelationalColumn()
-            //                                        {
-            //                                            Label = column.Name
-            //                                        }), parameterName, property.PropertyType, parameter.ParameterInfo,
-            //                                new List<PropertyInfo>() { property }, parameterPaths, tokens);
-            //                            return comparisonNode.AsEnumerable().ToList();
-            //                        }
-            //                        else
-            //                        {
-            //                            return new List<AstNode>();
-            //                        }
-                                    
-            //                    }).ToList();
-
-            //                    var navComparisons = parameter.TableRelations.NavigationTables.Select(nt =>
-            //                    {
-            //                        return BuildWhereClauseForPerspective(primaryTableReference,
-            //                            nt, "0", parameterPaths, parameter.ParameterInfo,
-            //                            new List<PropertyInfo>() { nt.ParentColumnField.Property }, tokens);
-            //                    });
-
-            //                    return navComparisons.Concat(filterComparisons).ToList();
-            //                }
-            //                else
-            //                    // this is referencing a foreign table, reference the table
-            //                {
-            //                    return parameter.TableRelations.NavigationTables.Select(nt =>
-            //                    {
-            //                        return BuildWhereClauseForPerspective(primaryTableReference,
-            //                            nt, "0", parameterPaths, parameter.ParameterInfo,
-            //                            nt.ParentColumnField?.Property.AsEnumerable().ToList() ?? new List<PropertyInfo>(), tokens);
-            //                    });
-            //                }
-            //            }
-            //            else
-            //            {
-            //                return new List<AstNode>();
-            //            }
-
-            //        }).ToList()
-            //);
+            
             var whereClause = new WhereClause().SetArgs(andOperator);
             return andOperator.Args.Any() ? whereClause : null;
         }
@@ -876,53 +791,6 @@ namespace SigQL
             return placeholder;
         }
 
-
-        //private WhereClause  BuildWhereClauseForJoinRelations(List<DetectedParameter> parameters, TableRelations fromClauseRelations, List<ParameterPath> parameterPaths)
-        //{
-        //    return new WhereClause().SetArgs(new AndOperator().SetArgs(parameters.SelectMany(
-        //        parameter =>
-        //        {
-        //            // if this is a primitive or built in .NET type, just set it equal
-        //            // to the expected value
-        //            if (!this.databaseResolver.IsTableOrTableProjection(parameter.Type))
-        //            {
-        //                var parameterName = parameter.Name;
-        //                var column = GetColumnForParameterName(fromClauseRelations, parameterName);
-        //                parameterPaths.Add(new ParameterPath()
-        //                {
-        //                    Parameter = parameter.ParameterInfo,
-        //                    SqlParameterName = parameterName
-        //                });
-
-        //                return new EqualsOperator().SetArgs(
-        //                    new ColumnIdentifier()
-        //                    {
-        //                        Args = new AstNode[]
-        //                        {
-        //                            new RelationalTable()
-        //                            {
-        //                                Label = column.Table.Name
-        //                            },
-        //                            new RelationalColumn()
-        //                            {
-        //                                Label = column.Name
-        //                            }
-        //                        }
-        //                    }, new NamedParameterIdentifier()
-        //                    {
-        //                        Name = parameterName
-        //                    }).AsEnumerable();
-        //            }
-        //            else
-        //                // this is referencing a foreign table, reference the table
-        //            {
-        //                return BuildWhereOperationsForJoinTables(this.databaseResolver.BuildTableRelations(this.databaseResolver.ToArgumentContainer(parameter.Type), ColumnFilters.WhereClause), parameterPaths, parameter.ParameterInfo, new List<PropertyInfo>());
-        //            }
-                            
-        //        })
-        //    ));
-        //}
-
         private class OrderBySpec
         {
             private readonly Func<string, string> resolveTableNameFunc;
@@ -1023,8 +891,7 @@ namespace SigQL
                         {
                             var viaRelationPath = orderByRelation.ViaRelationPath;
                             var parameterArgument = new ParameterArgument(p.ParameterPath.Parameter, this.databaseResolver);
-
-                            string columnName;
+                            
                             var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
                                 p.ResolveTableRelations);
 
@@ -1076,7 +943,6 @@ namespace SigQL
             string viaRelationPath,
             Func<IEnumerable<string>, TableRelations> resolveTableRelationsAliasFunc)
         {
-            string tableAliasName = null;
             var tableRelations = this.databaseResolver.BuildTableRelationsFromViaParameter(
                 parameterArgument,
                 viaRelationPath);
@@ -1154,43 +1020,6 @@ namespace SigQL
             return leftOuterJoin;
         }
 
-        //private IEnumerable<AstNode> BuildWhereOperationsForJoinTables(TableRelations navigationTableRelations,
-        //    List<ParameterPath> parameterPaths, ParameterInfo rootParameter,
-        //    List<PropertyInfo> currentPropertyPaths)
-        //{
-        //    var targetTable = navigationTableRelations.TargetTable;
-        //    var operations = navigationTableRelations.ProjectedColumns.Select(column =>
-        //        {
-        //            var sqlParameterName = $"{targetTable.Name}{column.Name}";
-        //            var currentPropertyPath = currentPropertyPaths.ToList();
-        //            currentPropertyPath.Add(column.Property);
-        //            parameterPaths.Add(new ParameterPath() { Parameter = rootParameter, Properties = currentPropertyPath, SqlParameterName = sqlParameterName });
-        //            return new AndOperator().SetArgs(
-        //                new EqualsOperator().SetArgs(
-        //                    new ColumnIdentifier().SetArgs(new RelationalTable() {Label = targetTable.Name},
-        //                        new RelationalColumn() {Label = column.Name}),
-        //                    new ColumnIdentifier().SetArgs(new NamedParameterIdentifier()
-        //                        {Name = sqlParameterName})));
-        //        }).Cast<AstNode>()
-        //            .Concat(navigationTableRelations.NavigationTables != null ? navigationTableRelations.NavigationTables.SelectMany(navigationTableRelations1 =>
-        //            {
-        //                currentPropertyPaths.Add(navigationTableRelations1.ParentColumnField.Property);
-        //                return BuildWhereOperationsForJoinTables(navigationTableRelations1, parameterPaths, rootParameter,
-        //                        currentPropertyPaths);
-        //            }) : new LeftOuterJoin[0]);
-        //    return operations;
-        //}
-
-        private IColumnDefinition GetColumnForParameterName(TableRelations tableRelations, string parameterName)
-        {
-            var matchingTargetTableColumn = tableRelations.TargetTable.Columns.FirstOrDefault(c => c.Name.Equals(parameterName, StringComparison.InvariantCultureIgnoreCase));
-            if (matchingTargetTableColumn == null)
-            {
-                return tableRelations.NavigationTables.Select(t => GetColumnForParameterName(t, parameterName)).FirstOrDefault();
-            }
-            return matchingTargetTableColumn;
-        }
-
         private IColumnDefinition GetColumnForParameterName(ITableDefinition table, string parameterName)
         {
             var matchingTargetTableColumn = table.Columns.FirstOrDefault(c => c.Name.Equals(parameterName, StringComparison.InvariantCultureIgnoreCase));
@@ -1202,7 +1031,7 @@ namespace SigQL
         {
             Select,
             Insert,
-            Update, // not yet supported
+            Update,
             Delete
         }
     }

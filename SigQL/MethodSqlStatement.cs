@@ -40,7 +40,6 @@ namespace SigQL
         // these are string literal replacements, for non parameterized variables
         // sent through method arguments. For example, the direction of the order by clause
         public IEnumerable<TokenPath> Tokens { get; set; }
-        // public IEnumerable<ColumnAliasForeignKeyDefinition> ColumnAliasRelations { get; set; }
         public ITableKeyDefinition TargetTablePrimaryKey { get; set; }
         public IDictionary<string, ITableKeyDefinition> TablePrimaryKeyDefinitions { get; set; }
         internal SqlStatementBuilder SqlBuilder { get; set; }
@@ -105,19 +104,5 @@ namespace SigQL
 
             return value;
         }
-
-        // private void TokenValueConverter(AstNode parentNode, object value)
-        // {
-        //     switch (parentNode)
-        //     {
-        //         case OrderByIdentifier x:
-        //             var orderByValue = value as IOrderByValue;
-        //             var directionString = orderByValue == null || orderByValue.Direction == OrderByDirection.Ascending ? "asc" : "desc";
-        //             x.Direction = directionString;
-        //             break;
-        //         default:
-        //             throw new ArgumentException($"Unsupported token parameter value {value?.GetType()}");
-        //     }
-        // }
     }
 }

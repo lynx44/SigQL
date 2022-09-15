@@ -15,7 +15,6 @@ namespace SigQL.Sql
             this.ProjectedColumns = new List<TableRelationColumnDefinition>();
         }
         public IArgument Argument { get; set; }
-        //public Type ProjectionType { get; set; }
         public ITableDefinition TargetTable { get; set; }
         public IEnumerable<TableRelations> NavigationTables { get; set; }
         public IEnumerable<TableRelationColumnDefinition> ProjectedColumns { get; set; }
@@ -23,17 +22,7 @@ namespace SigQL.Sql
         public string Alias => $"{TargetTable.Name}" + (RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{(Argument.Type != typeof(void) ? Argument.FullyQualifiedName() : Argument.Parent.FullyQualifiedName())}>" : null);
         public string TableName => TargetTable.Name;
         public TableRelations Parent { get; set; }
-
-        //public void AddArgument(IArgument argument, TableRelationsColumnSource source)
-        //{
-        //    Arguments.Add();
-        //}
-
-        //public IArgument GetArguments(TableRelationsColumnSource source)
-        //{
-
-        //}
-
+        
         public TableRelations Filter(TableRelationsColumnSource source, TableRelationsFilter filter)
         {
             var matchingColumns = this.ProjectedColumns.Where(c => c.Source == source && c.Arguments.All.Any(arg => filter.IsMatch(arg, false))).ToList();
@@ -66,21 +55,7 @@ namespace SigQL.Sql
 
             return tableRelations;
         }
-
-        //private static bool HasAnyParent(TableRelations tableRelations, Func<TableRelations, bool> condition)
-        //{
-        //    while (tableRelations.Parent != null)
-        //    {
-        //        var conditionMet = condition(tableRelations);
-        //        if (conditionMet)
-        //        {
-        //            return true;
-        //        }
-        //    }
-
-        //    return false;
-        //}
-
+        
         public bool RelationTreeHasAnyTableDefinedMultipleTimes()
         {
             var root = Parent ?? this;

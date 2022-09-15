@@ -79,11 +79,5 @@ namespace SigQL
             public ITableDefinition Table { get; set; }
             public MethodInfo RootMethodInfo { get; set; }
         }
-        
-        private class DeleteColumnParameter
-        {
-            public IColumnDefinition Column { get; set; }
-            public ParameterPath ParameterPath { get; set; }
-        }
     }
 }

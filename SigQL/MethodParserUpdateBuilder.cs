@@ -58,7 +58,6 @@ namespace SigQL
                 UnwrappedReturnType = null,
                 Parameters = parameterPaths,
                 Tokens = tokens,
-                // ColumnAliasRelations = columnAliasForeignKeyDefinitions,
                 TargetTablePrimaryKey = null,
                 TablePrimaryKeyDefinitions = null
             };

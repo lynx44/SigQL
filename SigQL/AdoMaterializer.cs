@@ -37,7 +37,6 @@ namespace SigQL
 
             var targetTablePrimaryKey = methodInvocation.SqlStatement.TargetTablePrimaryKey;
             var tablePrimaryKeyDefinitions = methodInvocation.SqlStatement.TablePrimaryKeyDefinitions;
-            var rootOutputType = methodInvocation.SqlStatement.UnwrappedReturnType;
             var returnType = methodInvocation.SqlStatement.ReturnType;
 
             return Materialize(statement, targetTablePrimaryKey, tablePrimaryKeyDefinitions, returnType);
@@ -197,11 +196,7 @@ namespace SigQL
             }
 
             rowValueContainer = bucket.Rows[keys];
-
-            // var directRelationships = relationships.Where(p =>
-            //     p.ColumnAliasForeignKeyPairs.Any(kp =>
-            //         (aliasName == null && !kp.ForeignTableColumnWithAlias.Alias.Contains(".")) || kp.ForeignTableColumnWithAlias.Alias.StartsWith(aliasName + ".")));
-
+            
             var allNavigationPropertyColumns = rowValues.Where(kvp => kvp.Key.Count(c => c == '.') == 1);
             var navigationPropertySets = allNavigationPropertyColumns.GroupBy(c => c.Key.Substring(0, c.Key.IndexOf(".")));
             foreach (var navigationPropertyColumns in navigationPropertySets)
