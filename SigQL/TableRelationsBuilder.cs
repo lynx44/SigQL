@@ -73,10 +73,10 @@ namespace SigQL
                     {
                         if (IsColumnType(d.Column.Type))
                             throw new InvalidIdentifierException(
-                                $"Unable to identify matching database column for {d.Column.Argument.FullyQualifiedName()}. Column {d.Column.Name} does not exist in table {tableDefinition.Name}.");
+                                $"Unable to identify matching database column for {d.Column.Argument.GetCallsiteTypeName()} {d.Column.Argument.FullyQualifiedTypeName()}. Column {d.Column.Name} does not exist in table {tableDefinition.Name}.");
                         else
                             throw new InvalidIdentifierException(
-                                $"Unable to identify matching database table for {d.Column.Argument.FullyQualifiedName()} of type {d.Column.Argument.Type}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(d.Column.Type))} does not exist.");
+                                $"Unable to identify matching database table for {d.Column.Argument.GetCallsiteTypeName()} {d.Column.Argument.FullyQualifiedTypeName()} of type {d.Column.Argument.Type}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(d.Column.Type))} does not exist.");
 
                     }
                     return new TableRelationColumnDefinition(tableColumn,
@@ -113,7 +113,7 @@ namespace SigQL
                         if (!(foreignKeys?.Any()).GetValueOrDefault(false))
                         {
                             throw new InvalidIdentifierException(
-                                $"Unable to identify matching database foreign key for property {navigationTableRelations.Argument.FullyQualifiedName()}. No foreign key between {tableDefinition.Name} and {navigationTableRelations.TargetTable.Name} could be found.");
+                                $"Unable to identify matching database foreign key for property {navigationTableRelations.Argument.FullyQualifiedTypeName()}. No foreign key between {tableDefinition.Name} and {navigationTableRelations.TargetTable.Name} could be found.");
                         }
 
                         var oneToManyFk = foreignKeys.First(fk => TableEqualityComparer.Default.Equals(fk.PrimaryKeyTable, navigationTableRelations.TargetTable));

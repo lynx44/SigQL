@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using SigQL.Extensions;
 using SigQL.Schema;
 
 namespace SigQL
@@ -25,7 +26,7 @@ namespace SigQL
         PropertyInfo GetPropertyInfo();
 
         TResult WhenParameter<TResult>(Func<ParameterInfo, TResult> parameterAction, Func<PropertyInfo, TResult> propertyAction);
-        
+        string GetCallsiteTypeName();
     }
 
 
@@ -62,6 +63,11 @@ namespace SigQL
         public TResult WhenParameter<TResult>(Func<ParameterInfo, TResult> parameterAction, Func<PropertyInfo, TResult> propertyAction)
         {
             throw new InvalidOperationException("Argument is a table, not a parameter or property");
+        }
+
+        public string GetCallsiteTypeName()
+        {
+            return "table";
         }
     }
 
@@ -101,6 +107,11 @@ namespace SigQL
         public TResult WhenParameter<TResult>(Func<ParameterInfo, TResult> parameterAction, Func<PropertyInfo, TResult> propertyAction)
         {
             throw new InvalidOperationException("Argument is a type, not a parameter or property");
+        }
+
+        public string GetCallsiteTypeName()
+        {
+            return "type";
         }
     }
 
@@ -150,6 +161,12 @@ namespace SigQL
         public static string FullyQualifiedName(this IArgument argument)
         {
             return string.Join(".", argument.RootToPath().Select(a => a.Name));
+        }
+
+        public static string FullyQualifiedTypeName(this IArgument argument)
+        {
+            var rootToPath = argument.RootToPath();
+            return string.Join(".", rootToPath.Take(rootToPath.Count() - 1).Select(a => a.Type?.Name ?? a.Name).AppendOne(argument.Name));
         }
 
         public static ParameterPath ToParameterPath(this IArgument argument)
@@ -214,6 +231,11 @@ namespace SigQL
             return parameterAction(this.parameterInfo);
         }
 
+        public string GetCallsiteTypeName()
+        {
+            return "parameter";
+        }
+
         private readonly ParameterInfo parameterInfo;
         private readonly DatabaseResolver databaseResolver;
 
@@ -253,6 +275,11 @@ namespace SigQL
         public TResult WhenParameter<TResult>(Func<ParameterInfo, TResult> parameterAction, Func<PropertyInfo, TResult> propertyAction)
         {
             return propertyAction(this.propertyInfo);
+        }
+
+        public string GetCallsiteTypeName()
+        {
+            return "property";
         }
 
 

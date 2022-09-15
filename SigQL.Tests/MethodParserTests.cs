@@ -1215,7 +1215,7 @@ namespace SigQL.Tests
                 }
                 catch (InvalidIdentifierException ex)
                 {
-                    Assert.AreEqual("Unable to identify matching database column for property WorkLog.IInvalidColumn.WorkLogId. Column WorkLogId does not exist in table WorkLog.",
+                    Assert.AreEqual("Unable to identify matching database column for property IInvalidColumn.WorkLogId. Column WorkLogId does not exist in table WorkLog.",
                         ex.Message);
                     throw;
                 }
@@ -1253,7 +1253,7 @@ namespace SigQL.Tests
                 }
                 catch (InvalidIdentifierException ex)
                 {
-                    Assert.AreEqual("Unable to identify matching database table for property WorkLog.IInvalidNestedColumn.NonExistingTable of type System.Collections.Generic.IEnumerable`1[SigQL.Tests.Common.Databases.Labor.NonExistingTable+IId]. Table NonExistingTable does not exist.",
+                    Assert.AreEqual("Unable to identify matching database table for property IInvalidNestedColumn.NonExistingTable of type System.Collections.Generic.IEnumerable`1[SigQL.Tests.Common.Databases.Labor.NonExistingTable+IId]. Table NonExistingTable does not exist.",
                         ex.Message);
                     throw;
                 }
@@ -1310,7 +1310,7 @@ namespace SigQL.Tests
                 }
                 catch (InvalidIdentifierException ex)
                 {
-                    Assert.AreEqual("Unable to identify matching database column for property WorkLog.IInvalidColumn.WorkLogId. Column WorkLogId does not exist in table WorkLog.",
+                    Assert.AreEqual("Unable to identify matching database column for property IInvalidColumn.WorkLogId. Column WorkLogId does not exist in table WorkLog.",
                         ex.Message);
                     throw;
                 }
@@ -1329,7 +1329,7 @@ namespace SigQL.Tests
                 }
                 catch (InvalidIdentifierException ex)
                 {
-                    Assert.AreEqual("Unable to identify matching database column for property WorkLog.IInvalidColumnWithAlias.Id. Column WorkLogId does not exist in table WorkLog.",
+                    Assert.AreEqual("Unable to identify matching database column for property IInvalidColumnWithAlias.Id. Column WorkLogId does not exist in table WorkLog.",
                         ex.Message);
                     throw;
                 }
@@ -1348,7 +1348,7 @@ namespace SigQL.Tests
                 }
                 catch (InvalidIdentifierException ex)
                 {
-                    Assert.AreEqual("Unable to identify matching database table for property WorkLog.IInvalidNestedColumn.NonExistingTable of type System.Collections.Generic.IEnumerable`1[SigQL.Tests.Common.Databases.Labor.NonExistingTable+IId]. Table NonExistingTable does not exist.",
+                    Assert.AreEqual("Unable to identify matching database table for property IInvalidNestedColumn.NonExistingTable of type System.Collections.Generic.IEnumerable`1[SigQL.Tests.Common.Databases.Labor.NonExistingTable+IId]. Table NonExistingTable does not exist.",
                         ex.Message);
                     throw;
                 }
@@ -1367,7 +1367,7 @@ namespace SigQL.Tests
                 }
                 catch (InvalidIdentifierException ex)
                 {
-                    Assert.AreEqual("Unable to identify matching database foreign key for property WorkLog.IInvalidAddressRelation.Address. No foreign key between WorkLog and Address could be found.",
+                    Assert.AreEqual("Unable to identify matching database foreign key for property IInvalidAddressRelation.Address. No foreign key between WorkLog and Address could be found.",
                         ex.Message);
                     throw;
                 }
