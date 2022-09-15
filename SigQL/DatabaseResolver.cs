@@ -114,7 +114,7 @@ namespace SigQL
 
                     foreach (var primaryColumn in primaryColumns)
                     {
-                        tableKeyDefinitions[string.Join(".", currentPaths.AppendOne(primaryColumn.ColumnDefinition.Name))] = table.PrimaryKey;
+                        tableKeyDefinitions[string.Join(".", currentPaths)] = table.PrimaryKey;
                     }
                 
 
@@ -299,13 +299,16 @@ namespace SigQL
 
             var navigationTables = tableRelations.NavigationTables.ToList();
             navigationTables.Remove(navigationTableRelations);
-            
+
+
+            var manyToManyArgument = new TypeArgument(typeof(void), this);
+            manyToManyArgument.Parent = tableRelations.Argument;
 
             var manyToManyTableRelations = new TableRelations()
             {
                 //ProjectionType = null,
                 //ParentColumnField = parentColumnField,
-                Argument = new TypeArgument(typeof(void), this),
+                Argument = manyToManyArgument,
                 TargetTable = tableDefinition,
                 NavigationTables = new []{ navigationTableRelations },
                 ProjectedColumns = new List<TableRelationColumnDefinition>(),

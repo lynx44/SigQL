@@ -68,8 +68,8 @@ namespace SigQL
     internal class TypeArgument : IArgument
     {
         private readonly DatabaseResolver databaseResolver;
-        public Type Type { get; set; }
-        public string Name { get; set; }
+        public Type Type { get; }
+        public string Name => Type.Name;
 
         public TypeArgument(Type type, DatabaseResolver databaseResolver)
         {
@@ -167,7 +167,7 @@ namespace SigQL
             var node = argument;
             while (parentType != typeof(void) && node.Parent != null)
             {
-                if (node.Parent.Type == parentType)
+                if (OutputFactory.UnwrapType(node.Parent.Type) == parentType)
                 {
                     return true;
                 }

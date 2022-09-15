@@ -20,7 +20,7 @@ namespace SigQL.Sql
         public IEnumerable<TableRelations> NavigationTables { get; set; }
         public IEnumerable<TableRelationColumnDefinition> ProjectedColumns { get; set; }
         public IForeignKeyDefinition ForeignKeyToParent { get; set; }
-        public string Alias => $"{TargetTable.Name}" + (RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{Argument.FullyQualifiedName()}>" : null);
+        public string Alias => $"{TargetTable.Name}" + (RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{(Argument.Type != typeof(void) ? Argument.FullyQualifiedName() : Argument.Parent.FullyQualifiedName())}>" : null);
         public string TableName => TargetTable.Name;
         public TableRelations Parent { get; set; }
 
