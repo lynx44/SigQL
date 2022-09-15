@@ -180,7 +180,10 @@ namespace SigQL
 
         internal static int GetOrdinal(this IEnumerable<IArgument> arguments, IArgument argument)
         {
-            return arguments.ToList().IndexOf(argument);
+            var depth = argument.PathToRoot().Count();
+            var parentIndex = argument.Parent?.ClassProperties.ToList().IndexOf(argument) ?? 0;
+            var paramPosition = arguments.ToList().IndexOf(argument);
+            return (depth * 100) + parentIndex * 10 + paramPosition;
             //throw new NotImplementedException("implement ordinals");
             //var parameterList = arguments.ToList();
             //return parameterList.IndexOf(path.Parameter);
