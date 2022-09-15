@@ -155,12 +155,12 @@ namespace SigQL
                     )
                 );
 
-                var tokenPath = new TokenPath(insertColumnParameter.ParameterPath.Argument)
+                var tokenPath = new TokenPath(insertColumnParameter.ParameterPath.Argument.FindParameter())
                 {
                     SqlParameterName = insertColumnParameter.ParameterPath.SqlParameterName,
                     UpdateNodeFunc = (parameterValue, tokenPath) =>
                     {
-                        var enumerable = parameterValue is IEnumerable ? parameterValue as IEnumerable : parameterValue.AsEnumerable();
+                        var enumerable = tokenPath.Argument.Type.IsCollectionType() ? parameterValue as IEnumerable : parameterValue.AsEnumerable();
                         var sqlParameters = new Dictionary<string, object>();
                         var allItems = enumerable?.Cast<object>();
                         if (allItems != null && allItems.Any())
@@ -345,7 +345,8 @@ namespace SigQL
                     }
 
                     var parameterInfo = tableTypeParameters.Single();
-                    var tableRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.DetectTable(parameterInfo.ParameterType), new TypeArgument(parameterInfo.ParameterType, this.databaseResolver), TableRelationsColumnSource.Parameters);
+                    var tableDefinition = insertSpec.Table ?? this.databaseResolver.DetectTable(parameterInfo.ParameterType);
+                    var tableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, new ParameterArgument(parameterInfo, this.databaseResolver).AsEnumerable()), TableRelationsColumnSource.Parameters);
                     insertSpec.ColumnParameters = tableRelations.ProjectedColumns.SelectMany(pc =>
                         pc.Arguments.All.Select(arg =>
                             new InsertColumnParameter()
