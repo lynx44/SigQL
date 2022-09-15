@@ -84,10 +84,10 @@ namespace SigQL
                 {
                     if (this.databaseResolver.IsTableOrTableProjection(c.Type))
                     {
-                        return c.Type.GetProperties().Select(pr => new UpdateColumnParameter()
+                        return c.ClassProperties.Select(pr => new UpdateColumnParameter()
                         {
                             Column = updateSpec.Table.Columns.FindByName(pr.Name),
-                            ParameterPath = new ParameterPath(c)
+                            ParameterPath = new ParameterPath(pr)
                             {
                                 SqlParameterName = $"{c.Name}{pr.Name}"
                             }

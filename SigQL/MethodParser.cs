@@ -480,7 +480,7 @@ namespace SigQL
 
             andOperator.Args = andOperator.Args.Concat(
             whereClauseTableRelations.NavigationTables.Select(nt =>
-                BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths, tokens)));
+                BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths, tokens))).ToList();
 
             //var andOperator = new AndOperator().SetArgs(parameters.SelectMany<DetectedParameter, AstNode>(
             //        parameter =>
