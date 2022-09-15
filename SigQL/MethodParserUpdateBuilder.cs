@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using SigQL.Extensions;
 using SigQL.Schema;
+using SigQL.Sql;
 using SigQL.Types.Attributes;
 
 namespace SigQL
@@ -19,17 +21,17 @@ namespace SigQL
             WhereClause whereClause = null;
             if (updateSpec.FilterParameters.Any())
             {
-                var parameters = this.databaseResolver.BuildDetectedParameters(updateSpec.Table, updateSpec.FilterParameters).ToList();
+                var tableRelations = this.databaseResolver.BuildTableRelations(primaryTable, new TableArgument(primaryTable, updateSpec.FilterParameters.AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters);
 
                 whereClause = BuildWhereClauseFromTargetTablePerspective(
-                    new RelationalTable() { Label = primaryTable.Name }, primaryTable, parameters, parameterPaths,
+                    new RelationalTable() { Label = primaryTable.Name }, tableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause), parameterPaths,
                     tokens);
             }
-            
+
             var statement = new Update()
             {
                 Args = new TableIdentifier().SetArgs(new RelationalTable() { Label = primaryTable.Name }).AsEnumerable(),
-                SetClause = updateSpec.SetColumnParameters.Select(c => 
+                SetClause = updateSpec.SetColumnParameters.Select(c =>
                     new SetEqualOperator().SetArgs(
                             new ColumnIdentifier()
                                 .SetArgs(new RelationalColumn()
@@ -42,7 +44,7 @@ namespace SigQL
                             }
                         )),
                 FromClause = new FromClause().SetArgs(new TableIdentifier().SetArgs(new RelationalTable()
-                    {Label = primaryTable.Name})),
+                { Label = primaryTable.Name })),
                 WhereClause = whereClause
             };
 
@@ -56,7 +58,6 @@ namespace SigQL
                 UnwrappedReturnType = null,
                 Parameters = parameterPaths,
                 Tokens = tokens,
-                // ColumnAliasRelations = columnAliasForeignKeyDefinitions,
                 TargetTablePrimaryKey = null,
                 TablePrimaryKeyDefinitions = null
             };
@@ -75,36 +76,34 @@ namespace SigQL
                     updateSpec.Table = this.databaseConfiguration.Tables.FindByName(updateAttribute.TableName);
                 }
 
-                var setParameters = methodInfo.GetParameters().Where(p => p.GetCustomAttribute<SetAttribute>() != null).ToList();
+                var arguments = methodInfo.GetParameters().AsArguments(this.databaseResolver);
+                var setParameters = arguments.Where(p => p.GetCustomAttribute<SetAttribute>() != null).ToList();
                 
                 updateSpec.SetColumnParameters = setParameters.SelectMany(c =>
                 {
-                    if (this.databaseResolver.IsTableOrTableProjection(c.ParameterType))
+                    if (this.databaseResolver.IsTableOrTableProjection(c.Type))
                     {
-                        return c.ParameterType.GetProperties().Select(pr => new UpdateColumnParameter()
+                        return c.ClassProperties.Select(pr => new UpdateColumnParameter()
                         {
                             Column = updateSpec.Table.Columns.FindByName(pr.Name),
-                            ParameterPath = new ParameterPath()
+                            ParameterPath = new ParameterPath(pr)
                             {
-                                SqlParameterName = $"{c.Name}{pr.Name}",
-                                Parameter = c,
-                                Properties = pr.AsEnumerable()
+                                SqlParameterName = $"{c.Name}{pr.Name}"
                             }
                         });
                     }
                     return new UpdateColumnParameter()
                     {
                         Column = updateSpec.Table.Columns.FindByName(c.Name),
-                        ParameterPath = new ParameterPath()
+                        ParameterPath = new ParameterPath(c)
                         {
-                            SqlParameterName = c.Name,
-                            Parameter = c
+                            SqlParameterName = c.Name
                         }
                     }.AsEnumerable();
                 }).ToList();
 
-                var filterParameters = methodInfo.GetParameters().Except(setParameters).ToList();
-                updateSpec.FilterParameters = filterParameters;
+                var filterParameters = arguments.Except(setParameters).ToList();
+                updateSpec.FilterParameters = filterParameters.Select(c => c.GetParameterInfo()).ToList();
 
                 updateSpec.RootMethodInfo = methodInfo;
 

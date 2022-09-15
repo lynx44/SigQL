@@ -9,17 +9,53 @@ namespace SigQL.Sql
 {
     internal class TableRelations : ITableHierarchyAlias
     {
-        public Type ProjectionType { get; set; }
+        public TableRelations()
+        {
+            this.NavigationTables = new List<TableRelations>();
+            this.ProjectedColumns = new List<TableRelationColumnDefinition>();
+        }
+        public IArgument Argument { get; set; }
         public ITableDefinition TargetTable { get; set; }
         public IEnumerable<TableRelations> NavigationTables { get; set; }
-        public IEnumerable<ColumnDefinitionWithPath> ProjectedColumns { get; set; }
+        public IEnumerable<TableRelationColumnDefinition> ProjectedColumns { get; set; }
         public IForeignKeyDefinition ForeignKeyToParent { get; set; }
-        public ColumnField ParentColumnField { get; set; }
-        public TypeHierarchyNode HierarchyNode { get; set; }
-        public string Alias => $"{TargetTable.Name}" + (RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{HierarchyNode.QualifiedPath}>" : null);
+        public string Alias => $"{TargetTable.Name}" + (RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{(Argument.Type != typeof(void) ? Argument.FullyQualifiedName() : Argument.Parent.FullyQualifiedName())}>" : null);
         public string TableName => TargetTable.Name;
         public TableRelations Parent { get; set; }
+        
+        public TableRelations Filter(TableRelationsColumnSource source, TableRelationsFilter filter)
+        {
+            var matchingColumns = this.ProjectedColumns.Where(c => c.Source == source && c.Arguments.All.Any(arg => filter.IsMatch(arg, false))).ToList();
+            var filteredTableRelations = new TableRelations()
+            {
+                Argument = this.Argument,
+                ForeignKeyToParent = this.ForeignKeyToParent,
+                ProjectedColumns = matchingColumns,
+                TargetTable = this.TargetTable
+            };
+            var matchingNavigationTables = this.NavigationTables.Select(t => t.Filter(source, filter)).ToList();
+            matchingNavigationTables.ForEach(t => t.Parent = filteredTableRelations);
+            filteredTableRelations.NavigationTables = matchingNavigationTables;
 
+            filteredTableRelations = PruneBranchesWithoutColumns(filteredTableRelations);
+            
+            return filteredTableRelations;
+        }
+
+        private static TableRelations PruneBranchesWithoutColumns(TableRelations tableRelations)
+        {
+            foreach (var navigationTable in tableRelations.NavigationTables)
+            {
+                PruneBranchesWithoutColumns(navigationTable);
+            }
+
+            tableRelations.NavigationTables = tableRelations.NavigationTables.Where(nt => 
+                
+                nt.ProjectedColumns.Any() || nt.NavigationTables.Any()).ToList();
+
+            return tableRelations;
+        }
+        
         public bool RelationTreeHasAnyTableDefinedMultipleTimes()
         {
             var root = Parent ?? this;
@@ -61,30 +97,95 @@ namespace SigQL.Sql
 
             return null;
         }
+
+        public TableRelations FindViaRelations(IEnumerable<string> tableRelationPath)
+        {
+            if (tableRelationPath.FirstOrDefault() == this.TableName)
+            {
+                return FindViaRelations(tableRelationPath.Skip(1).ToList(), this);
+            }
+
+            return null;
+        }
+
+        private TableRelations FindViaRelations(IEnumerable<string> relatedTableNames, TableRelations tableRelation)
+        {
+
+            var nextTableName = relatedTableNames.FirstOrDefault();
+            var matchingTableRelation = tableRelation.NavigationTables.FirstOrDefault(t => t.TableName == nextTableName);
+            var remainingTableNames = relatedTableNames.Skip(1).ToList();
+
+            if (!remainingTableNames.Any())
+            {
+                return matchingTableRelation;
+            }
+
+            return FindViaRelations(remainingTableNames, matchingTableRelation);
+        }
     }
 
-    internal class ColumnDefinitionWithPath : IColumnDefinition
+    internal class TableRelationColumnDefinition : IColumnDefinition
     {
         private readonly IColumnDefinition columnDefinition;
-        public ParameterInfo Parameter { get; }
-        public PropertyInfo Property { get; }
+        
+        public ArgumentCollection Arguments { get; set; }
 
         public string Name => columnDefinition.Name;
         public string DataTypeDeclaration => columnDefinition.DataTypeDeclaration;
 
         public ITableDefinition Table => columnDefinition.Table;
 
-        public ColumnDefinitionWithPath(IColumnDefinition columnDefinition, PropertyInfo property)
+        public TableRelationsColumnSource Source { get; }
+
+        public TableRelationColumnDefinition(IColumnDefinition columnDefinition, IArgument argument, TableRelationsColumnSource source)
         {
             this.columnDefinition = columnDefinition;
-            this.Property = property;
+            this.Arguments = new ArgumentCollection();
+            this.Arguments.AddArgument(argument, source);
+            this.Source = source;
+        }
+    }
+
+    internal class ArgumentCollection
+    {
+        private class ArgumentWithSource
+        {
+            public ArgumentWithSource(IArgument argument, TableRelationsColumnSource source)
+            {
+                Argument = argument;
+                Source = source;
+            }
+
+            public IArgument Argument { get; set; }
+            public TableRelationsColumnSource Source { get; set; }
         }
 
-        public ColumnDefinitionWithPath(IColumnDefinition columnDefinition, ParameterInfo parameter)
+        private List<ArgumentWithSource> Arguments { get; set; }
+
+        public ArgumentCollection()
         {
-            this.columnDefinition = columnDefinition;
-            this.Parameter = parameter;
+            this.Arguments = new List<ArgumentWithSource>();
         }
+
+        public void AddArgument(IArgument argument, TableRelationsColumnSource source)
+        {
+            Arguments.Add(new ArgumentWithSource(argument, source));
+        }
+
+        public IEnumerable<IArgument> GetArguments(TableRelationsColumnSource source)
+        {
+            return Arguments.Where(a => a.Source == source)
+                .Select(a => a.Argument)
+                .ToList();
+        }
+
+        public IEnumerable<IArgument> All => Arguments.Select(a => a.Argument).ToList();
+    }
+    
+    internal enum TableRelationsColumnSource
+    {
+        ReturnType,
+        Parameters
     }
 
     public interface ITableHierarchyAlias

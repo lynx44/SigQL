@@ -13,9 +13,8 @@ namespace SigQL
 {
     public partial class MethodParser
     {
-        private MethodSqlStatement BuildInsertStatement(InsertSpec insertSpec, List<ParameterPath> parameterPaths, ParameterInfo rootParameter = null, List<PropertyInfo> propertyPaths = null)
+        private MethodSqlStatement BuildInsertStatement(InsertSpec insertSpec, List<ParameterPath> parameterPaths)
         {
-            propertyPaths ??= new List<PropertyInfo>();
             var targetTableType = insertSpec.UnwrappedReturnType;
 
             var valuesListClause = new ValuesListClause();
@@ -156,13 +155,12 @@ namespace SigQL
                     )
                 );
 
-                var tokenPath = new TokenPath()
+                var tokenPath = new TokenPath(insertColumnParameter.ParameterPath.Argument.FindParameter())
                 {
-                    Parameter = insertColumnParameter.ParameterPath.Parameter,
                     SqlParameterName = insertColumnParameter.ParameterPath.SqlParameterName,
                     UpdateNodeFunc = (parameterValue, tokenPath) =>
                     {
-                        var enumerable = parameterValue is IEnumerable ? parameterValue as IEnumerable : parameterValue.AsEnumerable();
+                        var enumerable = tokenPath.Argument.Type.IsCollectionType() ? parameterValue as IEnumerable : parameterValue.AsEnumerable();
                         var sqlParameters = new Dictionary<string, object>();
                         var allItems = enumerable?.Cast<object>();
                         if (allItems != null && allItems.Any())
@@ -242,7 +240,7 @@ namespace SigQL
                     var fromClauseRelations = resolvedSelectClause.FromClauseRelations;
                     var selectClause = resolvedSelectClause.Ast;
 
-                    var fromClauseNode = BuildFromClause(fromClauseRelations, new List<ParameterInfo>());
+                    var fromClauseNode = BuildFromClause(fromClauseRelations, new List<IArgument>());
                     
                     var primaryTable = fromClauseRelations.TargetTable;
                     var outputParameterTableSelectAlias = "i";
@@ -287,11 +285,9 @@ namespace SigQL
                     ColumnParameters = t.ForeignKeyToParent.KeyPairs.Select(c => new InsertColumnParameter()
                     {
                         Column = c.ForeignTableColumn,
-                        ParameterPath = new ParameterPath()
+                        ParameterPath = new ParameterPath(t.Argument)
                         {
-                            SqlParameterName = $"{insertSpec.RelationalPrefix}{t.TargetTable.Name}",
-                            Parameter = rootParameter ?? insertColumnParameter.ParameterPath.Parameter,
-                            Properties = propertyPaths.AppendOne(t.ParentColumnField.Property).ToList()
+                            SqlParameterName = $"{insertSpec.RelationalPrefix}{t.TargetTable.Name}"
                         }
                     }).ToList(),
                     RelationalPrefix = insertSpec.Table.Name,
@@ -302,7 +298,7 @@ namespace SigQL
 
                 // parameterPaths.AddRange(manyTableInsertSpecs.SelectMany(m => m.ColumnParameters.Select(c => c.ParameterPath)).ToList());
                 var methodSqlStatements = manyTableInsertSpecs.Select(tis =>
-                    BuildInsertStatement(tis, parameterPaths, rootParameter ?? insertColumnParameter.ParameterPath.Parameter, propertyPaths.AppendOne(tis.TableRelations.ParentColumnField.Property).ToList())).ToList();
+                    BuildInsertStatement(tis, parameterPaths)).ToList();
 
                 statement.AddRange(methodSqlStatements.SelectMany(mst => mst.CommandAst));
                 tokens.AddRange(methodSqlStatements.SelectMany(mst => mst.Tokens));
@@ -338,7 +334,7 @@ namespace SigQL
                 {
                     insertSpec.Table = this.databaseConfiguration.Tables.FindByName(insertAttribute.TableName);
                 }
-               
+
                 var methodParameters = methodInfo.GetParameters();
                 var tableTypeParameters = methodParameters.Where(p => this.databaseResolver.IsTableOrTableProjection(OutputFactory.UnwrapType(p.ParameterType)));
                 if (tableTypeParameters.Any())
@@ -347,20 +343,21 @@ namespace SigQL
                     {
                         throw new InvalidOperationException("Only one table representation parameter is supported.");
                     }
-                    
+
                     var parameterInfo = tableTypeParameters.Single();
-                    var tableRelations = this.databaseResolver.BuildTableRelationsFromType(parameterInfo.ParameterType);
-                    insertSpec.ColumnParameters = tableRelations.ProjectedColumns.Select(pc =>
-                        new InsertColumnParameter()
-                        {
-                            Column = pc,
-                            ParameterPath = new ParameterPath()
+                    var tableDefinition = insertSpec.Table ?? this.databaseResolver.DetectTable(parameterInfo.ParameterType);
+                    var tableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, new ParameterArgument(parameterInfo, this.databaseResolver).AsEnumerable()), TableRelationsColumnSource.Parameters);
+                    insertSpec.ColumnParameters = tableRelations.ProjectedColumns.SelectMany(pc =>
+                        pc.Arguments.All.Select(arg =>
+                            new InsertColumnParameter()
                             {
-                                SqlParameterName = pc.Name,
-                                Parameter = parameterInfo,
-                                Properties = new List<PropertyInfo>() {pc.Property}
-                            }
-                        }).ToList();
+                                Column = pc,
+                                ParameterPath = new ParameterPath(arg)
+                                {
+                                    SqlParameterName = pc.Name
+                                }
+                            })
+                        ).ToList();
                     if (insertSpec.Table == null)
                     {
                         insertSpec.Table = tableRelations.TargetTable;
@@ -370,15 +367,14 @@ namespace SigQL
                 }
                 else
                 {
-                    insertSpec.ColumnParameters = 
-                        methodParameters
-                            .Select(p => 
+                    insertSpec.ColumnParameters =
+                        methodParameters.AsArguments(this.databaseResolver)
+                            .Select(p =>
                                 new InsertColumnParameter()
                                 {
                                     Column = insertSpec.Table.Columns.FindByName(p.Name),
-                                    ParameterPath = new ParameterPath()
+                                    ParameterPath = new ParameterPath(p)
                                     {
-                                        Parameter = p,
                                         SqlParameterName = p.Name
                                     }
                                 }
@@ -392,8 +388,8 @@ namespace SigQL
                 return insertSpec;
             }
 
-             
-            
+
+
             return null;
         }
 

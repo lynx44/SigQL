@@ -46,14 +46,21 @@ namespace SigQL.Tests.Common.Databases.Labor
         WorkLog.IWorkLogId GetWorkLogByEmployeeNameViaAttribute([ViaRelation(nameof(Employee) + "." + nameof(WorkLog.Employee.Name))] string employeeName);
         Employee.IEmployeeId GetEmployeeByStreetAddress(Employee.StreetAddressFilter filter);
         // WorkLog.IWorkLogId GetWorkLogByEmployeeNameDirect(Employee.EmployeeNameFilter filter);
-        IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsAttribute([OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate))] OrderByDirection direction = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsAttribute([Column(nameof(WorkLog.StartDate))] OrderByDirection direction = OrderByDirection.Ascending);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogs(OrderByDirection startDate = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogs(OrderByDirection startDate = OrderByDirection.Ascending, OrderByDirection endDate = OrderByDirection.Ascending, OrderByDirection employeeId = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.IWorkLogWithEmployee> GetOrderedWorkLogs([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))] OrderByDirection employeeName, [Column(nameof(WorkLog.StartDate))] OrderByDirection direction, IOrderBy dynamicOrderBy);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsMultiple(OrderByDirection startDate = OrderByDirection.Ascending, OrderByDirection endDate = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsViaClassFilter(WorkLog.OrderByDirectionStartDate filter);
         IEnumerable<WorkLog.IWorkLogId> INVALID_GetOrderedWorkLogs(OrderByDirection theStartDate = OrderByDirection.Ascending);
         //IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsGenericType<TOrder>(OrderBy<TOrder> direction = null);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicOrderBy(IOrderBy order);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetOrderedWorkLogsWithDynamicOrderByRelation(IOrderBy order);
+        IEnumerable<WorkLog> GetOrderedWorkLogsWithDynamicOrderByRelationCanonicalDataType(IOrderBy order);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicEnumerableOrderBy(IEnumerable<IOrderBy> orders);
-        IEnumerable<WorkLog.IWorkLogWithEmployeeWithAddress> GetWorkLogsOrderedByAddressId([OrderBy(nameof(Address), nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(WorkLog.DynamicOrderByEnumerable filter);
+
+        IEnumerable<WorkLog.IWorkLogWithEmployeeWithAddress> GetWorkLogsOrderedByAddressId([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address) + "." + nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithLike(Like name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithStartsWith([StartsWith] string name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithContains([Contains] string name);
@@ -79,6 +86,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddress([ViaRelation(nameof(Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address) + "." + nameof(Address.StreetAddress))] string streetAddress);
         IEnumerable<Employee.IEmployeeId> EF_GetEmployeeIdsForStreetAddress([ViaRelation(nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address) + "." + nameof(Address.StreetAddress))] string streetAddress);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameWithDifferingParameterName([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))] string theEmployeeName);
+        IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForWorkLogLocationIdClassFilter(Employee.WorkLogLocationIdFilterViaRelation filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameViaClassFilter(WorkLog.EmployeeNameViaRelationFilter filter);
+        IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddressViaClassFilter(Employee.StreetAddressFilterViaRelation filter);
+        IEnumerable<Employee.IEmployeeId> EF_GetEmployeeIdsForStreetAddressViaClassFilter(Employee.EFStreetAddressFilterViaRelation filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameWithDifferingParameterNameViaClassFilter(WorkLog.EmployeeNameFilterWithAliasViaRelation filter);
 
         /// <summary>
         /// This is illegal. The interface T specified in the OrderBy<T> definition must only contain one column,
@@ -115,7 +127,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsViaClassFilter(WorkLog.FilterWithOffset filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsViaClassFilterAndParameter(WorkLog.FilterWithOffsetAndParameter filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithNavigationTableFilterWithOffset(WorkLog.GetByEmployeeNameFilterWithOffset filter);
-        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithOrder([Offset] int skip, [OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate))] OrderByDirection order = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithOrder([Offset] int skip, [Column(nameof(WorkLog.StartDate))] OrderByDirection order = OrderByDirection.Ascending);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithPrimaryTableFilter([Offset] int skip, DateTime startDate);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithNavigationTableFilter([Offset] int skip, WorkLog.GetByEmployeeNameFilter filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> TakeWorkLogs([Fetch] int take);
@@ -140,7 +152,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         //IEnumerable<itvf_GetWorkLogsByEmployeeId.IId> itvf_GetWorkLogsByEmployeeIdWithClassParameters(itvf_GetWorkLogsByEmployeeId.Parameters parameters);
 
         // poco
-        IEnumerable<WorkLog.WorkLogWithEmployeeWithAddressPoco> GetWorkLogsOrderedByAddressIdPocoReturn([OrderBy(nameof(Address), nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.WorkLogWithEmployeeWithAddressPoco> GetWorkLogsOrderedByAddressIdPocoReturn([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address) + "." + nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
         IEnumerable<WorkLog.WorkLogIdPocoWithClrOnlyProperty> GetWorkLogsWithClrOnlyProperty();
         IEnumerable<WorkLog.WorkLogIdPocoWithNestedClrOnlyProperty> GetWorkLogsWithNestedClrOnlyProperty();
 

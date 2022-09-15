@@ -60,8 +60,6 @@ namespace SigQL
 
         public MemberResolutionResult ResolveProperty(PropertyInfo propertyInfo)
         {
-            //var propertyInfo = GetMatchingProperty(methodInfo);
-
             var interceptResult = new MemberResolutionResult();
             if (propertyInfo != null)
             {

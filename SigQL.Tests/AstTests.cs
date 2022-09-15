@@ -554,6 +554,33 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void BasicOrderBy_Multiple()
+        {
+            var selectStatement = new Select()
+            {
+                SelectClause = new SelectClause()
+                {
+                    Args = new[] { new ColumnIdentifier() { Args = new[] { new RelationalColumn() { Label = "name" } } }, }
+                },
+                FromClause = new FromClause()
+                {
+                    Args = new[] { new TableIdentifier() { Args = new[] { new RelationalTable() { Label = "person" } } } }
+                },
+                OrderByClause = new OrderByClause()
+                {
+                    Args = new[]
+                    {
+                        new OrderByIdentifier() { Args = new[] { new ColumnIdentifier() { Args = new[] { new RelationalColumn() { Label = "name" } } } } },
+                        new OrderByIdentifier() { Args = new[] { new ColumnIdentifier() { Args = new[] { new RelationalColumn() { Label = "id" } } } } }
+                    }
+                }
+            };
+
+            var statement = Build(selectStatement);
+            Assert.AreEqual("select \"name\" from \"person\" order by \"name\", \"id\"", statement);
+        }
+
+        [TestMethod]
         public void BasicOrderByWithOffset()
         {
             var selectStatement = new Select()

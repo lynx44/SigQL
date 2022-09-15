@@ -377,7 +377,7 @@ namespace SigQL.Schema
 
         public int GetHashCode(IForeignKeyDefinition obj)
         {
-            return obj.PrimaryKeyTable.Name.GetHashCode() + obj.KeyPairs.Sum(c => c.PrimaryTableColumn.Name.GetHashCode() + c.ForeignTableColumn.Name.GetHashCode() + c.ForeignTableColumn.Table.Name.GetHashCode());
+            return new Tuple<string, IEnumerable<Tuple<string, string, string>>>(obj.PrimaryKeyTable.Name, obj.KeyPairs.Select(c => new Tuple<string, string, string>(c.PrimaryTableColumn.Name, c.ForeignTableColumn.Name, c.ForeignTableColumn.Table.Name))).GetHashCode();
         }
     }
 }

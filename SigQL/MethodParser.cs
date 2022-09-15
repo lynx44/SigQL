@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -60,27 +61,39 @@ namespace SigQL
             
             projectionType = OutputFactory.UnwrapType(returnType);
 
+
+            var methodParameters = methodInfo.GetParameters();
+            var arguments = methodParameters.AsArguments(this.databaseResolver);
+
+            var tableDefinition = this.databaseResolver.DetectTable(projectionType);
+            TableRelations allTableRelations;
+            {
+                var projectionTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TypeArgument(projectionType, this.databaseResolver),
+                    TableRelationsColumnSource.ReturnType);
+                var parametersTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, arguments),
+                    TableRelationsColumnSource.Parameters);
+                allTableRelations = this.databaseResolver.MergeTableRelations(
+                    projectionTableRelations,
+                    parametersTableRelations);
+            }
+
             var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
-            var resolvedSelectClause = selectClauseBuilder.Build(returnType);
-            var fromClauseRelations = resolvedSelectClause.FromClauseRelations;
+            var selectTableRelations = allTableRelations.Filter(TableRelationsColumnSource.ReturnType, ColumnFilters.SelectClause);
+            var resolvedSelectClause = selectClauseBuilder.Build(selectTableRelations);
             
             var tablePrimaryKeyDefinitions = resolvedSelectClause.TableKeyDefinitions;
             
             var selectClause = resolvedSelectClause.Ast;
 
-            var primaryTable = fromClauseRelations.TargetTable;
+            var primaryTable = allTableRelations.TargetTable;
             var parameterPaths = new List<ParameterPath>();
             var tokens = new List<TokenPath>();
+            
+            var allJoinRelations = selectTableRelations;
 
-            var methodParameters = methodInfo.GetParameters();
-            var detectedParameters =
-                this.databaseResolver.BuildDetectedParameters(primaryTable, methodInfo.GetParameters());
-            var allJoinRelations = fromClauseRelations;
-
-            var functionParameters = methodParameters.Where(p => IsFunctionParameter(p)).ToList();
-            parameterPaths.AddRange(functionParameters.Select(p => new ParameterPath()
+            var functionParameters = arguments.Where(p => IsFunctionParameter(p)).ToList();
+            parameterPaths.AddRange(functionParameters.Select(p => new ParameterPath(p)
             {
-                Parameter = p,
                 SqlParameterName = p.Name
             }));
             var fromClauseNode = BuildFromClause(allJoinRelations, functionParameters);
@@ -92,24 +105,28 @@ namespace SigQL
                 FromClause = fromClause
             };
 
-            var orderByParameters = methodParameters.Where(p =>
-                IsOrderByAttributeParameter(p) ||
-                IsDynamicOrderByParameter(p) ||
-                IsOrderByDirectionParameter(p)).ToList();
-            IEnumerable<OrderBySpec> orderBySpecs = ConvertToOrderBySpecs(orderByParameters, primaryTable, fromClauseRelations);
+            var orderByParameters = allTableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.OrderBy);
+            
+            var orderBySpecs = ConvertToOrderBySpecs(arguments, orderByParameters, primaryTable, allTableRelations).ToList();
+            var dynamicOrderByParameterPaths = this.FindDynamicOrderByParameterPaths(arguments);
+            var dynamicOrderBySpecs = ConvertToOrderBySpecs(arguments, dynamicOrderByParameterPaths, primaryTable, allTableRelations);
+
+            orderBySpecs.AddRange(dynamicOrderBySpecs);
+            orderBySpecs = orderBySpecs.OrderBy(o => o.Ordinal).ToList();
             if (orderBySpecs.Any())
             {
                 statement.OrderByClause = BuildOrderByClause(null, orderBySpecs, tokens);
             }
 
             // offset functionality
-            var offsetParameter = GetParameterPathWithAttribute<OffsetAttribute>(methodParameters);
-            var fetchParameter = GetParameterPathWithAttribute<FetchAttribute>(methodParameters);
+            var offsetParameter = GetParameterPathWithAttribute<OffsetAttribute>(arguments);
+            var fetchParameter = GetParameterPathWithAttribute<FetchAttribute>(arguments);
+            var whereClauseTableRelations = allTableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause);
             if ((offsetParameter != null || fetchParameter != null))
             {
-                if ((fromClauseRelations.NavigationTables != null && fromClauseRelations.NavigationTables.Any()))
+                if ((allTableRelations.NavigationTables != null && allTableRelations.NavigationTables.Any()))
                 {
-                    var primaryTableAlias = $"{fromClauseRelations.TargetTable.Name}0";
+                    var primaryTableAlias = $"{allTableRelations.TargetTable.Name}0";
                     var offsetFromClause =
                         new FromClauseNode().SetArgs(
                             new Alias() { Label = primaryTableAlias }.SetArgs(
@@ -132,9 +149,9 @@ namespace SigQL
                     ).ToArray();
 
                     WhereClause offsetWhereClause = null;
-                    if (detectedParameters.Any())
+                    if (whereClauseTableRelations.ProjectedColumns.Any() || whereClauseTableRelations.NavigationTables.Any())
                     {
-                        offsetWhereClause = BuildWhereClauseFromTargetTablePerspective(new Alias() { Label = primaryTableAlias }, primaryTable, detectedParameters, parameterPaths, tokens);
+                        offsetWhereClause = BuildWhereClauseFromTargetTablePerspective(new Alias() { Label = primaryTableAlias }, whereClauseTableRelations, parameterPaths, tokens);
                     }
 
                     OrderByClause offsetOrderByClause = BuildOrderByWithOffsetClause(statement, primaryTableAlias, orderBySpecs, tokens, offsetParameter, parameterPaths, fetchParameter);
@@ -166,7 +183,7 @@ namespace SigQL
                                             new Alias() {Label = offsetTableAliasName},
                                             new RelationalColumn() {Label = c.Name}),
                                         new ColumnIdentifier().SetArgs(
-                                            new RelationalTable() {Label = fromClauseRelations.Alias},
+                                            new RelationalTable() {Label = allTableRelations.Alias},
                                             new RelationalColumn() {Label = c.Name})))
                             )
                         )
@@ -179,27 +196,21 @@ namespace SigQL
                 {
                     var offsetOrderByClause = BuildOrderByWithOffsetClause(statement, null, orderBySpecs, tokens, offsetParameter, parameterPaths, fetchParameter);
                     statement.OrderByClause = offsetOrderByClause;
-                    if (detectedParameters.Any())
+                    if (whereClauseTableRelations.ProjectedColumns.Any() || whereClauseTableRelations.NavigationTables.Any())
                     {
                         statement.WhereClause = BuildWhereClauseFromTargetTablePerspective(
-                            new RelationalTable() { Label = primaryTable.Name }, primaryTable, detectedParameters, parameterPaths,
+                            new RelationalTable() { Label = allTableRelations.Alias }, whereClauseTableRelations, parameterPaths,
                             tokens);
                     }
                 }
             }
-            else if (detectedParameters.Any())
+            else if (whereClauseTableRelations.ProjectedColumns.Any() || whereClauseTableRelations.NavigationTables.Any())
             {
                 statement.WhereClause = BuildWhereClauseFromTargetTablePerspective(
-                    new RelationalTable() {Label = fromClauseRelations.Alias}, primaryTable, detectedParameters, parameterPaths,
+                    new RelationalTable() {Label = allTableRelations.Alias}, whereClauseTableRelations, parameterPaths,
                     tokens);
             }
-
-            // remove IN parameters - these are converted to separate parameters
-            parameterPaths.RemoveAll(p =>
-                (p.Properties?.Any()).GetValueOrDefault(false)
-                    ? p.Properties.Select(pp => pp.PropertyType).Last().IsCollectionType()
-                    : p.Parameter.ParameterType.IsCollectionType());
-
+            
             if (isCountResult)
             {
                 var countStatement = new Select();
@@ -220,52 +231,56 @@ namespace SigQL
                 UnwrappedReturnType = projectionType,
                 Parameters = parameterPaths,
                 Tokens = tokens,
-                // ColumnAliasRelations = columnAliasForeignKeyDefinitions,
-                TargetTablePrimaryKey = !isCountResult ? fromClauseRelations.TargetTable.PrimaryKey : new TableKeyDefinition(),
+                TargetTablePrimaryKey = !isCountResult ? allTableRelations.TargetTable.PrimaryKey : new TableKeyDefinition(),
                 TablePrimaryKeyDefinitions = !isCountResult ? tablePrimaryKeyDefinitions : new Dictionary<string, ITableKeyDefinition>()
             };
             return sqlStatement;
         }
 
-        private static ParameterPath GetParameterPathWithAttribute<TAttribute>(ParameterInfo[] methodParameters)
+        private IEnumerable<IArgument> FindDynamicOrderByParameterPaths(IEnumerable<IArgument> arguments)
+        {
+            var orderByArguments = this.databaseResolver.FindMatchingArguments(arguments, a => a.Type.IsAssignableFrom(typeof(OrderBy)) ||
+                                                                                                                                   a.Type.IsAssignableFrom(typeof(IEnumerable<OrderBy>)));
+            var matchingArgs = orderByArguments.Select(a =>
+            {
+                return a;
+            }).ToList();
+
+            return matchingArgs;
+        }
+        
+        private static ParameterPath GetParameterPathWithAttribute<TAttribute>(IEnumerable<IArgument> arguments)
             where TAttribute : Attribute
         {
-            var parameterPathWithAttribute = methodParameters.SingleOrDefault(p => p.GetCustomAttribute<TAttribute>() != null);
+            var parameterPathWithAttribute = arguments.SingleOrDefault(p => p.GetCustomAttribute<TAttribute>() != null);
             if (parameterPathWithAttribute != null)
             {
                 return 
-                    new ParameterPath()
-                    {
-                        Parameter = parameterPathWithAttribute
-                    };
+                    new ParameterPath(parameterPathWithAttribute);
             }
 
-            return FindClassFilterPropertyWithAttribute<TAttribute>(methodParameters);
+            return FindClassFilterPropertyWithAttribute<TAttribute>(arguments);
         }
 
-        private static ParameterPath FindClassFilterPropertyWithAttribute<TAttribute>(ParameterInfo[] methodParameters)
+        private static ParameterPath FindClassFilterPropertyWithAttribute<TAttribute>(IEnumerable<IArgument> arguments)
             where TAttribute : Attribute
         {
-            var propertiesWithAttribute = methodParameters.Select(p =>
+            var propertiesWithAttribute = arguments.Select(p =>
             {
-                var isClass = p.ParameterType.IsClass || p.ParameterType.IsInterface;
+                var isClass = p.Type.IsClass || p.Type.IsInterface;
                 if (isClass)
                 {
-                    var propsWithAttr = p.ParameterType.GetProperties().Where(p => p.GetCustomAttribute<TAttribute>() != null);
+                    var propsWithAttr = p.ClassProperties.Where(p => p.GetCustomAttribute<TAttribute>() != null).ToList();
                     if (propsWithAttr.Count() >= 2)
                     {
-                        throw new InvalidAttributeException(typeof(TAttribute), propsWithAttr,
+                        throw new InvalidAttributeException(typeof(TAttribute), propsWithAttr.Select(a => a.GetPropertyInfo()),
                             $"Attribute [{typeof(TAttribute).Name}] is specified more than once.");
                     }
 
                     if (propsWithAttr.Any())
                     {
                         return
-                            new ParameterPath()
-                            {
-                                Parameter = p,
-                                Properties = propsWithAttr.ToList()
-                            };
+                            new ParameterPath(propsWithAttr.First());
                     }
                 }
 
@@ -281,7 +296,7 @@ namespace SigQL
             return propertiesWithAttribute.SingleOrDefault();
         }
 
-        private bool IsFunctionParameter(ParameterInfo parameter)
+        private bool IsFunctionParameter(IArgument parameter)
         {
             return parameter.GetCustomAttribute<ParameterAttribute>() != null;
         }
@@ -307,7 +322,7 @@ namespace SigQL
             var offsetClause = new OffsetClause();
             if (offsetParameter != null)
             {
-                var offsetSqlParameterName = offsetParameter.GenerateSuggestedSqlParameterName();
+                var offsetSqlParameterName = offsetParameter.GenerateSuggestedSqlIdentifierName();
                 offsetParameter.SqlParameterName = offsetSqlParameterName;
                 parameterPaths.Add(offsetParameter);
                 offsetClause.OffsetCount = new NamedParameterIdentifier() {Name = offsetSqlParameterName};
@@ -319,7 +334,7 @@ namespace SigQL
 
             if (fetchParameter != null)
             {
-                var fetchSqlParameterName = fetchParameter.GenerateSuggestedSqlParameterName();
+                var fetchSqlParameterName = fetchParameter.GenerateSuggestedSqlIdentifierName();
                 fetchParameter.SqlParameterName = fetchSqlParameterName;
                 parameterPaths.Add(fetchParameter);
                 offsetClause.Fetch = new FetchClause()
@@ -330,80 +345,85 @@ namespace SigQL
             return offsetOrderByClause;
         }
 
-        private bool IsDynamicOrderByParameter(ParameterInfo parameter)
+        private static bool IsOrderByDirectionParameter(ParameterPath p)
         {
-            return parameter.ParameterType.IsAssignableFrom(typeof(OrderBy)) || parameter.ParameterType.IsAssignableFrom(typeof(IEnumerable<OrderBy>));
+            return p.GetEndpointType() == typeof(OrderByDirection);
         }
 
-        //private static bool IsGenericOrderByParameter(ParameterInfo p)
-        //{
-        //    return p.ParameterType.IsGenericType &&
-        //           p.ParameterType.GetGenericTypeDefinition().IsAssignableFrom(typeof(OrderBy<>));
-        //}
-
-        private static bool IsOrderByAttributeParameter(ParameterInfo p)
-        {
-            return p.GetCustomAttribute<OrderByAttribute>() != null;
-        }
-
-        private static bool IsOrderByDirectionParameter(ParameterInfo p)
-        {
-            return p.ParameterType == typeof(OrderByDirection);
-        }
-
-        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<ParameterInfo> orderByParameters,
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<IArgument> arguments, TableRelations orderByTableRelations,
             ITableDefinition primaryTable, TableRelations primaryTableRelations)
         {
-            return orderByParameters.Select(p => ConvertToOrderBySpec(p, primaryTable, primaryTableRelations)).ToList();
+            var matchingArgs = this.databaseResolver.ProjectedColumnsToArguments(orderByTableRelations);
+            return matchingArgs.Select(p => ConvertToOrderBySpec(p.ToParameterPath(), arguments.GetOrdinal(p),  primaryTable, primaryTableRelations)).ToList();
+        }
+        
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<IArgument> arguments, IEnumerable<IArgument> dynamicOrderByParameterPaths, ITableDefinition primaryTable, TableRelations primaryTableRelations)
+        {
+            Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
+
+            return dynamicOrderByParameterPaths.Select(argument =>
+            {
+                return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindViaRelations)
+                {
+                    ParameterPath = argument.ToParameterPath(),
+                    IsDynamic = true,
+                    IsCollection = argument.ToParameterPath().GetEndpointType().IsCollectionType(),
+                    Ordinal = arguments.GetOrdinal(argument)
+                };
+            }).ToList();
         }
 
-        private OrderBySpec ConvertToOrderBySpec(ParameterInfo p, ITableDefinition primaryTable,
+        private OrderBySpec ConvertToOrderBySpec(ParameterPath parameterPath, int ordinal, ITableDefinition primaryTable,
             TableRelations primaryTableRelations)
         {
             Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
-            if (IsOrderByAttributeParameter(p))
+            
+            if (IsOrderByDirectionParameter(parameterPath))
             {
-                var orderByAttribute = p.GetCustomAttribute<OrderByAttribute>();
-                var matchingRelation = primaryTableRelations.Find(orderByAttribute.Table);
-                var table = matchingRelation.Alias;
+                string columnName;
+                string tableName = primaryTable.Name;
+                string tableAliasName = primaryTable.Name;
+                columnName = this.databaseResolver.GetColumnName(parameterPath.Argument);
 
-                var column = orderByAttribute.Column;
-
-                return new OrderBySpec(resolveTableAlias)
+                var viaRelationAttribute = parameterPath.GetEndpointAttribute<ViaRelationAttribute>();
+                if (viaRelationAttribute != null)
                 {
-                    TableName = table,
-                    ColumnName = column,
-                    Parameter = p,
-                    IsDynamic = false,
-                    IsCollection = false
-                };
-            }
-            else if (IsOrderByDirectionParameter(p))
-            {
-                var column = primaryTable.Columns.FindByName(p.Name);
+                    var parameterArgument = new ParameterArgument(parameterPath.Parameter, this.databaseResolver);
+                    var viaRelationPath = viaRelationAttribute.Path;
+                    var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
+                        primaryTableRelations.FindViaRelations);
+                    columnName = result.ColumnName;
+                    tableName = result.TableName;
+                    tableAliasName = result.TableAliasName;
+                }
+
+                var orderByTable = this.databaseConfiguration.Tables.FindByName(tableName);
+                var column = orderByTable.Columns.FindByName(columnName);
 
                 if (column == null)
                 {
                     throw new InvalidIdentifierException(
-                        $"Unable to identify matching database column for order by parameter \"{p.Name}\". Column \"{p.Name}\" does not exist in table {primaryTable.Name}.");
+                        $"Unable to identify matching database column for order by parameter \"{parameterPath.GenerateClassQualifiedName()}\". Column \"{parameterPath.GetEndpointColumnName()}\" does not exist in table {orderByTable.Name}.");
                 }
 
-                return new OrderBySpec(resolveTableAlias)
+                return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindViaRelations)
                 {
-                    TableName = primaryTableRelations.Alias,
+                    TableName = tableAliasName ?? tableName ?? primaryTableRelations.Alias,
                     ColumnName = column.Name,
-                    Parameter = p,
+                    ParameterPath = parameterPath,
                     IsDynamic = false,
-                    IsCollection = false
+                    IsCollection = false,
+                    Ordinal = ordinal
                 };
             }
             else
             {
-                return new OrderBySpec(resolveTableAlias)
+                return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindViaRelations)
                 {
-                    Parameter = p,
+                    ParameterPath = parameterPath,
                     IsDynamic = true,
-                    IsCollection = p.ParameterType.IsCollectionType()
+                    IsCollection = parameterPath.GetEndpointType().IsCollectionType(),
+                    Ordinal = ordinal
                 };
 
             }
@@ -428,98 +448,107 @@ namespace SigQL
             return StatementType.Select;
         }
 
-        private WhereClause BuildWhereClauseFromTargetTablePerspective(AstNode primaryTableReference,
-            ITableDefinition primaryTable, IEnumerable<DetectedParameter> parameters,
-            List<ParameterPath> parameterPaths, List<TokenPath> tokens)
+        private WhereClause BuildWhereClauseFromTargetTablePerspective(AstNode primaryTableReference, TableRelations whereClauseTableRelations, List<ParameterPath> parameterPaths, List<TokenPath> tokens)
         {
-            var andOperator = new AndOperator().SetArgs(parameters.SelectMany<DetectedParameter, AstNode>(
-                    parameter =>
+            var andOperator = new AndOperator().SetArgs(whereClauseTableRelations.ProjectedColumns.SelectMany(column =>
+                {
+                    return column.Arguments.GetArguments(TableRelationsColumnSource.Parameters).SelectMany(arg =>
                     {
-                        // if this is a primitive or built in .NET type, just set it equal
-                        // to the expected value
-                        //var isTableOrTableProjection = this.databaseResolver.IsTableOrTableProjection(parameter.Type);
-                        if (!this.databaseResolver.IsClrOnly(parameter.ParameterInfo))
-                        {
+                        var argument = arg.GetEndpoint();
+                        var parameterName = argument.Name;
+                        var dbColumn = GetColumnForParameterName(whereClauseTableRelations.TargetTable, parameterName);
 
-                            if (!this.databaseResolver.IsTableOrTableProjection(parameter.Type) &&
-                                parameter.TableRelations == null)
-                            {
-                                var parameterName = parameter.ParameterInfo.Name;
-                                var column = GetColumnForParameterName(primaryTable, parameter.Name);
 
-                                var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
-                                    .SetArgs(primaryTableReference,
-                                        new RelationalColumn()
-                                        {
-                                            Label = column.Name
-                                        }), parameterName, parameter.Type, parameter.ParameterInfo, new List<PropertyInfo>(), parameterPaths, tokens);
-                                return comparisonNode.AsEnumerable().ToList();
-                            }
-                            else
-                            if (this.databaseResolver.IsTableOrTableProjection(parameter.Type) &&
-                                TableEqualityComparer.Default.Equals(primaryTable, parameter.TableRelations.TargetTable))
-                            {
-                                var filterComparisons = parameter.Type.GetProperties().Where(p => !this.databaseResolver.IsTableOrTableProjection(p.PropertyType)).SelectMany(property =>
+                        var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
+                            .SetArgs(primaryTableReference,
+                                new RelationalColumn()
                                 {
-                                    if (!this.databaseResolver.IsDecoratedNonColumn(property))
-                                    {
-                                        var parameterName = property.Name;
+                                    Label = column.Name
+                                }), parameterName, argument, parameterPaths, tokens);
+                        return comparisonNode.AsEnumerable().ToList();
+                    });
 
-                                        var column = GetColumnForParameterName(parameter.TableRelations, this.databaseResolver.GetColumnName(property));
+                }
+            ));
 
-                                        var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
-                                                .SetArgs(primaryTableReference,
-                                                    new RelationalColumn()
-                                                    {
-                                                        Label = column.Name
-                                                    }), parameterName, property.PropertyType, parameter.ParameterInfo,
-                                            new List<PropertyInfo>() { property }, parameterPaths, tokens);
-                                        return comparisonNode.AsEnumerable().ToList();
-                                    }
-                                    else
-                                    {
-                                        return new List<AstNode>();
-                                    }
-                                    
-                                }).ToList();
-
-                                var navComparisons = parameter.TableRelations.NavigationTables.Select(nt =>
-                                {
-                                    return BuildWhereClauseForPerspective(primaryTableReference,
-                                        nt, "0", parameterPaths, parameter.ParameterInfo,
-                                        new List<PropertyInfo>() { nt.ParentColumnField.Property }, tokens);
-                                });
-
-                                return navComparisons.Concat(filterComparisons).ToList();
-                            }
-                            else
-                                // this is referencing a foreign table, reference the table
-                            {
-                                return parameter.TableRelations.NavigationTables.Select(nt =>
-                                {
-                                    return BuildWhereClauseForPerspective(primaryTableReference,
-                                        nt, "0", parameterPaths, parameter.ParameterInfo,
-                                        nt.ParentColumnField?.Property.AsEnumerable().ToList() ?? new List<PropertyInfo>(), tokens);
-                                });
-                            }
-                        }
-                        else
-                        {
-                            return new List<AstNode>();
-                        }
-
-                    }).ToList()
-            );
+            andOperator.Args = andOperator.Args.Concat(
+            whereClauseTableRelations.NavigationTables.Select(nt =>
+                BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths, tokens))).ToList();
+            
             var whereClause = new WhereClause().SetArgs(andOperator);
             return andOperator.Args.Any() ? whereClause : null;
         }
+        
+        private AstNode BuildWhereClauseForPerspective(
+            AstNode primaryTableReference, TableRelations navigationTableRelations, string navigationTableAliasPostfix,
+            List<ParameterPath> parameterPaths, List<TokenPath> tokens)
+        {
+            var navigationTableAlias = $"{navigationTableRelations.TargetTable.Name}{navigationTableAliasPostfix}";
+
+            var selectStatement = new Select();
+            selectStatement.SelectClause =
+                new SelectClause().SetArgs(
+                    new Literal() { Value = "1" });
+            selectStatement.FromClause = new FromClause();
+            selectStatement.FromClause.SetArgs(
+                new Alias() { Label = navigationTableAlias }.SetArgs(
+                    new TableIdentifier().SetArgs(
+                        new RelationalTable() { Label = navigationTableRelations.TargetTable.Name })));
+
+            selectStatement.WhereClause = new WhereClause().SetArgs(
+                new AndOperator().SetArgs(
+
+                        // match foreign keys to parent
+                        navigationTableRelations.ForeignKeyToParent.KeyPairs.Select(kp =>
+                        {
+                            IColumnDefinition primaryTableColumn = null;
+                            IColumnDefinition navigationTableColumn = null;
+                            if (TableEqualityComparer.Default.Equals(kp.ForeignTableColumn.Table,
+                                navigationTableRelations.TargetTable))
+                            {
+                                primaryTableColumn = kp.PrimaryTableColumn;
+                                navigationTableColumn = kp.ForeignTableColumn;
+                            }
+                            else
+                            {
+                                primaryTableColumn = kp.ForeignTableColumn;
+                                navigationTableColumn = kp.PrimaryTableColumn;
+                            }
+                            return new EqualsOperator().SetArgs(
+                                new TableIdentifier().SetArgs(new Alias() { Label = navigationTableAlias }, new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = navigationTableColumn.Name })),
+                                new TableIdentifier().SetArgs(primaryTableReference, new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = primaryTableColumn.Name })));
+                        }).ToList()
+                        .Concat(
+                            navigationTableRelations.ProjectedColumns.SelectMany(c =>
+                            {
+                                var sqlParameterName = $"{navigationTableAlias}{c.Name}";
+                                return
+                                    c.Arguments.GetArguments(TableRelationsColumnSource.Parameters).Select(arg =>
+                                        BuildComparisonNode(
+                                            new ColumnIdentifier().SetArgs(new Alias() { Label = navigationTableAlias },
+                                                new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Name })),
+                                            sqlParameterName, arg, parameterPaths, tokens)).ToList();
+
+                            }).ToList()
+                        )
+                        .Concat(
+                            navigationTableRelations.NavigationTables.Select((nt, i) =>
+                            {
+                                return BuildWhereClauseForPerspective(new Alias() { Label = navigationTableAlias }, nt,
+                                        $"{navigationTableAliasPostfix}{i}", parameterPaths, tokens);
+                            }).ToList()
+                        )
+                    ));
+
+            return new AndOperator().SetArgs(
+                new Exists().SetArgs(selectStatement));
+        }
 
         private AstNode BuildComparisonNode(AstNode columnNode,
-            string parameterName, Type methodParameterType, ParameterInfo rootParameter,
-            List<PropertyInfo> propertyPath, List<ParameterPath> parameterPaths, List<TokenPath> tokens)
+            string parameterName, IArgument argument, List<ParameterPath> parameterPaths, List<TokenPath> tokens)
         {
             AstNode operatorNode = null;
-            var comparisonSpec = this.databaseResolver.GetColumnSpec(methodParameterType, propertyPath.Any() ? propertyPath.Last().CustomAttributes : rootParameter.CustomAttributes);
+            var comparisonSpec = this.databaseResolver.GetColumnSpec(argument);
             var parameterType = comparisonSpec.ComparisonType;
 
             var placeholder = new Placeholder();
@@ -527,10 +556,8 @@ namespace SigQL
                 comparisonSpec.IsAnyLike)
             {
                 operatorNode = new LikeOperator();
-                var token = new TokenPath()
+                var token = new TokenPath(argument)
                 {
-                    Parameter = rootParameter,
-                    Properties = propertyPath,
                     SqlParameterName = parameterName,
                     UpdateNodeFunc = (parameterValue, parameterArg) =>
                     {
@@ -598,10 +625,8 @@ namespace SigQL
                     (comparisonSpec.Not ? (InPredicate) new NotInPredicate() : new InPredicate());
                 inPredicate.LeftComparison = columnNode;
                 placeholder.SetArgs(inPredicate);
-                var token = new TokenPath()
+                var token = new TokenPath(argument)
                 {
-                    Parameter = rootParameter,
-                    Properties = propertyPath,
                     SqlParameterName = parameterName,
                     UpdateNodeFunc = (parameterValue, parameterArg) =>
                     {
@@ -701,10 +726,8 @@ namespace SigQL
                     operatorNode = new EqualsOperator();
                 }
 
-                var token = new TokenPath()
+                var token = new TokenPath(argument)
                 {
-                    Parameter = rootParameter,
-                    Properties = propertyPath,
                     SqlParameterName = parameterName,
                     UpdateNodeFunc = (parameterValue, parameterArg) =>
                     {
@@ -731,7 +754,7 @@ namespace SigQL
                 tokens.Add(token);
             }
 
-            parameterPaths.Add(new ParameterPath() { Parameter = rootParameter, Properties = propertyPath, SqlParameterName = parameterName });
+            parameterPaths.Add(new ParameterPath(argument) { SqlParameterName = parameterName });
             
             var logicalOperatorNode = operatorNode.SetArgs(
                 columnNode, 
@@ -744,10 +767,8 @@ namespace SigQL
 
             if (comparisonSpec.IgnoreIfNull || comparisonSpec.IgnoreIfNullOrEmpty)
             {
-                var token = new TokenPath()
+                var token = new TokenPath(argument)
                 {
-                    Parameter = rootParameter,
-                    Properties = propertyPath,
                     SqlParameterName = parameterName,
                     UpdateNodeFunc = (parameterValue, parameterArg) =>
                     {
@@ -770,138 +791,33 @@ namespace SigQL
             return placeholder;
         }
 
-        private AstNode BuildWhereClauseForPerspective(
-            AstNode primaryTableReference, TableRelations navigationTable, string navigationTableAliasPostfix,
-            List<ParameterPath> parameterPaths, ParameterInfo rootParameter,
-            List<PropertyInfo> currentPropertyPaths, List<TokenPath> tokens)
-        {
-            var navigationTableAlias = $"{navigationTable.TargetTable.Name}{navigationTableAliasPostfix}";
-
-            var selectStatement = new Select();
-            selectStatement.SelectClause = 
-                new SelectClause().SetArgs(
-                    new Literal() { Value = "1" });
-            selectStatement.FromClause = new FromClause();
-            selectStatement.FromClause.SetArgs(
-                new Alias() { Label = navigationTableAlias }.SetArgs(
-                    new TableIdentifier().SetArgs(
-                        new RelationalTable() { Label = navigationTable.TargetTable.Name })));
-
-            selectStatement.WhereClause = new WhereClause().SetArgs(
-                new AndOperator().SetArgs(
-                    
-                        // match foreign keys to parent
-                        navigationTable.ForeignKeyToParent.KeyPairs.Select(kp =>
-                            {
-                                IColumnDefinition primaryTableColumn = null;
-                                IColumnDefinition navigationTableColumn = null;
-                                if (TableEqualityComparer.Default.Equals(kp.ForeignTableColumn.Table,
-                                    navigationTable.TargetTable))
-                                {
-                                    primaryTableColumn = kp.PrimaryTableColumn;
-                                    navigationTableColumn = kp.ForeignTableColumn;
-                                }
-                                else
-                                {
-                                    primaryTableColumn = kp.ForeignTableColumn;
-                                    navigationTableColumn = kp.PrimaryTableColumn;
-                                }
-                                return new EqualsOperator().SetArgs(
-                                    new TableIdentifier().SetArgs(new Alias() {Label = navigationTableAlias}, new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = navigationTableColumn.Name })),
-                                    new TableIdentifier().SetArgs(primaryTableReference, new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = primaryTableColumn.Name })));
-                            }).ToList()
-                        .Concat(
-                            navigationTable.ProjectedColumns.Select(c =>
-                            {
-                                var sqlParameterName = $"{navigationTableAlias}{c.Name}";
-                                var currentPropertyPath = currentPropertyPaths.ToList();
-                                if(c.Property != null)
-                                    currentPropertyPath.Add(c.Property);
-                                return BuildComparisonNode(
-                                    new ColumnIdentifier().SetArgs(new Alias() {Label = navigationTableAlias},
-                                        new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = c.Name})),
-                                    sqlParameterName, c.Property?.PropertyType ?? rootParameter.ParameterType, rootParameter, currentPropertyPath, parameterPaths, tokens);
-                            }).ToList()
-                        )
-                        .Concat(
-                            navigationTable.NavigationTables.Select((nt , i) =>
-                            {
-                                if(nt.ParentColumnField != null)
-                                    currentPropertyPaths.Add(nt.ParentColumnField.Property);
-                                return BuildWhereClauseForPerspective(new Alias() { Label = navigationTableAlias }, nt,
-                                        $"{navigationTableAliasPostfix}{i}", parameterPaths, rootParameter, currentPropertyPaths, tokens);
-                            }).ToList()
-                        )       
-                    ));
-
-            return new AndOperator().SetArgs(
-                new Exists().SetArgs(selectStatement));
-        }
-
-        private WhereClause  BuildWhereClauseForJoinRelations(List<DetectedParameter> parameters, TableRelations fromClauseRelations, List<ParameterPath> parameterPaths)
-        {
-            return new WhereClause().SetArgs(new AndOperator().SetArgs(parameters.SelectMany(
-                parameter =>
-                {
-                    // if this is a primitive or built in .NET type, just set it equal
-                    // to the expected value
-                    if (!this.databaseResolver.IsTableOrTableProjection(parameter.Type))
-                    {
-                        var parameterName = parameter.Name;
-                        var column = GetColumnForParameterName(fromClauseRelations, parameterName);
-                        parameterPaths.Add(new ParameterPath()
-                        {
-                            Parameter = parameter.ParameterInfo,
-                            SqlParameterName = parameterName
-                        });
-
-                        return new EqualsOperator().SetArgs(
-                            new ColumnIdentifier()
-                            {
-                                Args = new AstNode[]
-                                {
-                                    new RelationalTable()
-                                    {
-                                        Label = column.Table.Name
-                                    },
-                                    new RelationalColumn()
-                                    {
-                                        Label = column.Name
-                                    }
-                                }
-                            }, new NamedParameterIdentifier()
-                            {
-                                Name = parameterName
-                            }).AsEnumerable();
-                    }
-                    else
-                        // this is referencing a foreign table, reference the table
-                    {
-                        return BuildWhereOperationsForJoinTables(this.databaseResolver.BuildTableRelationsFromType(parameter.Type), parameterPaths, parameter.ParameterInfo, new List<PropertyInfo>());
-                    }
-                            
-                })
-            ));
-        }
-
         private class OrderBySpec
         {
             private readonly Func<string, string> resolveTableNameFunc;
+            private readonly Func<IEnumerable<string>, TableRelations> resolveTableViaRelationPathFunc;
 
-            public OrderBySpec(Func<string, string> resolveTableNameFunc)
+            public OrderBySpec(Func<string, string> resolveTableNameFunc,
+                Func<IEnumerable<string>, TableRelations> resolveTableViaRelationPathFunc)
             {
                 this.resolveTableNameFunc = resolveTableNameFunc;
+                this.resolveTableViaRelationPathFunc = resolveTableViaRelationPathFunc;
             }
 
             public string TableName { get; set; }
             public string ColumnName { get; set; }
-            public ParameterInfo Parameter { get; set; }
             public bool IsDynamic { get; set; }
             public bool IsCollection { get; set; }
+            public ParameterPath ParameterPath { get; set; }
+            public int Ordinal { get; set; }
 
             public string ResolveTableAlias(string tableName)
             {
                 return resolveTableNameFunc(tableName);
+            }
+
+            public TableRelations ResolveTableRelations(IEnumerable<string> tableRelationPath)
+            {
+                return resolveTableViaRelationPathFunc(tableRelationPath);
             }
         }
 
@@ -913,12 +829,11 @@ namespace SigQL
                 {
                     if (!p.IsDynamic)
                     {
-                        var tokenName = $"{p.Parameter.Name}_OrderByDirection";
+                        var tokenName = $"{p.ParameterPath.GenerateSuggestedSqlIdentifierName()}_OrderByDirection";
 
                         var orderByNode = new OrderByIdentifier() { Direction = $"{{{tokenName}}}" };
-                        tokens.Add(new TokenPath()
+                        tokens.Add(new TokenPath(p.ParameterPath.Argument)
                         {
-                            Parameter = p.Parameter,
                             UpdateNodeFunc = (parameterValue, parameterArg) =>
                             {
                                 var directionString = "asc";
@@ -949,15 +864,15 @@ namespace SigQL
             return orderByClause;
         }
 
-        private IEnumerable<OrderByIdentifier> BuildDynamicOrderByIdentifier(OrderByClause orderByClause,
+        private IEnumerable<OrderByIdentifier> BuildDynamicOrderByIdentifier(
+            OrderByClause orderByClause,
              List<TokenPath> tokens, OrderBySpec p)
         {
-            var tokenName = $"{p.Parameter.Name}_OrderBy";
+            var tokenName = $"{p.ParameterPath.GenerateSuggestedSqlIdentifierName()}_OrderBy";
 
             List<OrderByIdentifier> orderByClauses = new List<OrderByIdentifier>();
-            tokens.Add(new TokenPath()
+            tokens.Add(new TokenPath(p.ParameterPath.Argument)
             {
-                Parameter = p.Parameter,
                 UpdateNodeFunc = (parameterValue, parameterArg) =>
                 {
                     var orderBys = p.IsCollection ? parameterValue as IEnumerable<IOrderBy> : (parameterValue as IOrderBy).AsEnumerable();
@@ -970,16 +885,36 @@ namespace SigQL
 
                     var orderByIdentifiers = orderBys.Select(orderBy =>
                     {
-                        var tableIdentifier = this.databaseConfiguration.Tables.FindByName(orderBy.Table);
-                        if (tableIdentifier == null)
+                        string tableName;
+                        var orderByRelation = orderBy as OrderByRelation;
+                        if (orderByRelation != null)
                         {
-                            throw new InvalidIdentifierException($"Unable to identify matching database table for order by parameter {p.Parameter.Name} with specified table name \"{orderBy.Table}\". Table {orderBy.Table} could not be found.");
-                        }
+                            var viaRelationPath = orderByRelation.ViaRelationPath;
+                            var parameterArgument = new ParameterArgument(p.ParameterPath.Parameter, this.databaseResolver);
+                            
+                            var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
+                                p.ResolveTableRelations);
 
-                        if (tableIdentifier.Columns.FindByName(orderBy.Column) == null)
-                        {
-                            throw new InvalidIdentifierException($"Unable to identify matching database column for order by parameter {p.Parameter.Name} with specified column name \"{orderBy.Column}\". Column {orderBy.Column} does not exist in table {tableIdentifier.Name}.");
+                            orderByRelation.Table = result.TableAliasName;
+                            orderByRelation.Column = result.ColumnName;
+                            tableName = result.TableAliasName;
                         }
+                        else
+                        {
+                            var tableIdentifier = this.databaseConfiguration.Tables.FindByName(orderBy.Table);
+                            if (tableIdentifier == null)
+                            {
+                                throw new InvalidIdentifierException($"Unable to identify matching database table for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified table name \"{orderBy.Table}\". Table {orderBy.Table} could not be found.");
+                            }
+
+                            if (tableIdentifier.Columns.FindByName(orderBy.Column) == null)
+                            {
+                                throw new InvalidIdentifierException($"Unable to identify matching database column for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified column name \"{orderBy.Column}\". Column {orderBy.Column} does not exist in table {tableIdentifier.Name}.");
+                            }
+
+                            tableName = p.ResolveTableAlias(tableIdentifier.Name);
+                        }
+                        
 
                         var orderByNode = new OrderByIdentifier()
                         {
@@ -990,12 +925,12 @@ namespace SigQL
 
                         return orderByNode.SetArgs(
                             new ColumnIdentifier().SetArgs(
-                                (AstNode) new RelationalTable() {Label = p.ResolveTableAlias(orderBy.Table) },
+                                (AstNode) new RelationalTable() {Label = tableName },
                                 new RelationalColumn() {Label = orderBy.Column}
                             ));
                     }).ToList();
 
-                    orderByClause.SetArgs(orderByIdentifiers);
+                    orderByClause.Args = (orderByClause.Args ?? new List<AstNode>()).Concat(orderByIdentifiers).ToList();
 
                     return new Dictionary<string, object>();
                 }
@@ -1003,7 +938,35 @@ namespace SigQL
             return new List<OrderByIdentifier>();
         }
 
-        private FromClauseNode BuildFromClause(TableRelations tableRelations, IEnumerable<ParameterInfo> functionParameters)
+        private TableAliasResult ResolveTableAliasNameForViaRelationOrderBy(
+            IArgument parameterArgument, 
+            string viaRelationPath,
+            Func<IEnumerable<string>, TableRelations> resolveTableRelationsAliasFunc)
+        {
+            var tableRelations = this.databaseResolver.BuildTableRelationsFromViaParameter(
+                parameterArgument,
+                viaRelationPath);
+
+            var tableRelationPaths = new List<string>();
+            var currTableRelations = tableRelations;
+            string columnName = null;
+            do
+            {
+                tableRelationPaths.Add(currTableRelations.TableName);
+                if (!currTableRelations.NavigationTables.Any())
+                {
+                    columnName = currTableRelations.ProjectedColumns.Single().Name;
+                }
+                currTableRelations = currTableRelations.NavigationTables.SingleOrDefault();
+
+            } while (currTableRelations != null);
+
+            var aliasRelation = resolveTableRelationsAliasFunc(tableRelationPaths);
+
+            return new TableAliasResult(aliasRelation.TableName, aliasRelation.Alias, columnName);
+        }
+
+        private FromClauseNode BuildFromClause(TableRelations tableRelations, IEnumerable<IArgument> functionParameters)
         {
             var fromClauseNode = new FromClauseNode();
             var targetTable = tableRelations.TargetTable;
@@ -1057,83 +1020,18 @@ namespace SigQL
             return leftOuterJoin;
         }
 
-        private IEnumerable<AstNode> BuildWhereOperationsForJoinTables(TableRelations navigationTableRelations,
-            List<ParameterPath> parameterPaths, ParameterInfo rootParameter,
-            List<PropertyInfo> currentPropertyPaths)
-        {
-            var targetTable = navigationTableRelations.TargetTable;
-            var operations = navigationTableRelations.ProjectedColumns.Select(column =>
-                {
-                    var sqlParameterName = $"{targetTable.Name}{column.Name}";
-                    var currentPropertyPath = currentPropertyPaths.ToList();
-                    currentPropertyPath.Add(column.Property);
-                    parameterPaths.Add(new ParameterPath() { Parameter = rootParameter, Properties = currentPropertyPath, SqlParameterName = sqlParameterName });
-                    return new AndOperator().SetArgs(
-                        new EqualsOperator().SetArgs(
-                            new ColumnIdentifier().SetArgs(new RelationalTable() {Label = targetTable.Name},
-                                new RelationalColumn() {Label = column.Name}),
-                            new ColumnIdentifier().SetArgs(new NamedParameterIdentifier()
-                                {Name = sqlParameterName})));
-                }).Cast<AstNode>()
-                    .Concat(navigationTableRelations.NavigationTables != null ? navigationTableRelations.NavigationTables.SelectMany(navigationTableRelations1 =>
-                    {
-                        currentPropertyPaths.Add(navigationTableRelations1.ParentColumnField.Property);
-                        return BuildWhereOperationsForJoinTables(navigationTableRelations1, parameterPaths, rootParameter,
-                                currentPropertyPaths);
-                    }) : new LeftOuterJoin[0]);
-            return operations;
-        }
-
-        private IColumnDefinition GetColumnForParameterName(TableRelations tableRelations, string parameterName)
-        {
-            var matchingTargetTableColumn = tableRelations.TargetTable.Columns.FirstOrDefault(c => c.Name.Equals(parameterName, StringComparison.InvariantCultureIgnoreCase));
-            if (matchingTargetTableColumn == null)
-            {
-                return tableRelations.NavigationTables.Select(t => GetColumnForParameterName(t, parameterName)).FirstOrDefault();
-            }
-            return matchingTargetTableColumn;
-        }
-
         private IColumnDefinition GetColumnForParameterName(ITableDefinition table, string parameterName)
         {
             var matchingTargetTableColumn = table.Columns.FirstOrDefault(c => c.Name.Equals(parameterName, StringComparison.InvariantCultureIgnoreCase));
             
             return matchingTargetTableColumn;
         }
-
-        private IEnumerable<DetectedParameter> DetectParameters(IEnumerable<ParameterInfo> whereClauseParameters, MethodInfo methodInfo)
-        {
-            return whereClauseParameters.Select(p => new DetectedParameter(this.databaseResolver.GetColumnName(p), p.ParameterType, p));
-        }
-
-        private bool TryDetectTargetFromOuterClass(Type columnOutputType, ref Type detectedType)
-        {
-            return this.databaseResolver.TryDetectTargetFromOuterClass(columnOutputType, ref detectedType);
-        }
-
-        private bool TryDetectTargetFromIRepositoryInterfaceArg(MethodInfo methodInfo, Type columnOutputType, ref Type fromTableType)
-        {
-            var irepositoryType = methodInfo.DeclaringType.GetInterfaces().FirstOrDefault(iface =>
-                iface.IsGenericType && iface.GetGenericTypeDefinition().IsAssignableFrom(typeof(IRepository<>)));
-            if (irepositoryType != null)
-            {
-                fromTableType = irepositoryType.GetGenericArguments().First();
-                return true;
-            }
-
-            return false;
-        }
-
-        public AstNode AstFor<T>(Expression<Func<T>> args)
-        {
-            throw new NotImplementedException();
-        }
-
+        
         private enum StatementType
         {
             Select,
             Insert,
-            Update, // not yet supported
+            Update,
             Delete
         }
     }
@@ -1161,26 +1059,67 @@ namespace SigQL
 
     public class ParameterPath
     {
+        internal IArgument Argument { get; }
         public string SqlParameterName { get; set; }
-        public ParameterInfo Parameter { get; set; }
-        public IEnumerable<PropertyInfo> Properties { get; set; }
+        public ParameterInfo Parameter => Argument.FindParameter().GetParameterInfo();
+
+        public IEnumerable<PropertyInfo> Properties =>
+            this.Argument.FindPropertiesFromRoot().Select(a => a.GetPropertyInfo()).ToList();
+
+
+        internal ParameterPath(IArgument argument)
+        {
+            Argument = argument;
+        }
+        
         public Type GetEndpointType()
         {
             if (Properties != null && Properties.Any()) return Properties.Last().PropertyType;
             return Parameter.ParameterType;
         }
 
-        public string GenerateSuggestedSqlParameterName()
+        public T GetEndpointAttribute<T>()
+            where T: Attribute
+        {
+            if (Properties != null && Properties.Any()) return Properties.Last().GetCustomAttribute<T>();
+            return Parameter.GetCustomAttribute<T>();
+        }
+
+        public string GenerateSuggestedSqlIdentifierName()
         {
             return $"{Parameter.Name}{(Properties != null ? string.Join("_", Properties.Select(p => p.Name)) : null)}";
+        }
+
+        public string GenerateClassQualifiedName()
+        {
+            return $"{Parameter.Name}{(Properties != null && Properties.Any() ? "." + string.Join(".", Properties.Select(p => p.Name)) : null)}";
+        }
+
+        public string GetEndpointColumnName()
+        {
+            var columnAttribute = this.GetEndpointAttribute<ColumnAttribute>();
+            if (columnAttribute != null)
+            {
+                return columnAttribute.ColumnName;
+            }
+            if (Properties != null && Properties.Any()) return Properties.Last().Name;
+            return Parameter.Name;
         }
     }
 
     public class TokenPath
     {
+        internal TokenPath(IArgument argument)
+        {
+            Argument = argument;
+        }
+
+        public ParameterInfo Parameter => Argument.FindParameter().GetParameterInfo();
+
+        public IEnumerable<PropertyInfo> Properties =>
+            this.Argument.FindPropertiesFromRoot().Select(a => a.GetPropertyInfo()).ToList();
         public string SqlParameterName { get; set; }
-        public ParameterInfo Parameter { get; set; }
-        public IEnumerable<PropertyInfo> Properties { get; set; }
+        internal IArgument Argument { get; set; }
         public Func<object, TokenPath, IDictionary<string, object>> UpdateNodeFunc { get; set; }
     }
 
@@ -1251,18 +1190,17 @@ namespace SigQL
         }
     }
 
-    internal class DetectedParameter
+    internal struct TableAliasResult
     {
-        public string Name { get; }
-        public Type Type { get; }
-        public ParameterInfo ParameterInfo { get; }
-        public TableRelations TableRelations { get; set; }
+        public string TableName { get; }
+        public string ColumnName { get; }
+        public string TableAliasName { get; }
 
-        public DetectedParameter(string name, Type type, ParameterInfo parameterInfo)
+        public TableAliasResult(string tableName, string tableAliasName, string columnName)
         {
-            Name = name;
-            Type = type;
-            ParameterInfo = parameterInfo;
+            this.TableName = tableName;
+            this.ColumnName = columnName;
+            this.TableAliasName = tableAliasName;
         }
     }
 }

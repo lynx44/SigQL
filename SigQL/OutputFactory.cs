@@ -46,12 +46,5 @@ namespace SigQL
             
             return result.AsEnumerable().Single();
         }
-
-        public static object ToGenericEnumerable(object collection, Type unwrappedType)
-        {
-            var castMethod = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast), BindingFlags.Static | BindingFlags.Public);
-            var castMethodForType = castMethod.MakeGenericMethod(unwrappedType);
-            return castMethodForType.Invoke(null, collection.AsEnumerable().ToArray());
-        }
     }
 }

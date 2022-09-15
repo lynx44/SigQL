@@ -33,4 +33,23 @@
         public string Column { get; }
         public OrderByDirection Direction { get; }
     }
+
+    public class OrderByRelation : IOrderBy
+    {
+
+        public OrderByRelation(string viaRelationPath) : this(viaRelationPath, OrderByDirection.Ascending)
+        {
+        }
+
+        public OrderByRelation(string viaRelationPath, OrderByDirection direction)
+        {
+            ViaRelationPath = viaRelationPath;
+            Direction = direction;
+        }
+
+        public string Table { get; internal set; }
+        public string Column { get; internal set; }
+        internal string ViaRelationPath { get; }
+        public OrderByDirection Direction { get; set; }
+    }
 }

@@ -511,15 +511,11 @@ Since SigQL is still in active development, supported feature use can cause conf
 
 The first place filter parameters can be defined are in arguments to a method. 
 
-Using the Offset/Fetch feature as an example, this syntax is currently only supported as an input parameter:
-
 	IEnumerable<Employee.IId> GetPage(IEnumerable<int> id, [Offset] int offset, [Fetch] int fetch);
 
-**Primary Class - (Level 1)**
+**Primary Class Properties - (Level 1)**
 
 The next level is specifying a class filter. The below class represents the same parameters, but with parameter values organized into class properties instead of individual method arguments.
-
-Moving the Id filter (IN clause) into a class filter is valid. However, moving Offset/Fetch into a class filter is not currently supported:
 
 	public class Employee 
 	{
@@ -527,24 +523,24 @@ Moving the Id filter (IN clause) into a class filter is valid. However, moving O
 		{
 			public IEnumerable<int> Id { get; set; }
 			[Offset]
-			public int INVALID_Offset { get; set; }
+			public int Offset { get; set; }
 			[Fetch]
-			public int INVALID_Fetch { get; set; }
+			public int Fetch { get; set; }
 		}
 	}
 	...
 	public interface IEmployeeRepository 
 	{
-		IEnumerable<Employee.IFields> INVALID_GetPage(PageFilter filter);
+		IEnumerable<Employee.IFields> GetPage(PageFilter filter);
 	}
 
-**Level 2 - Class Properties**
+**Level 2 - Nested Class Properties**
 
 The final level is specifying class filters for tables related to the primary table.
 
 Similar to a primary class filter (Level 1), the StartDate filter property is valid.
 
-However, while it may seem as if Offset/Fetch could limit the number of Employee records retrieved on a WorkLog, use of this feature at this level is invalid:
+However, while it may seem as if Offset/Fetch could limit the number of WorkLog records retrieved on an Employee, use of this feature at this level is invalid:
 
 	public class Employee 
 	{
@@ -584,7 +580,7 @@ The below list documents all features applicable to input parameters (WHERE clau
 |--|--|--|--|
 | [ClrOnly]  | No | Yes | Yes |
 | [Column] | Yes | Yes | Yes |
-| [Fetch] | Yes | No (planned) | No |
+| [Fetch] | Yes | Yes | No |
 | [GreaterThan] | Yes | Yes | Yes |
 | [GreaterThanOrEqual] | Yes | Yes | Yes |
 | [LessThan] | Yes | Yes | Yes |
@@ -595,11 +591,11 @@ The below list documents all features applicable to input parameters (WHERE clau
 | [Contains] | Yes | Yes | Yes |
 | [EndsWith] | Yes | Yes | Yes |
 | [Not] | Yes | Yes | Yes |
-| [Offset] | Yes | No (planned) | No |
-| [Parameter] | Yes| No (planned) | No |
-| [Set] | Yes| Yes (cannot mix with filter properties) | No |
-| [ViaRelation] | Yes| No (planned) | No |
-| SortByDirection | Yes | No (planned) | No |
+| [Offset] | Yes | Yes | No |
+| [Parameter] | Yes | No (planned) | No |
+| [Set] | Yes | Yes (cannot mix with filter properties) | No |
+| [ViaRelation] | Yes| Yes | No |
+| OrderByDirection | Yes | Yes | No |
 | IEnumerable<> (IN clause) | Yes | Yes | Yes |
 
 #### Output Matrix

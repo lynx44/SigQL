@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SigQL.Types;
 using SigQL.Types.Attributes;
 
 namespace SigQL.Tests.Common.Databases.Labor
@@ -273,6 +274,28 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             [ClrOnly] public int Id { get; set; }
             public int EmployeeId { get; set; }
+        }
+
+        public class OrderByDirectionStartDate
+        {
+            public OrderByDirection StartDate { get; set; }
+        }
+
+        public class DynamicOrderByEnumerable
+        {
+            public IEnumerable<IOrderBy> OrderBys { get; set; }
+        }
+
+        public class EmployeeNameViaRelationFilter
+        {
+            [ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee) + "." + nameof(Labor.Employee.Name))]
+            public string Name { get; set; }
+        }
+
+        public class EmployeeNameFilterWithAliasViaRelation
+        {
+            [ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))]
+            public string TheEmployeeName { get; set; }
         }
     }
 }

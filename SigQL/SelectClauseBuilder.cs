@@ -25,16 +25,22 @@ namespace SigQL
         {
             var projectionType = OutputFactory.UnwrapType(outputType);
 
-            var fromClauseRelations = this.databaseResolver.BuildTableRelationsFromType(projectionType);
+            var fromClauseRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.DetectTable(outputType), new TypeArgument(outputType, databaseResolver), TableRelationsColumnSource.ReturnType);
 
+            return Build(fromClauseRelations);
+        }
+
+        internal ResolvedSelectClause Build(TableRelations projectionTableRelations)
+        {
+            var tableRelations = projectionTableRelations.Filter(TableRelationsColumnSource.ReturnType, ColumnFilters.SelectClause);
             var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
 
-            var selectClauseAst = BuildSelectClause(fromClauseRelations, tablePrimaryKeyDefinitions);
+            var selectClauseAst = BuildSelectClause(tableRelations, tablePrimaryKeyDefinitions);
             var result = new ResolvedSelectClause(new SqlStatementBuilder())
             {
                 Ast = selectClauseAst,
                 TableKeyDefinitions = tablePrimaryKeyDefinitions,
-                FromClauseRelations = fromClauseRelations
+                FromClauseRelations = tableRelations
             };
             return result;
         }
@@ -49,14 +55,9 @@ namespace SigQL
         {
             var columnAliasForeignKeyDefinitions = this.databaseResolver.FindAllForeignKeys(fromClauseRelations)
                 .ToColumnAliasForeignKeyDefinitions().ToList();
-            var columnDefinitions = databaseResolver.ResolveColumnsForSelectStatement(fromClauseRelations, new List<string>(),
+            var columnDefinitions = databaseResolver.ResolveColumnsForSelectStatement(fromClauseRelations, 
                 columnAliasForeignKeyDefinitions, tablePrimaryKeyDefinitions);
-            //foreach (var columnDefinition in columnDefinitions)
-            //{
-            //    columnDefinition.ColumnDefinition.Alias =
-            //        string.Join(".", columnDefinition.PropertyPath.PropertyPaths.Select(p => p));
-            //}
-
+            
             var selectClause = new SelectClause()
                 .SetArgs(
                     columnDefinitions.Select(column =>
