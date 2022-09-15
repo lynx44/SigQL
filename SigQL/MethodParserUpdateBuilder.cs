@@ -13,59 +13,57 @@ namespace SigQL
     {
         private MethodSqlStatement BuildUpdateStatement(UpdateSpec updateSpec)
         {
-            throw new NotImplementedException();
-            //var methodInfo = updateSpec.RootMethodInfo;
+            var methodInfo = updateSpec.RootMethodInfo;
 
-            //var primaryTable = updateSpec.Table;
-            //var tokens = new List<TokenPath>();
-            //var parameterPaths = new List<ParameterPath>();
-            //WhereClause whereClause = null;
-            //if (updateSpec.FilterParameters.Any())
-            //{
-            //    var tableRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.ToArgumentContainer(updateSpec.Table,
-            //        updateSpec.FilterParameters.AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters);
+            var primaryTable = updateSpec.Table;
+            var tokens = new List<TokenPath>();
+            var parameterPaths = new List<ParameterPath>();
+            WhereClause whereClause = null;
+            if (updateSpec.FilterParameters.Any())
+            {
+                var tableRelations = this.databaseResolver.BuildTableRelations(primaryTable, new TableArgument(primaryTable, updateSpec.FilterParameters.AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters);
 
-            //    whereClause = BuildWhereClauseFromTargetTablePerspective(
-            //        new RelationalTable() { Label = primaryTable.Name }, tableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause), parameterPaths,
-            //        tokens);
-            //}
-            
-            //var statement = new Update()
-            //{
-            //    Args = new TableIdentifier().SetArgs(new RelationalTable() { Label = primaryTable.Name }).AsEnumerable(),
-            //    SetClause = updateSpec.SetColumnParameters.Select(c => 
-            //        new SetEqualOperator().SetArgs(
-            //                new ColumnIdentifier()
-            //                    .SetArgs(new RelationalColumn()
-            //                    {
-            //                        Label = c.Column.Name
-            //                    }),
-            //                new NamedParameterIdentifier()
-            //                {
-            //                    Name = c.ParameterPath.SqlParameterName
-            //                }
-            //            )),
-            //    FromClause = new FromClause().SetArgs(new TableIdentifier().SetArgs(new RelationalTable()
-            //        {Label = primaryTable.Name})),
-            //    WhereClause = whereClause
-            //};
+                whereClause = BuildWhereClauseFromTargetTablePerspective(
+                    new RelationalTable() { Label = primaryTable.Name }, tableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause), parameterPaths,
+                    tokens);
+            }
 
-            //parameterPaths.AddRange(updateSpec.SetColumnParameters.Select(c => c.ParameterPath).ToList());
+            var statement = new Update()
+            {
+                Args = new TableIdentifier().SetArgs(new RelationalTable() { Label = primaryTable.Name }).AsEnumerable(),
+                SetClause = updateSpec.SetColumnParameters.Select(c =>
+                    new SetEqualOperator().SetArgs(
+                            new ColumnIdentifier()
+                                .SetArgs(new RelationalColumn()
+                                {
+                                    Label = c.Column.Name
+                                }),
+                            new NamedParameterIdentifier()
+                            {
+                                Name = c.ParameterPath.SqlParameterName
+                            }
+                        )),
+                FromClause = new FromClause().SetArgs(new TableIdentifier().SetArgs(new RelationalTable()
+                { Label = primaryTable.Name })),
+                WhereClause = whereClause
+            };
 
-            //var sqlStatement = new MethodSqlStatement()
-            //{
-            //    CommandAst = statement.AsEnumerable(),
-            //    SqlBuilder = this.builder,
-            //    ReturnType = methodInfo.ReturnType,
-            //    UnwrappedReturnType = null,
-            //    Parameters = parameterPaths,
-            //    Tokens = tokens,
-            //    // ColumnAliasRelations = columnAliasForeignKeyDefinitions,
-            //    TargetTablePrimaryKey = null,
-            //    TablePrimaryKeyDefinitions = null
-            //};
+            parameterPaths.AddRange(updateSpec.SetColumnParameters.Select(c => c.ParameterPath).ToList());
 
-            //return sqlStatement;
+            var sqlStatement = new MethodSqlStatement()
+            {
+                CommandAst = statement.AsEnumerable(),
+                SqlBuilder = this.builder,
+                ReturnType = methodInfo.ReturnType,
+                UnwrappedReturnType = null,
+                Parameters = parameterPaths,
+                Tokens = tokens,
+                // ColumnAliasRelations = columnAliasForeignKeyDefinitions,
+                TargetTablePrimaryKey = null,
+                TablePrimaryKeyDefinitions = null
+            };
+
+            return sqlStatement;
         }
 
         private UpdateSpec GetUpdateSpec(MethodInfo methodInfo)
