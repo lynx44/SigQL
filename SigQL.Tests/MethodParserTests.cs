@@ -718,6 +718,21 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void OrderByDynamicEnumerableViaNavigationClassFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetOrderedWorkLogsWithDynamicEnumerableOrderByViaNavigationClassFilter(
+                new WorkLog.NavigationDynamicOrderByEnumerable()
+                {
+                    Employee = new Employee.DynamicOrderBy()
+                    {
+                        Order = new[] { new OrderBy(nameof(WorkLog), nameof(WorkLog.Id)) }
+                    }
+                }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by \"WorkLog\".\"Id\" asc", sql);
+        }
+
+        [TestMethod]
         public void OrderByDynamicEnumerableViaClassFilter_EmptyCollection_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(

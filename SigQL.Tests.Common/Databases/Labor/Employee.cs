@@ -121,6 +121,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             public OrderByDirection Name { get; set; }
         }
+        
+        public class DynamicOrderBy
+        {
+            public IEnumerable<IOrderBy> Order { get; set; }
+        }
     }
 
     // not yet used/supported

@@ -291,10 +291,14 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             public Employee.EmployeeNameOrder Employee { get; set; }
         }
-
         public class DynamicOrderByEnumerable
         {
             public IEnumerable<IOrderBy> OrderBys { get; set; }
+        }
+
+        public class NavigationDynamicOrderByEnumerable
+        {
+            public Employee.DynamicOrderBy Employee { get; set; }
         }
 
         public class EmployeeNameViaRelationFilter
