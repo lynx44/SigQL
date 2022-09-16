@@ -281,6 +281,17 @@ namespace SigQL.Tests.Common.Databases.Labor
             public OrderByDirection StartDate { get; set; }
         }
 
+        public class OrderByDirectionStartDateEndDate
+        {
+            public OrderByDirection StartDate { get; set; }
+            public OrderByDirection EndDate { get; set; }
+        }
+
+        public class OrderByDirectionEmployeeName
+        {
+            public Employee.EmployeeNameOrder Employee { get; set; }
+        }
+
         public class DynamicOrderByEnumerable
         {
             public IEnumerable<IOrderBy> OrderBys { get; set; }

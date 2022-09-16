@@ -1253,10 +1253,24 @@ namespace SigQL.SqlServer.Tests
             this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "1" }});
             this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "2" }});
             this.laborDbContext.SaveChanges();
-            var expected = this.laborDbContext.WorkLog.OrderBy(w => w.StartDate).Select(wl => wl.Id).ToList();
             var actual = this.monolithicRepository.GetOrderedWorkLogsByNonProjectedNavigationTable(OrderByDirection.Ascending).Select(wl => wl.Id).ToList();
 
             AreSame(new [] { 4,5,2,1,3}, actual);
+        }
+
+        [TestMethod]
+        public void OrderByProjectedNavigationTable()
+        {
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "4" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "3" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "5" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "1" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "2" }});
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetOrderedWorkLogsByClassFilterNavigationProperty(new WorkLog.OrderByDirectionEmployeeName() { Employee = new Employee.EmployeeNameOrder() { Name = OrderByDirection.Ascending } }).ToList();
+
+            AreSame(new [] { 4,5,2,1,3}, actual.Select(wl => wl.Id));
+            AreSame(new[] { "1", "2", "3", "4", "5" }, actual.Select(wl => wl.Employee.Name));
         }
 
         [TestMethod]

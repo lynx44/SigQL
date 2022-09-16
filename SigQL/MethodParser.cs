@@ -349,16 +349,16 @@ namespace SigQL
             return offsetOrderByClause;
         }
 
-        private static bool IsOrderByDirectionParameter(ParameterPath p)
+        private static bool IsOrderByDirectionParameter(IArgument arg)
         {
-            return p.GetEndpointType() == typeof(OrderByDirection);
+            return arg.Type == typeof(OrderByDirection);
         }
 
         private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<IArgument> arguments, TableRelations orderByTableRelations,
             ITableDefinition primaryTable, TableRelations primaryTableRelations)
         {
-            var matchingArgs = this.databaseResolver.ProjectedColumnsToArguments(orderByTableRelations);
-            return matchingArgs.Select(p => ConvertToOrderBySpec(p.ToParameterPath(), arguments.GetOrdinal(p),  primaryTable, primaryTableRelations)).ToList();
+            var columns = this.databaseResolver.GetProjectedColumns(orderByTableRelations);
+            return columns.SelectMany(c => ConvertToOrderBySpec(c, arguments,  primaryTable, primaryTableRelations)).ToList();
         }
         
         private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<IArgument> arguments, IEnumerable<IArgument> dynamicOrderByParameterPaths, ITableDefinition primaryTable, TableRelations primaryTableRelations)
@@ -377,61 +377,71 @@ namespace SigQL
             }).ToList();
         }
 
-        private OrderBySpec ConvertToOrderBySpec(ParameterPath parameterPath, int ordinal, ITableDefinition primaryTable,
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpec(TableRelationColumnDefinition columnRelation, IEnumerable<IArgument> arguments, ITableDefinition primaryTable,
             TableRelations primaryTableRelations)
         {
             Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
-            
-            if (IsOrderByDirectionParameter(parameterPath))
+
+            return columnRelation.Arguments.All.Select(arg =>
             {
-                string columnName;
-                string tableName = primaryTable.Name;
-                string tableAliasName = primaryTable.Name;
-                columnName = this.databaseResolver.GetColumnName(parameterPath.Argument);
-
-                var viaRelationAttribute = parameterPath.GetEndpointAttribute<ViaRelationAttribute>();
-                if (viaRelationAttribute != null)
+                var ordinal = arguments.GetOrdinal(arg);
+                if (IsOrderByDirectionParameter(arg))
                 {
-                    var parameterArgument = new ParameterArgument(parameterPath.Parameter, this.databaseResolver);
-                    var viaRelationPath = viaRelationAttribute.Path;
-                    var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
-                        primaryTableRelations.FindViaRelations);
-                    columnName = result.ColumnName;
-                    tableName = result.TableName;
-                    tableAliasName = result.TableAliasName;
+                    string columnName;
+                    string tableName;
+                    string tableAliasName;
+                    columnName = this.databaseResolver.GetColumnName(arg);
+
+                    var viaRelationAttribute = arg.GetCustomAttribute<ViaRelationAttribute>();
+                    if (viaRelationAttribute != null)
+                    {
+                        var parameterArgument = new ParameterArgument(arg.FindParameter().GetParameterInfo(), this.databaseResolver);
+                        var viaRelationPath = viaRelationAttribute.Path;
+                        var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
+                            primaryTableRelations.FindViaRelations);
+                        columnName = result.ColumnName;
+                        tableName = result.TableName;
+                        tableAliasName = result.TableAliasName;
+                    }
+                    else
+                    {
+                        tableName = columnRelation.Table.Name;
+                        tableAliasName = resolveTableAlias(tableName);
+                    }
+
+                    var orderByTable = this.databaseConfiguration.Tables.FindByName(tableName);
+                    var column = orderByTable.Columns.FindByName(columnName);
+
+                    if (column == null)
+                    {
+                        throw new InvalidIdentifierException(
+                            $"Unable to identify matching database column for order by parameter \"{arg.FullyQualifiedTypeName()}\". Column \"{columnName}\" does not exist in table {tableName}.");
+                    }
+
+                    return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindViaRelations)
+                    {
+                        TableName = tableAliasName ?? tableName ?? primaryTableRelations.Alias,
+                        ColumnName = column.Name,
+                        ParameterPath = arg.ToParameterPath(),
+                        IsDynamic = false,
+                        IsCollection = false,
+                        Ordinal = ordinal
+                    };
                 }
-
-                var orderByTable = this.databaseConfiguration.Tables.FindByName(tableName);
-                var column = orderByTable.Columns.FindByName(columnName);
-
-                if (column == null)
+                else
                 {
-                    throw new InvalidIdentifierException(
-                        $"Unable to identify matching database column for order by parameter \"{parameterPath.GenerateClassQualifiedName()}\". Column \"{parameterPath.GetEndpointColumnName()}\" does not exist in table {orderByTable.Name}.");
+                    return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindViaRelations)
+                    {
+                        ParameterPath = arg.ToParameterPath(),
+                        IsDynamic = true,
+                        IsCollection = arg.Type.IsCollectionType(),
+                        Ordinal = ordinal
+                    };
+
                 }
+            }).ToList();
 
-                return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindViaRelations)
-                {
-                    TableName = tableAliasName ?? tableName ?? primaryTableRelations.Alias,
-                    ColumnName = column.Name,
-                    ParameterPath = parameterPath,
-                    IsDynamic = false,
-                    IsCollection = false,
-                    Ordinal = ordinal
-                };
-            }
-            else
-            {
-                return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindViaRelations)
-                {
-                    ParameterPath = parameterPath,
-                    IsDynamic = true,
-                    IsCollection = parameterPath.GetEndpointType().IsCollectionType(),
-                    Ordinal = ordinal
-                };
 
-            }
-            
         }
 
         private StatementType DetectStatementType(MethodInfo methodInfo)

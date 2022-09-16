@@ -84,6 +84,7 @@ namespace SigQL.Tests.Common.Databases.Labor
             [Column(nameof(Id))] public int EmployeeId { get; set; }
         }
 
+
         public class EmployeeAddressWithNestedColumnAliasFilter
         {
             public Address.StreetAddressFilterWithAlias Address { get; set; }
@@ -114,6 +115,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             [ViaRelation(nameof(Employee) + "->" + nameof(WorkLog) + "." + nameof(WorkLog.LocationId))]
             public int LocationId { get; set; }
+        }
+        
+        public class EmployeeNameOrder
+        {
+            public OrderByDirection Name { get; set; }
         }
     }
 

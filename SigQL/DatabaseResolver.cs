@@ -247,15 +247,13 @@ namespace SigQL
             return specInfo;
         }
 
-        internal IEnumerable<IArgument> ProjectedColumnsToArguments(TableRelations tableRelations)
+        internal IEnumerable<TableRelationColumnDefinition> GetProjectedColumns(TableRelations tableRelations)
         {
-            var tableParameterPaths = tableRelations.ProjectedColumns
-                .SelectMany(p => 
-                    p.Arguments.GetArguments(TableRelationsColumnSource.Parameters)).ToList();
-            var navigationParameterPaths = tableRelations.NavigationTables.SelectMany(t =>
-                ProjectedColumnsToArguments(t));
+            var columns = tableRelations.ProjectedColumns.ToList();
+            var navigationColumns = tableRelations.NavigationTables.SelectMany(t =>
+                GetProjectedColumns(t));
 
-            return tableParameterPaths.Concat(navigationParameterPaths).ToList();
+            return columns.Concat(navigationColumns).ToList();
         }
     }
     

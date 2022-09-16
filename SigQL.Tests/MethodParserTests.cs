@@ -575,7 +575,7 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
-        public void OrderByDirectionMultipleColumns_ReturnsExpectedSql()
+        public void OrderByDirectionMultipleParameters_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogs(OrderByDirection.Ascending, OrderByDirection.Ascending, OrderByDirection.Descending));
 
@@ -588,6 +588,14 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogs(OrderByDirection.Ascending, OrderByDirection.Descending, new OrderBy(nameof(WorkLog), nameof(WorkLog.EndDate))));
 
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) order by \"Employee\".\"Name\" asc, \"WorkLog\".\"StartDate\" desc, \"WorkLog\".\"EndDate\" asc", sql);
+        }
+
+        [TestMethod]
+        public void OrderByDirectionViaClassFilterNavigationProperty_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsByClassFilterNavigationProperty(new WorkLog.OrderByDirectionEmployeeName() { Employee = new Employee.EmployeeNameOrder() {  Name = OrderByDirection.Ascending }}));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) order by \"Employee\".\"Name\" asc", sql);
         }
 
         [TestMethod]
@@ -604,6 +612,14 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsMultiple(OrderByDirection.Descending, OrderByDirection.Ascending));
 
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by \"WorkLog\".\"StartDate\" desc, \"WorkLog\".\"EndDate\" asc", sql);
+        }
+
+        [TestMethod]
+        public void OrderByDirectionMultipleViaClassFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsViaClassFilterMultiple(new WorkLog.OrderByDirectionStartDateEndDate() { StartDate = OrderByDirection.Ascending, EndDate = OrderByDirection.Descending }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by \"WorkLog\".\"StartDate\" asc, \"WorkLog\".\"EndDate\" desc", sql);
         }
 
         [TestMethod]
