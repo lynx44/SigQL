@@ -306,7 +306,7 @@ namespace SigQL.Schema
 
         public int GetHashCode(ITableDefinition obj)
         {
-            return obj.Schema.GetHashCode() + obj.Name.GetHashCode();
+            return new Tuple<string, string>(obj.Schema.Name, obj.Name).GetHashCode();
         }
     }
 
@@ -349,7 +349,7 @@ namespace SigQL.Schema
 
         public int GetHashCode(IColumnDefinition obj)
         {
-            return obj.Table.Schema.Name.GetHashCode() + obj.Table.Name.GetHashCode() + obj.Name.GetHashCode();
+            return new Tuple<string, string, string>(obj.Table.Schema.Name, obj.Table.Name, obj.Name).GetHashCode();
         }
     }
 

@@ -1230,6 +1230,36 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void OrderBy()
+        {
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 1, 1)});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 3, 1)});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 1, 1)});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2019, 1, 1)});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2022, 1, 1)});
+            this.laborDbContext.SaveChanges();
+            var expected = this.laborDbContext.WorkLog.OrderBy(w => w.StartDate).Select(wl => wl.Id).ToList();
+            var actual = this.monolithicRepository.GetOrderedWorkLogs(OrderByDirection.Ascending).Select(wl => wl.Id).ToList();
+
+            AreSame(expected, actual);
+        }
+
+        [TestMethod]
+        public void OrderByNonProjectedNavigationTable()
+        {
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "4" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "3" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "5" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "1" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "2" }});
+            this.laborDbContext.SaveChanges();
+            var expected = this.laborDbContext.WorkLog.OrderBy(w => w.StartDate).Select(wl => wl.Id).ToList();
+            var actual = this.monolithicRepository.GetOrderedWorkLogsByNonProjectedNavigationTable(OrderByDirection.Ascending).Select(wl => wl.Id).ToList();
+
+            AreSame(new [] { 4,5,2,1,3}, actual);
+        }
+
+        [TestMethod]
         public void GetOrderedViaDescendingOrderByDirectionMethodParameter()
         {
             this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 1, 1)});

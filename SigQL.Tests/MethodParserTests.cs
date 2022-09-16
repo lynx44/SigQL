@@ -606,6 +606,14 @@ namespace SigQL.Tests
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by \"WorkLog\".\"StartDate\" desc, \"WorkLog\".\"EndDate\" asc", sql);
         }
 
+        [TestMethod]
+        public void OrderByDirectionByNonProjectedNavigationTable_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsByNonProjectedNavigationTable(OrderByDirection.Ascending));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) order by \"Employee\".\"Name\" asc", sql);
+        }
+
         //[TestMethod]
         //public void OrderByMethodWithDynamicGenericTypeConstraint_ReturnsExpectedSql()
         //{

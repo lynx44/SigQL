@@ -66,12 +66,16 @@ namespace SigQL
             var arguments = methodParameters.AsArguments(this.databaseResolver);
 
             var tableDefinition = this.databaseResolver.DetectTable(projectionType);
+            
             TableRelations allTableRelations;
+            TableRelations orderbyTableRelations;
             {
                 var projectionTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TypeArgument(projectionType, this.databaseResolver),
                     TableRelationsColumnSource.ReturnType);
                 var parametersTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, arguments),
                     TableRelationsColumnSource.Parameters);
+                
+                orderbyTableRelations = parametersTableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.OrderBy);
                 allTableRelations = this.databaseResolver.MergeTableRelations(
                     projectionTableRelations,
                     parametersTableRelations);
@@ -89,7 +93,7 @@ namespace SigQL
             var parameterPaths = new List<ParameterPath>();
             var tokens = new List<TokenPath>();
             
-            var allJoinRelations = selectTableRelations;
+            var allJoinRelations = this.databaseResolver.MergeTableRelations(selectTableRelations, orderbyTableRelations);
 
             var functionParameters = arguments.Where(p => IsFunctionParameter(p)).ToList();
             parameterPaths.AddRange(functionParameters.Select(p => new ParameterPath(p)
