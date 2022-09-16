@@ -10,6 +10,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeFields> GetAllEmployeeFields();
         Employee.IEmployeeFields Get(int id);
         IEnumerable<WorkLog> GetWorkLogs();
+        WorkLog.IAliasedWorkLogId GetWithAliasedName(int id);
         Employee.IEmployeeFields GetByName(string name);
         Employee.IEmployeeFields GetByFilter(Employee.IdFilter filter);
         Employee.IEmployeeFields GetWithSpecifiedColumnName([Column(nameof(Employee.Id))] int employeeId);

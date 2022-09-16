@@ -112,6 +112,14 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void GetProjection_WithRepositoryInterfaceAndAliasedName_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetWithAliasedName(1));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"WorkLog\".\"Id\" \"WorkLogId\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" = @id))", sql);
+        }
+
+        [TestMethod]
         public void GetProjection_ViaInnerProjection_ReturnsExpectedSql()
         {
             var methodInfo = typeof(IWorkLogRepository).GetMethod(nameof(IWorkLogRepository.GetAllIds));

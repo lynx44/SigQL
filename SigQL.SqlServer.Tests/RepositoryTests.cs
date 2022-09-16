@@ -214,7 +214,19 @@ namespace SigQL.SqlServer.Tests
                 "WL3_Employee2",
             }, actual.SelectMany(w => w.Location.Address.Employees.Select(e => e.Name)));
         }
-        
+
+        [TestMethod]
+        public void GetWorkLogs_WithAliasedColumnName_ReturnsExpected()
+        {
+            var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog()).ToList();
+
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.GetWithAliasedName(2);
+
+            Assert.AreEqual(2, actual.WorkLogId);
+        }
+
         [TestMethod]
         public void GetWorkLogs_LocationAddressLocation_ReturnsNull()
         {

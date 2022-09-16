@@ -53,6 +53,11 @@ namespace SigQL.Tests.Common.Databases.Labor
             int? LocationId { get; }
         }
 
+        public interface IAliasedWorkLogId
+        {
+            [Column(nameof(WorkLog.Id))] int WorkLogId { get; }
+        }
+
         public interface ILocationIdAndEmployeeId
         {
             int EmployeeId { get; set; }
