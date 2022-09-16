@@ -1274,6 +1274,21 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void OrderByProjectedNavigationTableWithMultipleJoins()
+        {
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "4" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "3" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "5" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "1" }});
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "2" }});
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetOrderedWorkLogsByClassFilterNavigationPropertyCanonicalType(new WorkLog.OrderByDirectionEmployeeName() { Employee = new Employee.EmployeeNameOrder() { Name = OrderByDirection.Ascending } }).ToList();
+
+            AreSame(new [] { 4,5,2,1,3}, actual.Select(wl => wl.Id));
+            AreSame(new[] { "1", "2", "3", "4", "5" }, actual.Select(wl => wl.Employee.Name));
+        }
+
+        [TestMethod]
         public void GetOrderedViaDescendingOrderByDirectionMethodParameter()
         {
             this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2020, 1, 1)});

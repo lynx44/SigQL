@@ -51,6 +51,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogs(OrderByDirection startDate = OrderByDirection.Ascending, OrderByDirection endDate = OrderByDirection.Ascending, OrderByDirection employeeId = OrderByDirection.Ascending);
         IEnumerable<WorkLog.IWorkLogWithEmployee> GetOrderedWorkLogs([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))] OrderByDirection employeeName, [Column(nameof(WorkLog.StartDate))] OrderByDirection direction, IOrderBy dynamicOrderBy);
         IEnumerable<WorkLog.IWorkLogWithEmployee> GetOrderedWorkLogsByClassFilterNavigationProperty(WorkLog.OrderByDirectionEmployeeName filter);
+        IEnumerable<WorkLog> GetOrderedWorkLogsByClassFilterNavigationPropertyCanonicalType(WorkLog.OrderByDirectionEmployeeName filter);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsByNonProjectedNavigationTable([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))] OrderByDirection employeeName);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsMultiple(OrderByDirection startDate = OrderByDirection.Ascending, OrderByDirection endDate = OrderByDirection.Ascending);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsViaClassFilter(WorkLog.OrderByDirectionStartDate filter);

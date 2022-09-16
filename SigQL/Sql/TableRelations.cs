@@ -55,6 +55,39 @@ namespace SigQL.Sql
 
             return tableRelations;
         }
+
+        public TableRelations FindEquivalentBranch(TableRelations endpointRelations)
+        {
+            var path = new List<TableRelations>();
+            var currentRelations = endpointRelations;
+
+            do
+            {
+                path.Add(currentRelations);
+                currentRelations = currentRelations.Parent;
+            } while (currentRelations != null);
+
+            path.Reverse();
+
+            if (!TableEqualityComparer.Default.Equals(this.TargetTable, path.First().TargetTable))
+            {
+                throw new InvalidOperationException(
+                    $"TableRelations do not match. Expected table {this.TargetTable.Name}, received {path.First().TargetTable.Name}");
+            }
+
+            TableRelations thisEndpoint = this;
+            path.RemoveAt(0);
+            while (path.Any())
+            {
+                var relation = path.First();
+                thisEndpoint = this.NavigationTables.Single(t =>
+                    TableEqualityComparer.Default.Equals(relation.TargetTable, t.TargetTable));
+
+                path.RemoveAt(0);
+            }
+
+            return thisEndpoint;
+        }
         
         public bool RelationTreeHasAnyTableDefinedMultipleTimes()
         {
@@ -136,6 +169,7 @@ namespace SigQL.Sql
         public ITableDefinition Table => columnDefinition.Table;
 
         public TableRelationsColumnSource Source { get; }
+        public TableRelations TableRelations { get; set; }
 
         public TableRelationColumnDefinition(IColumnDefinition columnDefinition, IArgument argument, TableRelationsColumnSource source)
         {

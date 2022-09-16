@@ -63,12 +63,6 @@ namespace SigQL
                 ProjectedColumns = columns
             };
 
-
-            foreach (var navigationTable in tableRelations.NavigationTables)
-            {
-                navigationTable.Parent = tableRelations;
-            }
-
             IEnumerable<IForeignKeyDefinition> foreignKeys = null;
             foreach (var navigationTableRelations in tableRelations.NavigationTables)
             {
@@ -104,6 +98,17 @@ namespace SigQL
                     tableRelations = MergeTableRelations(tableRelations, navigationTableRelations);
                 }
             }
+            
+            foreach (var navigationTable in tableRelations.NavigationTables)
+            {
+                navigationTable.Parent = tableRelations;
+                foreach (var projectedColumn in navigationTable.ProjectedColumns)
+                {
+                    projectedColumn.TableRelations = navigationTable;
+                }
+            }
+
+            columns.ForEach(c => c.TableRelations = tableRelations);
 
             var viaTableRelations = viaRelationColumns.Select(c =>
             {
@@ -161,11 +166,15 @@ namespace SigQL
                     tableRelations.ProjectedColumns = new List<TableRelationColumnDefinition>()
                     {
                         new TableRelationColumnDefinition(column, argument, TableRelationsColumnSource.Parameters)
+                        {
+                            TableRelations = tableRelations
+                        }
                     };
                 }
 
                 if (previousRelation != null)
                 {
+                    tableRelations.Parent = previousRelation;
                     tableRelations.NavigationTables = new List<TableRelations>()
                     {
                         previousRelation

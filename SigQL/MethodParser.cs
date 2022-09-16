@@ -111,7 +111,7 @@ namespace SigQL
 
             var orderByParameters = allTableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.OrderBy);
             
-            var orderBySpecs = ConvertToOrderBySpecs(arguments, orderByParameters, primaryTable, allTableRelations).ToList();
+            var orderBySpecs = ConvertToOrderBySpecs(arguments, orderByParameters, allTableRelations).ToList();
             var dynamicOrderByParameterPaths = this.FindDynamicOrderByParameterPaths(arguments);
             var dynamicOrderBySpecs = ConvertToOrderBySpecs(arguments, dynamicOrderByParameterPaths, primaryTable, allTableRelations);
 
@@ -354,11 +354,10 @@ namespace SigQL
             return arg.Type == typeof(OrderByDirection);
         }
 
-        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<IArgument> arguments, TableRelations orderByTableRelations,
-            ITableDefinition primaryTable, TableRelations primaryTableRelations)
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<IArgument> arguments, TableRelations orderByTableRelations, TableRelations primaryTableRelations)
         {
             var columns = this.databaseResolver.GetProjectedColumns(orderByTableRelations);
-            return columns.SelectMany(c => ConvertToOrderBySpec(c, arguments,  primaryTable, primaryTableRelations)).ToList();
+            return columns.SelectMany(c => ConvertToOrderBySpec(c, arguments, primaryTableRelations)).ToList();
         }
         
         private IEnumerable<OrderBySpec> ConvertToOrderBySpecs(IEnumerable<IArgument> arguments, IEnumerable<IArgument> dynamicOrderByParameterPaths, ITableDefinition primaryTable, TableRelations primaryTableRelations)
@@ -377,10 +376,10 @@ namespace SigQL
             }).ToList();
         }
 
-        private IEnumerable<OrderBySpec> ConvertToOrderBySpec(TableRelationColumnDefinition columnRelation, IEnumerable<IArgument> arguments, ITableDefinition primaryTable,
-            TableRelations primaryTableRelations)
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpec(TableRelationColumnDefinition columnRelation, IEnumerable<IArgument> arguments,
+            TableRelations fromTableRelations)
         {
-            Func<string, string> resolveTableAlias = (tableName) => primaryTableRelations.Find(tableName).Alias;
+            Func<string, string> resolveTableAlias = (tableName) => fromTableRelations.Find(tableName).Alias;
 
             return columnRelation.Arguments.All.Select(arg =>
             {
@@ -398,7 +397,7 @@ namespace SigQL
                         var parameterArgument = new ParameterArgument(arg.FindParameter().GetParameterInfo(), this.databaseResolver);
                         var viaRelationPath = viaRelationAttribute.Path;
                         var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
-                            primaryTableRelations.FindViaRelations);
+                            fromTableRelations.FindViaRelations);
                         columnName = result.ColumnName;
                         tableName = result.TableName;
                         tableAliasName = result.TableAliasName;
@@ -406,7 +405,8 @@ namespace SigQL
                     else
                     {
                         tableName = columnRelation.Table.Name;
-                        tableAliasName = resolveTableAlias(tableName);
+                        var columnTableRelations = fromTableRelations.FindEquivalentBranch(columnRelation.TableRelations);
+                        tableAliasName = columnTableRelations.Alias;
                     }
 
                     var orderByTable = this.databaseConfiguration.Tables.FindByName(tableName);
@@ -418,9 +418,9 @@ namespace SigQL
                             $"Unable to identify matching database column for order by parameter \"{arg.FullyQualifiedTypeName()}\". Column \"{columnName}\" does not exist in table {tableName}.");
                     }
 
-                    return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindViaRelations)
+                    return new OrderBySpec(resolveTableAlias, fromTableRelations.FindViaRelations)
                     {
-                        TableName = tableAliasName ?? tableName ?? primaryTableRelations.Alias,
+                        TableName = tableAliasName ?? tableName ?? fromTableRelations.Alias,
                         ColumnName = column.Name,
                         ParameterPath = arg.ToParameterPath(),
                         IsDynamic = false,
@@ -430,7 +430,7 @@ namespace SigQL
                 }
                 else
                 {
-                    return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindViaRelations)
+                    return new OrderBySpec(resolveTableAlias, fromTableRelations.FindViaRelations)
                     {
                         ParameterPath = arg.ToParameterPath(),
                         IsDynamic = true,
