@@ -959,7 +959,7 @@ namespace SigQL
         {
             var tableRelations = this.databaseResolver.BuildTableRelationsFromViaParameter(
                 parameterArgument,
-                viaRelationPath);
+                viaRelationPath, TableRelationsColumnSource.Parameters);
 
             var tableRelationPaths = new List<string>();
             var currTableRelations = tableRelations;

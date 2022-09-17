@@ -114,14 +114,14 @@ namespace SigQL
             {
                 IArgument argument = c.Column.Argument;
                 return BuildTableRelationsFromViaParameter(argument,
-                    argument.GetCustomAttribute<ViaRelationAttribute>().Path);
+                    argument.GetCustomAttribute<ViaRelationAttribute>().Path, source);
             }).ToList();
 
             var result = MergeTableRelations(viaTableRelations.AppendOne(tableRelations).ToArray());
             return result;
         }
         internal TableRelations BuildTableRelationsFromViaParameter(IArgument argument,
-            string viaRelationPath)
+            string viaRelationPath, TableRelationsColumnSource source)
         {
             var relations =
                 viaRelationPath.
@@ -165,7 +165,7 @@ namespace SigQL
                     }
                     tableRelations.ProjectedColumns = new List<TableRelationColumnDefinition>()
                     {
-                        new TableRelationColumnDefinition(column, argument, TableRelationsColumnSource.Parameters)
+                        new TableRelationColumnDefinition(column, argument, source)
                         {
                             TableRelations = tableRelations
                         }
