@@ -29,7 +29,7 @@ namespace SigQL
                             sql.Add($"{(a.Args != null ? $"({Walk(a.Args.SingleOrDefault())})" : string.Empty)}".Trim());
                             break;
                         case InPredicate a: 
-                            sql.Add($"({Walk(a.LeftComparison)}{a.Modifier?.PadLeft(a.Modifier.Length + 1)} in ({string.Join(", ", a.Args?.Select(a => Walk(a)) ?? new string[0])}))".Trim());
+                            sql.Add($"({Walk(a.LeftComparison)} {a.Keyword} ({string.Join(", ", a.Args?.Select(a => Walk(a)) ?? new string[0])}))".Trim());
                             break;
                         case Exists a: 
                             sql.Add($"exists ({Walk(a.Args.SingleOrDefault())})".Trim());
@@ -149,6 +149,9 @@ namespace SigQL
                             break;
                         case FromClauseNode a:
                             sql.Add($"{string.Join(" ", a.Args.Select(a => Walk(a)))}".Trim());
+                            break;
+                        case Predicate a: 
+                            sql.Add($"({Walk(a.Args.Take(1))} {a.Keyword} {Walk(a.Args.Skip(1).Single())})".Trim());
                             break;
                         case Placeholder a:
                             sql.Add(Walk(a.Args.SingleOrDefault())?.Trim());

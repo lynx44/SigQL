@@ -388,6 +388,15 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Where_NotLike_ReturnsExpectedSql()
+        {
+            
+            var sql = GetSqlForCall(() => monolithicRepository.GetEmployeesByNameWithNotLike(Like.FromUnsafeRawValue("name")));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((\"Employee\".\"Name\" not like @name))", sql);
+        }
+
+        [TestMethod]
         public void Where_LikeInNavigationProperty_ReturnsExpectedSql()
         {
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsByEmployeeNameWithLike));

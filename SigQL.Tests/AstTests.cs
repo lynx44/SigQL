@@ -323,12 +323,35 @@ namespace SigQL.Tests
                 },
                 WhereClause = new WhereClause()
                 {
-                    Args = new AstNode[] {new LikeOperator() { Args = new AstNode[] { new ColumnIdentifier() {Args = new[] {new RelationalColumn() {Label = "name"}}}, new NamedParameterIdentifier() { Name = "nameToFind" }} }}
+                    Args = new AstNode[] {new LikePredicate() { Args = new AstNode[] { new ColumnIdentifier() {Args = new[] {new RelationalColumn() {Label = "name"}}}, new NamedParameterIdentifier() { Name = "nameToFind" }} }}
                 }
             };
 
             var statement = Build(selectStatement);
             Assert.AreEqual("select \"name\" from \"person\" where (\"name\" like @nameToFind)", statement);
+        }
+
+        [TestMethod]
+        public void BasicWhereWithNotLike()
+        {
+            var selectStatement = new Select()
+            {
+                SelectClause = new SelectClause()
+                {
+                    Args = new[] {new ColumnIdentifier() {Args = new[] {new RelationalColumn() {Label = "name"}}},}
+                },
+                FromClause = new FromClause()
+                {
+                    Args = new [] {new TableIdentifier() { Args = new[] { new RelationalTable() { Label = "person" } }}}
+                },
+                WhereClause = new WhereClause()
+                {
+                    Args = new AstNode[] {new NotLikePredicate() { Args = new AstNode[] { new ColumnIdentifier() {Args = new[] {new RelationalColumn() {Label = "name"}}}, new NamedParameterIdentifier() { Name = "nameToFind" }} }}
+                }
+            };
+
+            var statement = Build(selectStatement);
+            Assert.AreEqual("select \"name\" from \"person\" where (\"name\" not like @nameToFind)", statement);
         }
 
         [TestMethod]

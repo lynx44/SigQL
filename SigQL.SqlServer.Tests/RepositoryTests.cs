@@ -831,6 +831,24 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void NotStartsWith()
+        {
+            this.laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Joe" },
+                new EFEmployee() { Name = "Jake" },
+                new EFEmployee() { Name = "Jam" },
+                new EFEmployee() { Name = "Kaylee" }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.Employee.Where(e => !e.Name.StartsWith("J")).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetEmployeesByNameWithNotStartsWith("J").Select(e => e.Id);
+
+            Assert.AreEqual(1, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
         public void Contains()
         {
             this.laborDbContext.Employee.AddRange(
@@ -867,6 +885,24 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void NotContains()
+        {
+            this.laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Joe" },
+                new EFEmployee() { Name = "Jake" },
+                new EFEmployee() { Name = "Jam" },
+                new EFEmployee() { Name = "Kaylee" }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.Employee.Where(e => !e.Name.Contains("a")).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetEmployeesByNameWithNotContains("a").Select(e => e.Id);
+
+            Assert.AreEqual(1, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
         public void EndsWith()
         {
             this.laborDbContext.Employee.AddRange(
@@ -899,6 +935,24 @@ namespace SigQL.SqlServer.Tests
             var actual = this.monolithicRepository.GetEmployeesByNameWithEndsWith(null).Select(e => e.Id);
             
             Assert.AreEqual(0, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void NotEndsWith()
+        {
+            this.laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Joe" },
+                new EFEmployee() { Name = "Jake" },
+                new EFEmployee() { Name = "Jam" },
+                new EFEmployee() { Name = "Kaylee" }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.Employee.Where(e => !e.Name.EndsWith("e")).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetEmployeesByNameWithNotEndsWith("e").Select(e => e.Id);
+
+            Assert.AreEqual(1, actual.Count());
             AreEquivalent(expected, actual);
         }
 

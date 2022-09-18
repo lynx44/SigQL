@@ -67,9 +67,13 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicEnumerableOrderByViaNavigationClassFilter(WorkLog.NavigationDynamicOrderByEnumerable filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeWithAddress> GetWorkLogsOrderedByAddressId([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address) + "." + nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithLike(Like name);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithNotLike([Not] Like name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithStartsWith([StartsWith] string name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithContains([Contains] string name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithEndsWith([EndsWith] string name);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithNotStartsWith([Not, StartsWith] string name);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithNotContains([Not, Contains] string name);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithNotEndsWith([Not, EndsWith] string name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameIgnoreIfNull([IgnoreIfNull] string name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameIgnoreIfNullOrEmptyString([IgnoreIfNullOrEmpty] string name);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNameWithLike(WorkLog.GetLikeEmployeeNameFilter filter);

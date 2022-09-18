@@ -390,12 +390,14 @@ namespace SigQL
         }
     }
 
-    public class LikeOperator : LogicalOperator
+    public class LikePredicate : Predicate
     {
-        public LikeOperator()
-        {
-            this.Label = "like";
-        }
+        public override string Keyword => "like";
+    }
+
+    public class NotLikePredicate : LikePredicate
+    {
+        public override string Keyword => "not like";
     }
 
     public class Alias : Operator
@@ -415,14 +417,17 @@ namespace SigQL
         }
     }
 
-    public class Predicate : AstNode
+    public abstract class Predicate : AstNode
     {
+        public abstract string Keyword { get; }
     }
 
     public class Join : Predicate
     {
         public string JoinType { get; set; }
         public AstNode RightNode { get; set; }
+
+        public override string Keyword => this.JoinType;
     }
 
     // public class CrossJoin : Join
@@ -451,13 +456,13 @@ namespace SigQL
 
     public class InPredicate : Predicate
     {
-        public virtual string Modifier => null;
         public AstNode LeftComparison { get; set; }
+        public override string Keyword => "in";
     }
 
     public class NotInPredicate : InPredicate
     {
-        public override string Modifier => "not";
+        public override string Keyword => "not in";
     }
 
     // public class RightOuterJoin : OuterJoin

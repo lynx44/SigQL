@@ -569,7 +569,9 @@ namespace SigQL
             if (typeof(Like).IsAssignableFrom(parameterType) || 
                 comparisonSpec.IsAnyLike)
             {
-                operatorNode = new LikeOperator();
+                operatorNode = 
+                   comparisonSpec.Not ? new NotLikePredicate() : 
+                       new LikePredicate();
                 var token = new TokenPath(argument)
                 {
                     SqlParameterName = parameterName,
