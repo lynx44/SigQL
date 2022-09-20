@@ -318,4 +318,18 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string TheEmployeeName { get; set; }
         }
     }
+
+    [SqlIdentifier(nameof(WorkLog))]
+    public class MyWorkLog
+    {
+        public int Id  { get; set; }
+        public DateTime StartDate { get; set; }
+    }
+
+    [SqlIdentifier(nameof(WorkLog))]
+    public class MyWorkLogWithEmployee
+    {
+        public int Id  { get; set; }
+        public MyEmployee Employee { get; set; }
+    }
 }

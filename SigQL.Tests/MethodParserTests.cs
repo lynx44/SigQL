@@ -114,7 +114,7 @@ namespace SigQL.Tests
         [TestMethod]
         public void GetProjection_WithRepositoryInterfaceAndAliasedName_ReturnsExpectedSql()
         {
-            var sql = GetSqlForCall(() => this.monolithicRepository.GetWithAliasedName(1));
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetWithAliasedColumnName(1));
 
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"WorkLog\".\"Id\" \"WorkLogId\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" = @id))", sql);
         }
@@ -143,6 +143,22 @@ namespace SigQL.Tests
             var sql = GetSqlFor(methodInfo);
 
             Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\"", sql);
+        }
+
+        [TestMethod]
+        public void Get_WithTableSqlIdentifierAttribute_ReturnsExpectedSql()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithSqlIdentifierAttribute());
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"WorkLog\".\"StartDate\" \"StartDate\" from \"WorkLog\"", sql);
+        }
+
+        [TestMethod]
+        public void Get_WithNavigationTableWithSqlIdentifierAttribute_ReturnsExpectedSql()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetNavigationPropertyWithSqlIdentifierAttribute());
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
         }
 
         [TestMethod]
@@ -199,6 +215,14 @@ namespace SigQL.Tests
         {
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetByFilter));
             var sql = GetSqlFor(methodInfo);
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where ((\"Employee\".\"Id\" = @Id))", sql);
+        }
+
+        [TestMethod]
+        public void GetSingleWithFilterUsingSqlIdentifierAttribute_ReturnsExpectedSql()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetByFilterWithSqlIdentifierAttribute(new MyEmployeeIdFilter() { Id = 1 }));
 
             Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where ((\"Employee\".\"Id\" = @Id))", sql);
         }

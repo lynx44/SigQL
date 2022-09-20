@@ -85,6 +85,11 @@ namespace SigQL
         
         public ITableDefinition DetectTable(Type t)
         {
+            var sqlIdentifier = t.GetCustomAttribute<SqlIdentifierAttribute>();
+            if (sqlIdentifier != null)
+            {
+                return this.databaseConfiguration.Tables.FindByName(sqlIdentifier.Name);
+            }
             Type detectedType = null;
             if (this.TryDetectTargetTable(t, ref detectedType))
             {
@@ -106,6 +111,11 @@ namespace SigQL
 
         public bool TryDetectTargetTable(Type columnOutputType, ref Type detectedType)
         {
+            var sqlIdentifier = columnOutputType.GetCustomAttribute<SqlIdentifierAttribute>();
+            if (sqlIdentifier != null)
+            {
+                return this.databaseConfiguration.Tables.FindByName(sqlIdentifier.Name) != null;
+            }
             columnOutputType = UnwrapCollectionTargetType(columnOutputType);
             if (this.databaseConfiguration.Tables.FindByName(columnOutputType.Name) != null)
             {

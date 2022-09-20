@@ -222,7 +222,7 @@ namespace SigQL.SqlServer.Tests
 
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
-            var actual = monolithicRepository.GetWithAliasedName(2);
+            var actual = monolithicRepository.GetWithAliasedColumnName(2);
 
             Assert.AreEqual(2, actual.WorkLogId);
         }

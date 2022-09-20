@@ -128,6 +128,20 @@ namespace SigQL.Tests.Common.Databases.Labor
         }
     }
 
+    [SqlIdentifier(nameof(Employee))]
+    public class MyEmployee
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+    }
+
+    [SqlIdentifier(nameof(Employee))]
+    public class MyEmployeeIdFilter
+    {
+        public int Id { get; set; }
+    }
+
+
     // not yet used/supported
     // public class EmployeeInsertFields
     // {
