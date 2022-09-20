@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -21,7 +22,7 @@ namespace SigQL
             WhereClause whereClause = null;
             if (updateSpec.FilterParameters.Any())
             {
-                var tableRelations = this.databaseResolver.BuildTableRelations(primaryTable, new TableArgument(primaryTable, updateSpec.FilterParameters.AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters);
+                var tableRelations = this.databaseResolver.BuildTableRelations(primaryTable, new TableArgument(primaryTable, updateSpec.FilterParameters.AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, ITableKeyDefinition>());
 
                 whereClause = BuildWhereClauseFromTargetTablePerspective(
                     new RelationalTable() { Label = primaryTable.Name }, tableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause), parameterPaths,

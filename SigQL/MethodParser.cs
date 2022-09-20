@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -66,14 +67,15 @@ namespace SigQL
             var arguments = methodParameters.AsArguments(this.databaseResolver);
 
             var tableDefinition = this.databaseResolver.DetectTable(projectionType);
-            
+            var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
+
             TableRelations allTableRelations;
             TableRelations orderbyTableRelations;
             {
                 var projectionTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TypeArgument(projectionType, this.databaseResolver),
-                    TableRelationsColumnSource.ReturnType);
+                    TableRelationsColumnSource.ReturnType, tablePrimaryKeyDefinitions);
                 var parametersTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, arguments),
-                    TableRelationsColumnSource.Parameters);
+                    TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, ITableKeyDefinition>());
                 
                 orderbyTableRelations = parametersTableRelations.Filter(TableRelationsColumnSource.Parameters, ColumnFilters.OrderBy);
                 allTableRelations = this.databaseResolver.MergeTableRelations(
@@ -83,9 +85,7 @@ namespace SigQL
 
             var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
             var selectTableRelations = allTableRelations.Filter(TableRelationsColumnSource.ReturnType, ColumnFilters.SelectClause);
-            var resolvedSelectClause = selectClauseBuilder.Build(selectTableRelations);
-            
-            var tablePrimaryKeyDefinitions = resolvedSelectClause.TableKeyDefinitions;
+            var resolvedSelectClause = selectClauseBuilder.Build(selectTableRelations, tablePrimaryKeyDefinitions);
             
             var selectClause = resolvedSelectClause.Ast;
 
@@ -236,7 +236,7 @@ namespace SigQL
                 Parameters = parameterPaths,
                 Tokens = tokens,
                 TargetTablePrimaryKey = !isCountResult ? allTableRelations.TargetTable.PrimaryKey : new TableKeyDefinition(),
-                TablePrimaryKeyDefinitions = !isCountResult ? tablePrimaryKeyDefinitions : new Dictionary<string, ITableKeyDefinition>()
+                TablePrimaryKeyDefinitions = !isCountResult ? tablePrimaryKeyDefinitions : new ConcurrentDictionary<string, ITableKeyDefinition>()
             };
             return sqlStatement;
         }
@@ -961,7 +961,7 @@ namespace SigQL
         {
             var tableRelations = this.databaseResolver.BuildTableRelationsFromViaParameter(
                 parameterArgument,
-                viaRelationPath, TableRelationsColumnSource.Parameters);
+                viaRelationPath, TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, ITableKeyDefinition>());
 
             var tableRelationPaths = new List<string>();
             var currTableRelations = tableRelations;

@@ -317,6 +317,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             [ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))]
             public string TheEmployeeName { get; set; }
         }
+
+        public interface IWorkLogToView
+        {
+            int Id { get; }
+            [JoinRelation("WorkLog.EmployeeId->WorkLogEmployeeView.EmployeeId")]
+            WorkLogEmployeeView.IFields View { get; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

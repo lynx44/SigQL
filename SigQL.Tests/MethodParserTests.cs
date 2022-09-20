@@ -41,6 +41,7 @@ namespace SigQL.Tests
             var streetAddressCoordinateTable = new TableDefinition(dbo, nameof(StreetAddressCoordinate), SetupColumns(typeof(StreetAddressCoordinate).GetProperties()));
             var diagnosticLogTable = new TableDefinition(dbo, nameof(DiagnosticLog), SetupColumns(typeof(DiagnosticLog).GetProperties()));
             var itvfGetWorkLogsByEmployeeIdFunction = new TableDefinition(dbo, nameof(itvf_GetWorkLogsByEmployeeId), SetupColumns(typeof(itvf_GetWorkLogsByEmployeeId).GetProperties()));
+            var workLogEmployeeView = new TableDefinition(dbo, nameof(WorkLogEmployeeView), SetupColumns(typeof(WorkLogEmployeeView).GetProperties()));
             itvfGetWorkLogsByEmployeeIdFunction.ObjectType = DatabaseObjectType.Function;
             workLogTable.PrimaryKey = new TableKeyDefinition(workLogTable.Columns.FindByName(nameof(WorkLog.Id)));
             employeeTable.PrimaryKey = new TableKeyDefinition(employeeTable.Columns.FindByName(nameof(Employee.Id)));
@@ -48,6 +49,7 @@ namespace SigQL.Tests
             addressTable.PrimaryKey = new TableKeyDefinition(addressTable.Columns.FindByName(nameof(Address.Id)));
             diagnosticLogTable.PrimaryKey = new TableKeyDefinition();
             itvfGetWorkLogsByEmployeeIdFunction.PrimaryKey = new TableKeyDefinition();
+            workLogEmployeeView.PrimaryKey = new TableKeyDefinition();
             streetAddressCoordinateTable.PrimaryKey = new TableKeyDefinition(streetAddressCoordinateTable.Columns.FindByName(nameof(StreetAddressCoordinate.Id)));
             var employeeAddressTable = new TableDefinition(dbo, nameof(EmployeeAddress), typeof(EmployeeAddress).GetProperties().Select(p => p.Name));
             workLogTable.ForeignKeyCollection = new ForeignKeyDefinitionCollection().AddForeignKeys(
@@ -77,7 +79,8 @@ namespace SigQL.Tests
                 employeeAddressTable,
                 streetAddressCoordinateTable,
                 diagnosticLogTable,
-                itvfGetWorkLogsByEmployeeIdFunction
+                itvfGetWorkLogsByEmployeeIdFunction,
+                workLogEmployeeView
             }));
 
             return databaseConfiguration;
@@ -261,6 +264,14 @@ namespace SigQL.Tests
             var sql = GetSqlFor(methodInfo);
 
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
+        }
+
+        [TestMethod]
+        public void GetJoinRelationAttribute_ReturnsExpectedSql()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithJoinRelationAttribute());
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"WorkLogEmployeeView\".\"WorkLogId\" \"View.WorkLogId\", \"WorkLogEmployeeView\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeId\" \"View.EmployeeId\", \"WorkLogEmployeeView\".\"EmployeeName\" \"View.EmployeeName\" from \"WorkLog\" left outer join \"WorkLogEmployeeView\" on ((\"WorkLog\".\"EmployeeId\" = \"WorkLogEmployeeView\".\"EmployeeId\"))", sql);
         }
 
         [TestMethod]

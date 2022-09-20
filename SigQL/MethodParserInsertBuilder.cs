@@ -346,7 +346,7 @@ namespace SigQL
 
                     var parameterInfo = tableTypeParameters.Single();
                     var tableDefinition = insertSpec.Table ?? this.databaseResolver.DetectTable(parameterInfo.ParameterType);
-                    var tableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, new ParameterArgument(parameterInfo, this.databaseResolver).AsEnumerable()), TableRelationsColumnSource.Parameters);
+                    var tableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, new ParameterArgument(parameterInfo, this.databaseResolver).AsEnumerable()), TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, ITableKeyDefinition>());
                     insertSpec.ColumnParameters = tableRelations.ProjectedColumns.SelectMany(pc =>
                         pc.Arguments.All.Select(arg =>
                             new InsertColumnParameter()

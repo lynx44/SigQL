@@ -154,6 +154,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         ICountResult<WorkLog.IWorkLogId> CountWorkLogs();
         IEnumerable<DiagnosticLog.IFields> FetchDiagnosticLogs([Fetch] int take);
 
+        IEnumerable<WorkLog.IWorkLogToView> GetWithJoinRelationAttribute();
+
         // view
         IEnumerable<WorkLogEmployeeView.IFields> GetWorkLogEmployeeView();
 

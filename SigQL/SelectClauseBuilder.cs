@@ -25,15 +25,15 @@ namespace SigQL
         {
             var projectionType = OutputFactory.UnwrapType(outputType);
 
-            var fromClauseRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.DetectTable(outputType), new TypeArgument(outputType, databaseResolver), TableRelationsColumnSource.ReturnType);
+            var fromClauseRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.DetectTable(outputType), new TypeArgument(outputType, databaseResolver), TableRelationsColumnSource.ReturnType, new ConcurrentDictionary<string, ITableKeyDefinition>());
 
-            return Build(fromClauseRelations);
+            return Build(fromClauseRelations, new ConcurrentDictionary<string, ITableKeyDefinition>());
         }
 
-        internal ResolvedSelectClause Build(TableRelations projectionTableRelations)
+        internal ResolvedSelectClause Build(TableRelations projectionTableRelations, ConcurrentDictionary<string, ITableKeyDefinition> primaryKeyDefinitions)
         {
             var tableRelations = projectionTableRelations.Filter(TableRelationsColumnSource.ReturnType, ColumnFilters.SelectClause);
-            var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
+            var tablePrimaryKeyDefinitions = primaryKeyDefinitions;
 
             var selectClauseAst = BuildSelectClause(tableRelations, tablePrimaryKeyDefinitions);
             var result = new ResolvedSelectClause(new SqlStatementBuilder())

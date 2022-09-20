@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -14,7 +15,11 @@ namespace SigQL
 {
     internal partial class DatabaseResolver
     {
-        public TableRelations BuildTableRelations(ITableDefinition tableDefinition, IArgument argument, TableRelationsColumnSource source)
+        public TableRelations BuildTableRelations(
+            ITableDefinition tableDefinition, 
+            IArgument argument, 
+            TableRelationsColumnSource source,
+            ConcurrentDictionary<string, ITableKeyDefinition> tableKeyDefinitions)
         {
             var columnFields = argument.ClassProperties.Where(p => !ColumnAttributes.IsDecoratedNonColumn(p)).Select(p => new ColumnField()
             {
@@ -33,7 +38,7 @@ namespace SigQL
             var relations = unprocessedNavigationTables
                 .Select(p =>
                 {
-                    var navigationTableRelations = BuildTableRelations(this.DetectTable(p.Column.Argument.Type), p.Column.Argument, source);
+                    var navigationTableRelations = BuildTableRelations(this.DetectTable(p.Column.Argument.Type), p.Column.Argument, source, tableKeyDefinitions);
                     return navigationTableRelations;
                 }).ToList();
             var columns = columnDescriptions.Where(t => !t.IsTable)
@@ -69,7 +74,18 @@ namespace SigQL
                 if (!TableEqualityComparer.Default.Equals(navigationTableRelations.TargetTable,
                         tableRelations.TargetTable))
                 {
-                    var foreignKey = this.FindPrimaryForeignKeyMatchForTables(tableDefinition, navigationTableRelations.TargetTable);
+                    var joinRelationAttribute = navigationTableRelations.Argument.GetCustomAttribute<JoinRelationAttribute>();
+                    IForeignKeyDefinition foreignKey;
+                    if (joinRelationAttribute != null)
+                    {
+                        var joinTableRelations = BuildTableRelationsFromViaParameter(navigationTableRelations.Argument, joinRelationAttribute.Path,
+                            TableRelationsColumnSource.ReturnType, tableKeyDefinitions);
+                        foreignKey = joinTableRelations.NavigationTables.Single().ForeignKeyToParent;
+                    }
+                    else
+                    {
+                        foreignKey = this.FindPrimaryForeignKeyMatchForTables(tableDefinition, navigationTableRelations.TargetTable);
+                    }
                     if (foreignKey == null)
                     {
                         foreignKeys = FindManyToManyForeignKeyMatchesForTables(tableDefinition, navigationTableRelations.TargetTable);
@@ -114,14 +130,14 @@ namespace SigQL
             {
                 IArgument argument = c.Column.Argument;
                 return BuildTableRelationsFromViaParameter(argument,
-                    argument.GetCustomAttribute<ViaRelationAttribute>().Path, source);
+                    argument.GetCustomAttribute<ViaRelationAttribute>().Path, source, tableKeyDefinitions);
             }).ToList();
 
             var result = MergeTableRelations(viaTableRelations.AppendOne(tableRelations).ToArray());
             return result;
         }
         internal TableRelations BuildTableRelationsFromViaParameter(IArgument argument,
-            string viaRelationPath, TableRelationsColumnSource source)
+            string viaRelationPath, TableRelationsColumnSource source, ConcurrentDictionary<string, ITableKeyDefinition> tableKeyDefinitions)
         {
             var relations =
                 viaRelationPath.
@@ -192,11 +208,31 @@ namespace SigQL
             {
                 if (previousRelation != null)
                 {
-                    tableRelation.ForeignKeyToParent =
-                        FindPrimaryForeignKeyMatchForTables(tableRelation.TargetTable, previousRelation.TargetTable);
+                    // use the specified columns to join if specified
+                    if (tableRelation.ProjectedColumns.Any() && previousRelation.ProjectedColumns.Any())
+                    {
+                        tableRelation.ForeignKeyToParent = new ForeignKeyDefinition(tableRelation.TargetTable,
+                            new ForeignKeyPair(previousRelation.ProjectedColumns.Single(),
+                                tableRelation.ProjectedColumns.Single()));
+                    }
+                    // otherwise, autodetect the relationship
+                    else
+                    {
+                        tableRelation.ForeignKeyToParent =
+                            FindPrimaryForeignKeyMatchForTables(tableRelation.TargetTable, previousRelation.TargetTable);
+                    }
+                    
                     if (tableRelation.ForeignKeyToParent == null)
                         throw new InvalidIdentifierException(
                             $"Unable to identify matching database foreign key for parameter {argument.Name} with ViaRelation[\"{viaRelationPath}\"]. No foreign key between {previousRelation.TargetTable.Name} and {tableRelation.TargetTable.Name} could be found.");
+                    
+                    if (!tableKeyDefinitions.ContainsKey(tableRelation.Argument.Name))
+                    {
+                        tableKeyDefinitions[tableRelation.Argument.Name] =
+                            new TableKeyDefinition(tableRelation.ForeignKeyToParent.KeyPairs
+                                .Select(kp => kp.PrimaryTableColumn).ToArray());
+
+                    }
                 }
                 previousRelation = tableRelation;
             }
