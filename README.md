@@ -925,6 +925,25 @@ Please search this repository for issues, and open a ticket if your question is 
 **I have an issue or think I found a bug, what should I do?**
 First, check the documentation and the available test cases to validate that your use case is supported. If this does not resolve the problem, you may open a new issue. You may also debug the code by downloading the sources. If you believe you are able to fix the problem, please submit a pull request (and please include tests).
 
+**How do I debug the library?**
+
+In Visual Studio:
+
+  1. Tools->Options->Debugging->General
+  - Uncheck _Enable Just My Code_  
+  - Check _Enable Source Server Support_
+  - Check _Enable Source Link support_
+  - Check _Suppress JIT optimization on module load (Managed only)_
+  2. Tools->Options->Debugging->Symbols
+  - Check _NuGet.org Symbol Server_
+  - Under _Load only specific modules_, click _Specify included modules_
+    - Add _SigQL*_
+  3. To set a breakpoint:
+   - Open Assembly Explorer
+   - Expand SigQL
+   - Find a suitable entry point and set the breakpoint
+     - If you're unsure where to start, open _MethodParser_ and set a breakpoint at the beginning of the _SqlFor_ method
+
 **Can SigQL make schema changes or migrate my database?**
 No. However, it can be run in tandem with your preferred migration technology. Specifically, EF migrations have been tested to work alongside SigQL.
 
@@ -933,3 +952,4 @@ Yes, they are supported in return types, parameters and filter classes.
 
 **What versions of .NET are targeted?**
 .NET Standard 2 (Core) and .NET Framework 4.6.2/4.7.2
+
