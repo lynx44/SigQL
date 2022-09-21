@@ -269,7 +269,7 @@ namespace SigQL.SqlServer.Tests
             var expected = Enumerable.Range(1, 3).Select(i => new EFWorkLog() { Employee = new EFEmployee() { Name = "James" + (4 - i) } }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
-            var actual = monolithicRepository.GetOrderedWorkLogsWithDynamicOrderByRelationCanonicalDataType(new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name), OrderByDirection.Ascending));
+            var actual = monolithicRepository.GetOrderedWorkLogsWithDynamicOrderByRelationCanonicalDataType(new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name), OrderByDirection.Ascending));
 
             AreSame(new List<string>()
             {

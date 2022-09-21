@@ -47,16 +47,15 @@ namespace SigQL.Tests.Common.Databases.Labor
         // where
         WorkLog.IWorkLogId GetWorkLogByLocationIdAndEmployeeId(int locationId, int employeeId);
         WorkLog.IWorkLogId GetWorkLogByEmployeeName(WorkLog.GetByEmployeeNameFilter filter);
-        WorkLog.IWorkLogId GetWorkLogByEmployeeNameViaAttribute([ViaRelation(nameof(Employee) + "." + nameof(WorkLog.Employee.Name))] string employeeName);
         Employee.IEmployeeId GetEmployeeByStreetAddress(Employee.StreetAddressFilter filter);
         // WorkLog.IWorkLogId GetWorkLogByEmployeeNameDirect(Employee.EmployeeNameFilter filter);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsAttribute([Column(nameof(WorkLog.StartDate))] OrderByDirection direction = OrderByDirection.Ascending);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogs(OrderByDirection startDate = OrderByDirection.Ascending);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogs(OrderByDirection startDate = OrderByDirection.Ascending, OrderByDirection endDate = OrderByDirection.Ascending, OrderByDirection employeeId = OrderByDirection.Ascending);
-        IEnumerable<WorkLog.IWorkLogWithEmployee> GetOrderedWorkLogs([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))] OrderByDirection employeeName, [Column(nameof(WorkLog.StartDate))] OrderByDirection direction, IOrderBy dynamicOrderBy);
+        IEnumerable<WorkLog.IWorkLogWithEmployee> GetOrderedWorkLogs([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))] OrderByDirection employeeName, [Column(nameof(WorkLog.StartDate))] OrderByDirection direction, IOrderBy dynamicOrderBy);
         IEnumerable<WorkLog.IWorkLogWithEmployee> GetOrderedWorkLogsByClassFilterNavigationProperty(WorkLog.OrderByDirectionEmployeeName filter);
         IEnumerable<WorkLog> GetOrderedWorkLogsByClassFilterNavigationPropertyCanonicalType(WorkLog.OrderByDirectionEmployeeName filter);
-        IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsByNonProjectedNavigationTable([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))] OrderByDirection employeeName);
+        IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsByNonProjectedNavigationTable([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))] OrderByDirection employeeName);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsMultiple(OrderByDirection startDate = OrderByDirection.Ascending, OrderByDirection endDate = OrderByDirection.Ascending);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsViaClassFilter(WorkLog.OrderByDirectionStartDate filter);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsViaClassFilterMultiple(WorkLog.OrderByDirectionStartDateEndDate filter);
@@ -68,7 +67,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicEnumerableOrderBy(IEnumerable<IOrderBy> orders);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(WorkLog.DynamicOrderByEnumerable filter);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicEnumerableOrderByViaNavigationClassFilter(WorkLog.NavigationDynamicOrderByEnumerable filter);
-        IEnumerable<WorkLog.IWorkLogWithEmployeeWithAddress> GetWorkLogsOrderedByAddressId([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address) + "." + nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeWithAddress> GetWorkLogsOrderedByAddressId([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address), nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithLike(Like name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithNotLike([Not] Like name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithStartsWith([StartsWith] string name);
@@ -93,11 +92,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsLessThanOrEqualToStartDate([LessThanOrEqual] DateTime startDate);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsLessThanStartDateClassFilter(WorkLog.StartDateLessThanFilter filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsLessThanOrEqualToStartDateClassFilter(WorkLog.StartDateLessThanOrEqualFilter filter);
-        IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForWorkLogLocationId([ViaRelation(nameof(Employee) + "->" + nameof(WorkLog) + "." + nameof(WorkLog.LocationId))] int locationId);
-        IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeName([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))] string name);
-        IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddress([ViaRelation(nameof(Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address) + "." + nameof(Address.StreetAddress))] string streetAddress);
-        IEnumerable<Employee.IEmployeeId> EF_GetEmployeeIdsForStreetAddress([ViaRelation(nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address) + "." + nameof(Address.StreetAddress))] string streetAddress);
-        IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameWithDifferingParameterName([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "." + nameof(Employee.Name))] string theEmployeeName);
+        IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForWorkLogLocationId([ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), nameof(WorkLog.LocationId))] int locationId);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeName([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))] string name);
+        IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddress([ViaRelation(nameof(Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address), nameof(Address.StreetAddress))] string streetAddress);
+        IEnumerable<Employee.IEmployeeId> EF_GetEmployeeIdsForStreetAddress([ViaRelation(nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address), nameof(Address.StreetAddress))] string streetAddress);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameWithDifferingParameterName([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))] string theEmployeeName);
         IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForWorkLogLocationIdClassFilter(Employee.WorkLogLocationIdFilterViaRelation filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameViaClassFilter(WorkLog.EmployeeNameViaRelationFilter filter);
         IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddressViaClassFilter(Employee.StreetAddressFilterViaRelation filter);
@@ -118,9 +117,9 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> INVALID_NonExistingPropertyColumnNameWithAlias(WorkLog.IInvalidColumnWithAlias args);
         IEnumerable<WorkLog.IWorkLogId> INVALID_NonExistingPropertyTableName(WorkLog.IInvalidNestedColumn args);
         IEnumerable<WorkLog.IWorkLogId> INVALID_NonExistingPropertyForeignKey(WorkLog.IInvalidAddressRelation args);
-        IEnumerable<Employee.IEmployeeId> INVALID_NonExistingViaRelationColumnName([ViaRelation(nameof(Employee) + "->" + nameof(WorkLog) + ".NonExistent")] int locationId);
-        IEnumerable<Employee.IEmployeeId> INVALID_NonExistingViaRelationTableName([ViaRelation(nameof(Employee) + "->NonExistent.Id")] int locationId);
-        IEnumerable<Employee.IEmployeeId> INVALID_NonExistingViaRelationForeignKey([ViaRelation(nameof(Employee) + "->" + nameof(Location) + "." + nameof(Location.Id))] int locationId);
+        IEnumerable<Employee.IEmployeeId> INVALID_NonExistingViaRelationColumnName([ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), "NonExistent")] int locationId);
+        IEnumerable<Employee.IEmployeeId> INVALID_NonExistingViaRelationTableName([ViaRelation(nameof(Employee) + "->NonExistent", "Id")] int locationId);
+        IEnumerable<Employee.IEmployeeId> INVALID_NonExistingViaRelationForeignKey([ViaRelation(nameof(Employee) + "->" + nameof(Location), nameof(Location.Id))] int locationId);
         //IEnumerable<Labor.WorkLog.IWorkLogId> INVALID_NonExistingDirectParameterColumnName();
 
         // offset
@@ -166,7 +165,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         //IEnumerable<itvf_GetWorkLogsByEmployeeId.IId> itvf_GetWorkLogsByEmployeeIdWithClassParameters(itvf_GetWorkLogsByEmployeeId.Parameters parameters);
 
         // poco
-        IEnumerable<WorkLog.WorkLogWithEmployeeWithAddressPoco> GetWorkLogsOrderedByAddressIdPocoReturn([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address) + "." + nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.WorkLogWithEmployeeWithAddressPoco> GetWorkLogsOrderedByAddressIdPocoReturn([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address), nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
         IEnumerable<WorkLog.WorkLogIdPocoWithClrOnlyProperty> GetWorkLogsWithClrOnlyProperty();
         IEnumerable<WorkLog.WorkLogIdPocoWithNestedClrOnlyProperty> GetWorkLogsWithNestedClrOnlyProperty();
 

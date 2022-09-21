@@ -396,8 +396,9 @@ namespace SigQL
                     {
                         var parameterArgument = new ParameterArgument(arg.FindParameter().GetParameterInfo(), this.databaseResolver);
                         var viaRelationPath = viaRelationAttribute.Path;
+                        var viaRelationColumn = viaRelationAttribute.Column;
                         var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
-                            fromTableRelations.FindViaRelations);
+                            viaRelationColumn, fromTableRelations.FindViaRelations);
                         columnName = result.ColumnName;
                         tableName = result.TableName;
                         tableAliasName = result.TableAliasName;
@@ -906,10 +907,11 @@ namespace SigQL
                         if (orderByRelation != null)
                         {
                             var viaRelationPath = orderByRelation.ViaRelationPath;
+                            var viaRelationColumn = orderByRelation.ViaRelationColumnName;
                             var parameterArgument = new ParameterArgument(p.ParameterPath.Parameter, this.databaseResolver);
                             
                             var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
-                                p.ResolveTableRelations);
+                                viaRelationColumn, p.ResolveTableRelations);
 
                             orderByRelation.Table = result.TableAliasName;
                             orderByRelation.Column = result.ColumnName;
@@ -957,11 +959,14 @@ namespace SigQL
         private TableAliasResult ResolveTableAliasNameForViaRelationOrderBy(
             IArgument parameterArgument, 
             string viaRelationPath,
+            string viaRelationColumnName,
             Func<IEnumerable<string>, TableRelations> resolveTableRelationsAliasFunc)
         {
             var tableRelations = this.databaseResolver.BuildTableRelationsFromViaParameter(
                 parameterArgument,
-                viaRelationPath, TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, ITableKeyDefinition>());
+                viaRelationPath,
+                viaRelationColumnName,
+                TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, ITableKeyDefinition>());
 
             var tableRelationPaths = new List<string>();
             var currTableRelations = tableRelations;

@@ -100,20 +100,20 @@ namespace SigQL.Tests.Common.Databases.Labor
         public class StreetAddressFilterViaRelation
 
         {
-            [ViaRelation(nameof(Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address) + "." + nameof(Address.StreetAddress))]
+            [ViaRelation(nameof(Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address), nameof(Address.StreetAddress))]
             public string StreetAddress { get; set; }
         }
 
         public class EFStreetAddressFilterViaRelation
 
         {
-            [ViaRelation(nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address) + "." + nameof(Address.StreetAddress))]
+            [ViaRelation(nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address), nameof(Address.StreetAddress))]
             public string StreetAddress { get; set; }
         }
 
         public class WorkLogLocationIdFilterViaRelation
         {
-            [ViaRelation(nameof(Employee) + "->" + nameof(WorkLog) + "." + nameof(WorkLog.LocationId))]
+            [ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), nameof(WorkLog.LocationId))]
             public int LocationId { get; set; }
         }
         

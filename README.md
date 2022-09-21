@@ -344,13 +344,13 @@ Assume we have a related table, WorkLog, which stores shift information about Em
 To retrieve all employees that started their shift on a specific day, the ViaRelation attribute can be used:
 
     public IEnumerable<Employee.IName> GetEmployeesWithStartDate(
-	    [ViaRelation("Employee->WorkLog.StartDate")] startDate);
+	    [ViaRelation("Employee->WorkLog", "StartDate")] startDate);
     ...
     // at call site
     var employeesWorkingToday = 
 	    employeeRepository.GetEmployeesWithStartDate(DateTime.Today);
 
-*Note that the first table in the relational path (Employee->) must be the same as the target table specified in the return type. Also note that the columns that join the tables together are not specified, they are automatically resolved.*
+*Note that the first table in the relational path (Employee->) must be the same as the target table specified in the return type. Also note that the columns that join the tables together are not neccessary when an obvious foreign key is present.*
 
 Relational filters can also be defined by inner classes:
 
@@ -455,7 +455,7 @@ If a WorkLog centered approach is desired:
 	    }
     }
     ...
-    public IEnumerable<WorkLog.IWithStartDateAndEmployees> Get([ViaRelation("WorkLog->Employee.Name")] employeeName);
+    public IEnumerable<WorkLog.IWithStartDateAndEmployees> Get([ViaRelation("WorkLog->Employee", "Name")] employeeName);
 
 Both of these result in similar data being retrieved, but the orientation of the data is switched.
 
@@ -605,8 +605,8 @@ The below list documents all features applicable to return types. All other feat
 | Feature | Class (L1) | Class Property (L2) |
 |--|--|--|--|
 | [ClrOnly] | Yes | Yes |
-| [Column] | No (planned) | No (planned) |
-| [ViaRelation] | No (planned) | No (planned) |
+| [Column] | Yes | Yes |
+| [JoinRelation] | Yes | Yes |
 
 ### Insert, Update, and Delete
 
@@ -667,7 +667,7 @@ Filters work the same as queries:
 
 	[Update(TableName = nameof(Employee))]
 	void Update([Set] string name, 
-		[ViaRelation("Employee->WorkLog.StartDate"), GreaterThanOrEqual] DateTime startDate);
+		[ViaRelation("Employee->WorkLog", "StartDate"), GreaterThanOrEqual] DateTime startDate);
 
 Complex objects can be passed:
 
@@ -712,7 +712,7 @@ Delete statements are executed via filter parameters:
     void Delete(int id);
     
     [Delete(TableName = nameof(Employee))]
-    void Delete([ViaRelation("Employee->WorkLog.StartDate"), GreaterThanOrEqual] DateTime startDate);
+    void Delete([ViaRelation("Employee->WorkLog", "StartDate"), GreaterThanOrEqual] DateTime startDate);
 
 Currently, delete statements cannot return a return value.
 

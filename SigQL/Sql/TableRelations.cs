@@ -219,7 +219,8 @@ namespace SigQL.Sql
     internal enum TableRelationsColumnSource
     {
         ReturnType,
-        Parameters
+        Parameters,
+        SpecifiedRelation
     }
 
     public interface ITableHierarchyAlias
