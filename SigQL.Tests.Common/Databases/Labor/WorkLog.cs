@@ -324,6 +324,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             [JoinRelation("WorkLog.EmployeeId->WorkLogEmployeeView.EmployeeId")]
             WorkLogEmployeeView.IFields View { get; }
         }
+
+        public interface IWorkLogToViewMismatchingCase
+        {
+            int Id { get; }
+            [JoinRelation("WorkLog.EmployeeId->WorkLogEmployeeView.EmployeeId")]
+            WorkLogEmployeeView.IFieldsMismatchingCase View { get; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

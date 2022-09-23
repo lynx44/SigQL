@@ -18,5 +18,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             int EmployeeId { get; }
             string EmployeeName { get; }
         }
+        public interface IFieldsMismatchingCase
+        {
+            int WorkLogID { get; }
+            DateTime StartDate { get; }
+            DateTime EndDate { get; }
+            int EmployeeID { get; }
+            string EmployeeName { get; }
+        }
     }
 }

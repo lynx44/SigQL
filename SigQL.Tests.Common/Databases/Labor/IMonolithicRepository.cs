@@ -154,6 +154,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<DiagnosticLog.IFields> FetchDiagnosticLogs([Fetch] int take);
 
         IEnumerable<WorkLog.IWorkLogToView> GetWithJoinRelationAttribute();
+        IEnumerable<WorkLog.IWorkLogToViewMismatchingCase> GetWithJoinRelationAttributeMismatchingKeyCase();
 
         // view
         IEnumerable<WorkLogEmployeeView.IFields> GetWorkLogEmployeeView();

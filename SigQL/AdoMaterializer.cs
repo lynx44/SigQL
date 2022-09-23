@@ -162,7 +162,7 @@ namespace SigQL
             int rowNumber = 0;
             while (reader.Read())
             {
-                var rowValueDictionary = new Dictionary<string, object>();
+                var rowValueDictionary = new Dictionary<string, object>(StringComparer.InvariantCultureIgnoreCase);
                 
                 Enumerable.Range(0, reader.FieldCount).ToList().ForEach((i) => rowValueDictionary.Add(reader.GetName(i), reader[i]));
 
@@ -205,7 +205,7 @@ namespace SigQL
                 var qualifiedAliasName = $"{aliasName}{(aliasName != null ? "." : string.Empty)}{navigationPropertyName}";
                 var navigationKeyColumnNames = 
                     tablePrimaryKeyDefinitions[qualifiedAliasName].Columns.Select(c => c.Name).ToList();
-                var navigationRowValues = new Dictionary<string, object>();
+                var navigationRowValues = new Dictionary<string, object>(StringComparer.InvariantCultureIgnoreCase);
                 foreach (var keyValuePair in rowValues)
                 {
                     // remove parent row values

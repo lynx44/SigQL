@@ -659,6 +659,25 @@ namespace SigQL.SqlServer.Tests
             Assert.AreEqual(expected.EndDate, actual.View.EndDate);
             Assert.AreEqual(expected.Id, actual.View.WorkLogId);
         }
+        
+        [TestMethod]
+        public void GetWithJoinRelationAttributeMismatchingKeyCase()
+        {
+            var employee = new EFEmployee() { Name = "Name" };
+            var workLog = new EFWorkLog()
+            {
+                Employee = employee, 
+                StartDate = new DateTime(2022, 1, 1), 
+                EndDate = new DateTime(2022, 2, 2)
+            };
+            this.laborDbContext.WorkLog.Add(workLog);
+            this.laborDbContext.SaveChanges();
+            var expected = workLog;
+            var actual = this.monolithicRepository.GetWithJoinRelationAttributeMismatchingKeyCase().First();
+            
+            //Assert.AreEqual(expected.Employee.Id, actual.Employee.Id);
+            //Assert.AreEqual(expected.Employee.Name, actual.Employee.Name);
+        }
 
         [TestMethod]
         public void GetViaMultipleWhereParameters()

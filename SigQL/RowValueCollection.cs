@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using SigQL.Utilities;
@@ -80,7 +81,7 @@ namespace SigQL
 
         public override int GetHashCode()
         {
-            var hashCode = this.ColumnName.GetHashCode() + (this.Value != null ? this.Value.GetHashCode() : 0);
+            var hashCode = new Tuple<string, object>(this.ColumnName, this.Value).GetHashCode();
             return hashCode;
         }
     }

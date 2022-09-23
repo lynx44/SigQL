@@ -1,5 +1,6 @@
 ﻿
 
+
 # SigQL
 
 SigQL is a .NET ORM that uses code signatures as the query language. Defining only a method signature, the SQL query and object materialization is handled automatically without writing an implementation.
@@ -350,7 +351,7 @@ To retrieve all employees that started their shift on a specific day, the ViaRel
     var employeesWorkingToday = 
 	    employeeRepository.GetEmployeesWithStartDate(DateTime.Today);
 
-*Note that the first table in the relational path (Employee->) must be the same as the target table specified in the return type. Also note that the columns that join the tables together are not neccessary when an obvious foreign key is present.*
+*Note that the first table in the relational path (Employee->) must be the same as the target table specified in the return type. Also note that the columns that join the tables together are not neccessary when a default foreign key is detected.*
 
 Relational filters can also be defined by inner classes:
 
