@@ -45,6 +45,16 @@ namespace SigQL
         public AstNode FetchCount { get; set; }
     }
 
+    public class OverClause : Clause
+    {
+        public OverClause()
+        {
+            this.Keyword = "over";
+        }
+
+        public Function Function { get; set; }
+    }
+
     public class OrderByClause : Clause
     {
         public OrderByClause()

@@ -38,7 +38,7 @@ namespace SigQL
                             sql.Add($"{(a.Args != null ? $"{Walk(a.Args.SingleOrDefault())}" : string.Empty)} \"{a.Label}\"".Trim());
                             break;
                         case Function a: 
-                            sql.Add($"{a.Name}({string.Join(",", a.Args.Select(a => Walk(a)))})");
+                            sql.Add($"{a.Name}({string.Join(",", (a.Args?.Select(a => Walk(a))) ?? new string[0])})");
                             break;
                         case TableAliasDefinition a: 
                             sql.Add($"{a.Alias} ({string.Join(",", a.Args.Select(a => Walk(a)))})".Trim());
@@ -72,6 +72,9 @@ namespace SigQL
                             break;
                         case FetchClause a:
                             sql.Add($"fetch next {Walk(a.FetchCount)} rows only".Trim());
+                            break;
+                        case OverClause a:
+                            sql.Add($"{Walk(a.Function)} over({Walk(a.Args)})".Trim());
                             break;
                         case WhereClause a:
                             sql.Add($"{a.Keyword} {string.Join(" ", a.Args.Select(a => Walk(a)))}".Trim());

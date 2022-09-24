@@ -258,9 +258,17 @@ namespace SigQL
                     
                     if (!tableKeyDefinitions.ContainsKey(tableRelation.Argument.Name))
                     {
-                        tableKeyDefinitions[tableRelation.Argument.Name] =
-                            new TableKeyDefinition(tableRelation.ForeignKeyToParent.KeyPairs
-                                .Select(kp => kp.PrimaryTableColumn).ToArray());
+                        if (tableRelation.TargetTable.PrimaryKey != null &&
+                            tableRelation.TargetTable.PrimaryKey.Columns.Any())
+                        {
+                            tableKeyDefinitions[tableRelation.Argument.Name] = tableRelation.TargetTable.PrimaryKey;
+                        }
+                        else
+                        {
+                            tableKeyDefinitions[tableRelation.Argument.Name] =
+                                new TableKeyDefinition(new ColumnDefinition[0]);
+                        }
+
                     }
                 }
                 previousRelation = tableRelation;

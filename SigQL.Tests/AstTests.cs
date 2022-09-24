@@ -660,6 +660,34 @@ namespace SigQL.Tests
             var statement = Build(selectStatement);
             Assert.AreEqual("select \"name\" from \"person\" order by \"name\" offset 10 rows fetch next 5 rows only", statement);
         }
+        
+        [TestMethod]
+        public void BasicOver()
+        {
+            var selectStatement = new Select()
+            {
+                SelectClause = new SelectClause().SetArgs(new OverClause()
+                {
+                    Function = new Function()
+                    {
+                        Name = "ROW_NUMBER"
+                    }
+                }.SetArgs(
+                    new OrderByClause().SetArgs(
+                        new ColumnIdentifier().SetArgs(
+                            new RelationalTable()
+                            {
+                                Label = "table"
+                            },
+                            new RelationalColumn()
+                            {
+                                Label = "column"
+                            }))))
+            };
+
+            var statement = Build(selectStatement);
+            Assert.AreEqual("select ROW_NUMBER() over(order by \"table\".\"column\")", statement);
+        }
 
         [TestMethod]
         public void BasicGroupBy()

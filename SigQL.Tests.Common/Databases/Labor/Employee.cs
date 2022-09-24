@@ -126,6 +126,12 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             public IEnumerable<IOrderBy> Order { get; set; }
         }
+
+        public interface IEmployeeToWorkLogView
+        {
+            [JoinRelation("Employee.Id->WorkLogEmployeeView.EmployeeId")]
+            IEnumerable<WorkLogEmployeeView.IDataFieldsWithWorkLogs> View { get; }
+        }
     }
 
     [SqlIdentifier(nameof(Employee))]

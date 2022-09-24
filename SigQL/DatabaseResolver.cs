@@ -72,6 +72,10 @@ namespace SigQL
                 primaryColumns.AddRange(columns);
                 columns = primaryColumns.ToList();
             }
+            else
+            {
+
+            }
             
             columns = columns.GroupBy(c => c.Alias, c => c).Select(c => c.First()).ToList();
 
