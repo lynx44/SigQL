@@ -32,18 +32,18 @@ namespace SigQL
             
             var columns = tableRelations.ProjectedColumns.SelectMany(p =>
             {
-                var targetColumn = table.Columns.FindByName(p.Name);
-                var argument = p.Arguments.GetArguments(TableRelationsColumnSource.ReturnType).First();
-                if (targetColumn == null)
-                {
-                    throw new InvalidIdentifierException(
-                        $"Unable to identify matching database column for property {argument.FullyQualifiedName()}. Column {p.Name} does not exist in table {table.Name}.");
-                }
+                //var targetColumn = table.Columns.FindByName(p.Name);
+                var argument = p.Arguments.GetArguments(TableRelationsColumnSource.ReturnType).FirstOrDefault();
+                //if (targetColumn == null)
+                //{
+                //    throw new InvalidIdentifierException(
+                //        $"Unable to identify matching database column for property {argument.FullyQualifiedName()}. Column {p.Name} does not exist in table {table.Name}.");
+                //}
 
                 return new ColumnDefinitionWithPropertyPath()
                 {
-                    ColumnDefinition = new ColumnAliasColumnDefinition(targetColumn, tableRelations),
-                    PropertyPath = new PropertyPath() { PropertyPaths = argument.FindPropertiesFromRoot().Select(arg => arg.Name).ToList() }
+                    ColumnDefinition = new ColumnAliasColumnDefinition(p.Name, p.DataTypeDeclaration, p.Table, tableRelations),
+                    PropertyPath = new PropertyPath() { PropertyPaths = argument?.FindPropertiesFromRoot().Select(arg => arg.Name).ToList() ?? new List<string>() { p.Name } }
                 }.AsEnumerable();
             }).ToList();
 
@@ -54,20 +54,20 @@ namespace SigQL
             
             var currentPaths = tableRelations.Argument.FindPropertiesFromRoot().Select(p => p.Name).ToList();
             
-            if ((table.PrimaryKey?.Columns.Any()).GetValueOrDefault(false))
+            if ((tableRelations.PrimaryKey?.Any()).GetValueOrDefault(false))
             {
-                var primaryColumns = table.PrimaryKey.Columns
+                var primaryColumns = tableRelations.PrimaryKey
                     .Select(c =>
                     {
                         return new ColumnDefinitionWithPropertyPath()
                         {
-                            ColumnDefinition = new ColumnAliasColumnDefinition(c, tableRelations),
+                            ColumnDefinition = new ColumnAliasColumnDefinition(c.Name, c.DataTypeDeclaration, c.Table, tableRelations),
                             PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.AppendOne(c.Name).ToList()}
                         };
                     }).ToList();
 
                 
-                tableKeyDefinitions[string.Join(".", currentPaths)] = table.PrimaryKey;
+                tableKeyDefinitions[string.Join(".", currentPaths)] = new TableKeyDefinition(tableRelations.PrimaryKey.ToArray());
             
                 primaryColumns.AddRange(columns);
                 columns = primaryColumns.ToList();
@@ -261,7 +261,7 @@ namespace SigQL
             return specInfo;
         }
 
-        internal IEnumerable<TableRelationColumnDefinition> GetProjectedColumns(TableRelations tableRelations)
+        internal IEnumerable<TableRelationColumnIdentifierDefinition> GetProjectedColumns(TableRelations tableRelations)
         {
             var columns = tableRelations.ProjectedColumns.ToList();
             var navigationColumns = tableRelations.NavigationTables.SelectMany(t =>

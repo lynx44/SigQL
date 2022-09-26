@@ -17,21 +17,23 @@ namespace SigQL.Sql
         public IArgument Argument { get; set; }
         public ITableDefinition TargetTable { get; set; }
         public IEnumerable<TableRelations> NavigationTables { get; set; }
-        public IEnumerable<TableRelationColumnDefinition> ProjectedColumns { get; set; }
+        public IEnumerable<TableRelationColumnIdentifierDefinition> ProjectedColumns { get; set; }
         public IForeignKeyDefinition ForeignKeyToParent { get; set; }
         public string Alias => $"{TargetTable.Name}" + (RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{(Argument.Type != typeof(void) ? Argument.FullyQualifiedName() : Argument.Parent.FullyQualifiedName())}>" : null);
         public string TableName => TargetTable.Name;
         public TableRelations Parent { get; set; }
+        public IEnumerable<TableRelationColumnIdentifierDefinition> PrimaryKey { get; set; }
         
         public TableRelations Filter(TableRelationsColumnSource source, TableRelationsFilter filter)
         {
-            var matchingColumns = this.ProjectedColumns.Where(c => c.Source == source && c.Arguments.All.Any(arg => filter.IsMatch(arg, false))).ToList();
+            var matchingColumns = this.ProjectedColumns.Where(c => c.Source == source && (!c.Arguments.All.Any() || c.Arguments.All.Any(arg => filter.IsMatch(arg, false)))).ToList();
             var filteredTableRelations = new TableRelations()
             {
                 Argument = this.Argument,
                 ForeignKeyToParent = this.ForeignKeyToParent,
                 ProjectedColumns = matchingColumns,
-                TargetTable = this.TargetTable
+                TargetTable = this.TargetTable,
+                PrimaryKey = this.PrimaryKey
             };
             var matchingNavigationTables = this.NavigationTables.Select(t => t.Filter(source, filter)).ToList();
             matchingNavigationTables.ForEach(t => t.Parent = filteredTableRelations);
@@ -157,26 +159,46 @@ namespace SigQL.Sql
         }
     }
 
-    internal class TableRelationColumnDefinition : IColumnDefinition
+    internal class TableRelationColumnDefinition : TableRelationColumnIdentifierDefinition
     {
-        private readonly IColumnDefinition columnDefinition;
-        
+        public TableRelationColumnDefinition(string name, string dataTypeDeclaration, ITableDefinition table, IArgument argument, TableRelationsColumnSource source)
+            : base(name, table, argument, source)
+        {
+            this.DataTypeDeclaration = dataTypeDeclaration;
+        }
+    }
+
+    internal class TableRelationColumnIdentifierDefinition : IColumnDefinition
+    {
+        private readonly string name;
+        private readonly ITableDefinition table;
+
         public ArgumentCollection Arguments { get; set; }
 
-        public string Name => columnDefinition.Name;
-        public string DataTypeDeclaration => columnDefinition.DataTypeDeclaration;
+        public string Name => this.name;
+        public string DataTypeDeclaration { get; protected set; }
 
-        public ITableDefinition Table => columnDefinition.Table;
+        public ITableDefinition Table => this.table;
 
         public TableRelationsColumnSource Source { get; }
         public TableRelations TableRelations { get; set; }
 
-        public TableRelationColumnDefinition(IColumnDefinition columnDefinition, IArgument argument, TableRelationsColumnSource source)
+        public TableRelationColumnIdentifierDefinition(string name, ITableDefinition table, IArgument argument, TableRelationsColumnSource source)
         {
-            this.columnDefinition = columnDefinition;
+            this.name = name;
+            this.table = table;
             this.Arguments = new ArgumentCollection();
-            this.Arguments.AddArgument(argument, source);
+            if(argument != null)
+                this.Arguments.AddArgument(argument, source);
             this.Source = source;
+        }
+    }
+
+    class TableRelationColumnRowNumberFunctionDefinition : TableRelationColumnIdentifierDefinition
+    {
+        public TableRelationColumnRowNumberFunctionDefinition(string name, ITableDefinition table, TableRelationsColumnSource source) 
+            : base(name, table, null, source)
+        {
         }
     }
 
@@ -219,8 +241,7 @@ namespace SigQL.Sql
     internal enum TableRelationsColumnSource
     {
         ReturnType,
-        Parameters,
-        SpecifiedRelation
+        Parameters
     }
 
     public interface ITableHierarchyAlias

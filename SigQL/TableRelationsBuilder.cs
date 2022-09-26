@@ -56,16 +56,54 @@ namespace SigQL
                                 $"Unable to identify matching database table for {d.Column.Argument.GetCallsiteTypeName()} {d.Column.Argument.FullyQualifiedTypeName()} of type {d.Column.Argument.Type}. Table {GetExpectedTableNameForType(UnwrapCollectionTargetType(d.Column.Type))} does not exist.");
 
                     }
-                    return new TableRelationColumnDefinition(tableColumn,
-                                d.Column.Argument, source);
-                }).ToList();
+                    return new TableRelationColumnDefinition(tableColumn.Name,
+                        tableColumn.DataTypeDeclaration,
+                        tableColumn.Table,
+                        d.Column.Argument, 
+                        source);
 
+                }).ToList<TableRelationColumnIdentifierDefinition>();
+
+            IEnumerable<TableRelationColumnIdentifierDefinition> primaryKey = null;
+
+            if (source == TableRelationsColumnSource.ReturnType)
+            {
+                if (tableDefinition.PrimaryKey.Columns.Any())
+                {
+                    var existingProjectedKeyColumns = columns.Where(c =>
+                        tableDefinition.PrimaryKey.Columns.Any(cl => ColumnEqualityComparer.Default.Equals(c, cl))).ToList();
+                    var missingProjectedKeyColumns = tableDefinition.PrimaryKey.Columns.Where(c =>
+                        !columns.Any(cl => ColumnEqualityComparer.Default.Equals(c, cl))).ToList();
+
+                    var additionalProjectedKeyColumns = missingProjectedKeyColumns.Select(c =>
+                        new TableRelationColumnIdentifierDefinition(c.Name, tableDefinition, null, source)).ToList();
+                    columns.AddRange(additionalProjectedKeyColumns);
+
+                    primaryKey = existingProjectedKeyColumns.Concat(additionalProjectedKeyColumns).ToList();
+                }
+                else
+                {
+                    var columnName = "RowNumber";
+                    // on the chance that the RowNumber is already a projected column name in this table, 
+                    // keep appending _SigQL until the column name is unique
+                    while (columns.Any(c => c.Name.Equals(columnName, StringComparison.InvariantCultureIgnoreCase)))
+                    {
+                        columnName += "_SigQL";
+                    }
+
+                    var rowNumberColumn = new TableRelationColumnRowNumberFunctionDefinition(columnName, tableDefinition, source);
+                    columns.Insert(0, rowNumberColumn);
+                    primaryKey = new[] {rowNumberColumn};
+                }
+            }
+            
             var tableRelations = new TableRelations()
             {
                 Argument = argument,
                 TargetTable = tableDefinition,
                 NavigationTables = relations,
-                ProjectedColumns = columns
+                ProjectedColumns = columns,
+                PrimaryKey = primaryKey
             };
 
             IEnumerable<IForeignKeyDefinition> foreignKeys = null;
@@ -209,7 +247,7 @@ namespace SigQL
                     
                     tableRelations.ProjectedColumns = new List<TableRelationColumnDefinition>()
                     {
-                        new TableRelationColumnDefinition(column, argument, source)
+                        new TableRelationColumnDefinition(column.Name, column.DataTypeDeclaration, column.Table, argument, source)
                         {
                             TableRelations = tableRelations
                         }
@@ -283,6 +321,7 @@ namespace SigQL
             {
                 Argument = tableRelationsCollection.Where(t => t.Argument != null).Select(t => t.Argument).First(),
                 TargetTable = tableRelationsCollection.First().TargetTable,
+                PrimaryKey = tableRelationsCollection.Where(t => t.PrimaryKey != null && t.PrimaryKey.Any()).Select(t => t.PrimaryKey).FirstOrDefault() ?? new TableRelationColumnIdentifierDefinition[0],
                 NavigationTables = tableRelationsCollection.SelectMany(t => t.NavigationTables).GroupBy(nt => nt.TargetTable, nt => nt, TableEqualityComparer.Default).Select(nt => MergeTableRelations(nt.ToArray())).ToList(),
                 ProjectedColumns = tableRelationsCollection.SelectMany(t => t.ProjectedColumns).ToList(),
                 ForeignKeyToParent = tableRelationsCollection.Where(t => t.ForeignKeyToParent != null).Select(t => t.ForeignKeyToParent).Distinct(ForeignKeyDefinitionEqualityComparer.Default).FirstOrDefault(),
@@ -316,7 +355,8 @@ namespace SigQL
 
         public static TableRelationsFilter SelectClause =
             new TableRelationsFilter((column, isTable) =>
-                !ColumnAttributes.IsDecoratedNonColumn(column));
+                !ColumnAttributes.IsDecoratedNonColumn(column) ||
+                column is TableRelationColumnRowNumberFunctionDefinition);
 
         public static TableRelationsFilter FromClause =
             new TableRelationsFilter(

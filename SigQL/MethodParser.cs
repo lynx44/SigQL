@@ -235,7 +235,7 @@ namespace SigQL
                 UnwrappedReturnType = projectionType,
                 Parameters = parameterPaths,
                 Tokens = tokens,
-                TargetTablePrimaryKey = !isCountResult ? allTableRelations.TargetTable.PrimaryKey : new TableKeyDefinition(),
+                TargetTablePrimaryKey = !isCountResult ? new TableKeyDefinition(allTableRelations.PrimaryKey.ToArray()) : new TableKeyDefinition(),
                 TablePrimaryKeyDefinitions = !isCountResult ? tablePrimaryKeyDefinitions : new ConcurrentDictionary<string, ITableKeyDefinition>()
             };
             return sqlStatement;
@@ -376,7 +376,7 @@ namespace SigQL
             }).ToList();
         }
 
-        private IEnumerable<OrderBySpec> ConvertToOrderBySpec(TableRelationColumnDefinition columnRelation, IEnumerable<IArgument> arguments,
+        private IEnumerable<OrderBySpec> ConvertToOrderBySpec(TableRelationColumnIdentifierDefinition columnRelation, IEnumerable<IArgument> arguments,
             TableRelations fromTableRelations)
         {
             Func<string, string> resolveTableAlias = (tableName) => fromTableRelations.Find(tableName).Alias;
@@ -994,10 +994,7 @@ namespace SigQL
             var tableIdentifier = new TableIdentifier().SetArgs(
                 (tableRelations.Alias == targetTable.Name ? (AstNode) new Placeholder() : new Alias() { Label = tableRelations.Alias }).SetArgs(
                 (targetTable.ObjectType == DatabaseObjectType.Table || targetTable.ObjectType == DatabaseObjectType.View)
-                ? (AstNode) new RelationalTable()
-                {
-                    Label = targetTable.Name
-                }
+                ? (AstNode) BuildFromClauseTable(tableRelations)
                 : new Function()
                 {
                     Name = targetTable.Name
@@ -1006,6 +1003,81 @@ namespace SigQL
             var leftOuterJoins = BuildJoins(tableRelations);
 
             return fromClauseNode.SetArgs(tableIdentifier.AsEnumerable<AstNode>().Concat(leftOuterJoins));
+        }
+
+        private static AstNode BuildFromClauseTable(TableRelations tableRelations)
+        {
+            if (HasRowNumberColumn(tableRelations))
+            {
+                return BuildRowNumberProjectionTableReference(tableRelations);
+            }
+
+            return new RelationalTable()
+            {
+                Label = tableRelations.TargetTable.Name
+            };
+        }
+
+        private static AstNode BuildRowNumberProjectionTableReference(TableRelations tableRelations)
+        {
+            var selectStatement = new Select();
+            var selectClause = new SelectClause()
+                .SetArgs(
+                    tableRelations.ProjectedColumns.Where(c => c is TableRelationColumnRowNumberFunctionDefinition).Select(column =>
+                        BuildFromClauseSelectColumn(column, tableRelations.ProjectedColumns)
+                    ).Concat(tableRelations.TargetTable.Columns.Select(c => BuildFromClauseSelectColumn(c, tableRelations.TargetTable.Columns)).ToList()).ToList()
+                );
+
+            var fromClause = new FromClause().SetArgs(new FromClauseNode().SetArgs(new TableIdentifier().SetArgs(new RelationalTable()
+                {Label = tableRelations.TableName})));
+
+            selectStatement.SelectClause = selectClause;
+            selectStatement.FromClause = fromClause;
+
+            return new Alias()
+            {
+                Label = tableRelations.TableName
+            }.SetArgs(new LogicalGrouping().SetArgs(selectStatement));
+        }
+
+        private static AstNode BuildFromClauseSelectColumn(IColumnDefinition column, IEnumerable<IColumnDefinition> allColumns)
+        {
+            // this is a ROW_NUMBER column
+            if (column is TableRelationColumnRowNumberFunctionDefinition)
+            {
+                var firstTableColumn = allColumns.First(c => !(c is TableRelationColumnRowNumberFunctionDefinition));
+                return new Alias()
+                {
+                    Label = column.Name
+                }.SetArgs(
+                        new OverClause()
+                        {
+                            Function = new Function()
+                            {
+                                Name = "ROW_NUMBER"
+                            }
+                        }.SetArgs(
+                            new OrderByClause().SetArgs(
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalColumn()
+                                    {
+                                        Label = firstTableColumn.Name
+                                    })))
+                );
+            }
+
+            // this is a normal column
+            return new ColumnIdentifier()
+                .SetArgs(
+                    new RelationalColumn()
+                {
+                    Label = column.Name
+                });
+        }
+
+        private static bool HasRowNumberColumn(TableRelations tableRelations)
+        {
+            return tableRelations.ProjectedColumns.Any(p => p is TableRelationColumnRowNumberFunctionDefinition);
         }
 
         private IEnumerable<LeftOuterJoin> BuildJoins(TableRelations tableRelations)
@@ -1177,8 +1249,8 @@ namespace SigQL
         public ColumnAliasForeignKeyPair(IForeignKeyPair foreignKeyPair)
         {
             this.foreignKeyPair = foreignKeyPair;
-            this.ForeignTableColumnWithAlias = new ColumnAliasColumnDefinition(this.ForeignTableColumn, null);
-            this.PrimaryTableColumnWithAlias = new ColumnAliasColumnDefinition(this.PrimaryTableColumn, null);
+            this.ForeignTableColumnWithAlias = new ColumnAliasColumnDefinition(this.ForeignTableColumn.Name, this.ForeignTableColumn.DataTypeDeclaration, this.ForeignTableColumn.Table, null);
+            this.PrimaryTableColumnWithAlias = new ColumnAliasColumnDefinition(this.PrimaryTableColumn.Name, this.PrimaryTableColumn.DataTypeDeclaration, this.PrimaryTableColumn.Table, null);
         }
 
         public ColumnAliasColumnDefinition ForeignTableColumnWithAlias { get; }
@@ -1188,17 +1260,19 @@ namespace SigQL
     public class ColumnAliasColumnDefinition : IColumnDefinition
     {
         private readonly IColumnDefinition columnDefinition;
-        public string Name => columnDefinition.Name;
-        public string DataTypeDeclaration => columnDefinition.DataTypeDeclaration;
+        public string Name { get; }
+        public string DataTypeDeclaration { get; }
 
-        public ITableDefinition Table => columnDefinition.Table;
+        public ITableDefinition Table { get; }
 
-        public ITableHierarchyAlias TableAlias { get; }
+        public string TableAlias { get; }
 
-        public ColumnAliasColumnDefinition(IColumnDefinition columnDefinition, ITableHierarchyAlias tableAlias)
+        public ColumnAliasColumnDefinition(string name, string dataTypeDeclaration, ITableDefinition table, ITableHierarchyAlias tableAlias)
         {
-            TableAlias = tableAlias;
-            this.columnDefinition = columnDefinition;
+            Name = name;
+            DataTypeDeclaration = dataTypeDeclaration;
+            Table = table;
+            TableAlias = tableAlias?.Alias;
         }
     }
 
