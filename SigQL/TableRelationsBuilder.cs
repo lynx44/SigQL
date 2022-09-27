@@ -92,7 +92,8 @@ namespace SigQL
                     }
 
                     var rowNumberColumn = new TableRelationColumnRowNumberFunctionDefinition(columnName, tableDefinition, source);
-                    columns.Insert(0, rowNumberColumn);
+                    rowNumberColumn.Arguments.AddArgument(argument, source);
+                    //columns.Insert(0, rowNumberColumn);
                     primaryKey = new[] {rowNumberColumn};
                 }
             }

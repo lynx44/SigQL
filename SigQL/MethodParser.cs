@@ -1007,15 +1007,23 @@ namespace SigQL
 
         private static AstNode BuildFromClauseTable(TableRelations tableRelations)
         {
-            if (HasRowNumberColumn(tableRelations))
+            if (HasRowNumberPrimaryKey(tableRelations))
             {
                 return BuildRowNumberProjectionTableReference(tableRelations);
             }
-
-            return new RelationalTable()
+            
+            var tableNode = new RelationalTable()
             {
                 Label = tableRelations.TargetTable.Name
             };
+
+            if (tableRelations.Alias != tableRelations.TableName)
+            {
+                return new Alias() { Label = tableRelations.Alias }.SetArgs(
+                    tableNode);
+            }
+
+            return tableNode;
         }
 
         private static AstNode BuildRowNumberProjectionTableReference(TableRelations tableRelations)
@@ -1023,7 +1031,7 @@ namespace SigQL
             var selectStatement = new Select();
             var selectClause = new SelectClause()
                 .SetArgs(
-                    tableRelations.ProjectedColumns.Where(c => c is TableRelationColumnRowNumberFunctionDefinition).Select(column =>
+                    tableRelations.PrimaryKey.Where(c => c is TableRelationColumnRowNumberFunctionDefinition).Select(column =>
                         BuildFromClauseSelectColumn(column, tableRelations.ProjectedColumns)
                     ).Concat(tableRelations.TargetTable.Columns.Select(c => BuildFromClauseSelectColumn(c, tableRelations.TargetTable.Columns)).ToList()).ToList()
                 );
@@ -1036,7 +1044,7 @@ namespace SigQL
 
             return new Alias()
             {
-                Label = tableRelations.TableName
+                Label = tableRelations.Alias
             }.SetArgs(new LogicalGrouping().SetArgs(selectStatement));
         }
 
@@ -1075,9 +1083,9 @@ namespace SigQL
                 });
         }
 
-        private static bool HasRowNumberColumn(TableRelations tableRelations)
+        private static bool HasRowNumberPrimaryKey(TableRelations tableRelations)
         {
-            return tableRelations.ProjectedColumns.Any(p => p is TableRelationColumnRowNumberFunctionDefinition);
+            return tableRelations.PrimaryKey.Any(p => p is TableRelationColumnRowNumberFunctionDefinition);
         }
 
         private IEnumerable<LeftOuterJoin> BuildJoins(TableRelations tableRelations)
@@ -1085,31 +1093,30 @@ namespace SigQL
             var references = tableRelations.NavigationTables;
             var leftOuterJoins = references.SelectMany(navigationTableRelations =>
             {
-                var foreignKey = navigationTableRelations.ForeignKeyToParent;
-                return BuildLeftOuterJoin(foreignKey, navigationTableRelations.TargetTable, navigationTableRelations, tableRelations, navigationTableRelations).AsEnumerable();
+                return BuildLeftOuterJoin(tableRelations, navigationTableRelations).AsEnumerable();
                 
             });
             return leftOuterJoins;
         }
 
-        private LeftOuterJoin BuildLeftOuterJoin(IForeignKeyDefinition foreignKey,
-            ITableDefinition navigationTable, ITableHierarchyAlias primaryTableAlias, ITableHierarchyAlias foreignTableAlias, TableRelations navigationTableRelations = null)
+        private LeftOuterJoin BuildLeftOuterJoin(
+             TableRelations tableRelations, TableRelations navigationTableRelations)
         {
             var tableHierarchyAliases = new List<ITableHierarchyAlias>();
-            tableHierarchyAliases.Add(primaryTableAlias);
-            tableHierarchyAliases.Add(foreignTableAlias);
+            tableHierarchyAliases.Add(tableRelations);
+            tableHierarchyAliases.Add(navigationTableRelations);
 
             var leftOuterJoin = new LeftOuterJoin().SetArgs(
                 new AndOperator().SetArgs(
-                foreignKey.KeyPairs.Select(kp =>
+                navigationTableRelations.ForeignKeyToParent.KeyPairs.Select(kp =>
                             new EqualsOperator().SetArgs(
                                 new ColumnIdentifier().SetArgs(new RelationalTable() {Label = tableHierarchyAliases.Single(s => s.TableName == kp.ForeignTableColumn.Table.Name).Alias },
                                     new RelationalColumn() {Label = kp.ForeignTableColumn.Name}),
                                 new ColumnIdentifier().SetArgs(new RelationalTable() {Label = tableHierarchyAliases.Single(s => s.TableName == kp.PrimaryTableColumn.Table.Name).Alias },
                                     new RelationalColumn() {Label = kp.PrimaryTableColumn.Name})))).AsEnumerable().Cast<AstNode>()
                     .Concat(navigationTableRelations != null ? BuildJoins(navigationTableRelations) : new LeftOuterJoin[0]));
-            var rightTableAlias = tableHierarchyAliases.Single(s => s.TableName == navigationTable.Name).Alias;
-            leftOuterJoin.RightNode = (navigationTable.Name == rightTableAlias ? (AstNode) new Placeholder() : new Alias() { Label = rightTableAlias }).SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = navigationTable.Name }));
+            //var rightTableAlias = tableHierarchyAliases.Single(s => s.TableName == navigationTableRelations.TableName).Alias;
+            leftOuterJoin.RightNode = BuildFromClauseTable(navigationTableRelations); //(navigationTableRelations.TableName == rightTableAlias ? (AstNode) new Placeholder() : new Alias() { Label = rightTableAlias }).SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = navigationTableRelations.TableName }));
             return leftOuterJoin;
         }
 

@@ -275,11 +275,19 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
-        public void GetJoinRelationAttributeViewNavigationCollection_ReturnsExpectedSql()
+        public void GetJoinRelationAttributeOnViewWithTableNavigationCollection_ReturnsExpectedSql()
         {
-            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithJoinRelationAttributeViewNavigationCollection());
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithJoinRelationAttributeOnViewWithTableNavigationCollection());
 
             Assert.AreEqual("select \"WorkLogEmployeeView\".\"RowNumber\" \"RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"EmployeeName\", \"Employee\".\"Id\" \"Employees.Id\", \"Address\".\"Id\" \"Employees.Addresses.Id\", \"Address\".\"StreetAddress\" \"Employees.Addresses.StreetAddress\" from (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" left outer join \"Employee\" on ((\"WorkLogEmployeeView\".\"EmployeeId\" = \"Employee\".\"Id\")) left outer join \"EmployeeAddress\" on ((\"EmployeeAddress\".\"EmployeeId\" = \"Employee\".\"Id\")) left outer join \"Address\" on ((\"EmployeeAddress\".\"AddressId\" = \"Address\".\"Id\"))", sql);
+        }
+
+        [TestMethod]
+        public void GetJoinRelationAttributeOnTableWithViewNavigationCollection_ReturnsExpectedSql()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithJoinRelationAttributeOnTableWithViewNavigationCollection());
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"View.RowNumber\", \"WorkLogEmployeeView\".\"RowNumber\" \"RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"View.EmployeeName\" from \"Employee\" left outer join (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on ((\"Employee\".\"Id\" = \"WorkLogEmployeeView\".\"EmployeeId\"))", sql);
         }
 
         [TestMethod]

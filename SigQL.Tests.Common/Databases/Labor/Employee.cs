@@ -130,7 +130,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         public interface IEmployeeToWorkLogView
         {
             [JoinRelation("Employee.Id->WorkLogEmployeeView.EmployeeId")]
-            IEnumerable<WorkLogEmployeeView.IDataFieldsWithWorkLogs> View { get; }
+            IEnumerable<WorkLogEmployeeView.IDataFields> View { get; }
         }
     }
 
