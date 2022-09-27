@@ -992,13 +992,13 @@ namespace SigQL
             var fromClauseNode = new FromClauseNode();
             var targetTable = tableRelations.TargetTable;
             var tableIdentifier = new TableIdentifier().SetArgs(
-                (tableRelations.Alias == targetTable.Name ? (AstNode) new Placeholder() : new Alias() { Label = tableRelations.Alias }).SetArgs(
+                
                 (targetTable.ObjectType == DatabaseObjectType.Table || targetTable.ObjectType == DatabaseObjectType.View)
                 ? (AstNode) BuildFromClauseTable(tableRelations)
                 : new Function()
                 {
                     Name = targetTable.Name
-                }.SetArgs(functionParameters.Select(p => new NamedParameterIdentifier() { Name = p.Name }))));
+                }.SetArgs(functionParameters.Select(p => new NamedParameterIdentifier() { Name = p.Name })));
 
             var leftOuterJoins = BuildJoins(tableRelations);
 
