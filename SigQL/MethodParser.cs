@@ -94,13 +94,10 @@ namespace SigQL
             var tokens = new List<TokenPath>();
             
             var allJoinRelations = this.databaseResolver.MergeTableRelations(selectTableRelations, orderbyTableRelations);
+            
+            allJoinRelations.Traverse(tr => parameterPaths.AddRange(tr.FunctionParameters));
 
-            var functionParameters = arguments.Where(p => IsFunctionParameter(p)).ToList();
-            parameterPaths.AddRange(functionParameters.Select(p => new ParameterPath(p)
-            {
-                SqlParameterName = p.Name
-            }));
-            var fromClauseNode = BuildFromClause(allJoinRelations, functionParameters);
+            var fromClauseNode = BuildFromClause(allJoinRelations);
             var fromClause = new FromClause().SetArgs(fromClauseNode);
 
             var statement = new Select()
@@ -243,8 +240,8 @@ namespace SigQL
 
         private IEnumerable<IArgument> FindDynamicOrderByParameterPaths(IEnumerable<IArgument> arguments)
         {
-            var orderByArguments = this.databaseResolver.FindMatchingArguments(arguments, a => a.Type.IsAssignableFrom(typeof(OrderBy)) ||
-                                                                                                                                   a.Type.IsAssignableFrom(typeof(IEnumerable<OrderBy>)));
+            var orderByArguments = arguments.Filter(a => a.Type.IsAssignableFrom(typeof(OrderBy)) ||
+                                                           a.Type.IsAssignableFrom(typeof(IEnumerable<OrderBy>)));
             var matchingArgs = orderByArguments.Select(a =>
             {
                 return a;
@@ -987,18 +984,12 @@ namespace SigQL
             return new TableAliasResult(aliasRelation.TableName, aliasRelation.Alias, columnName);
         }
 
-        private FromClauseNode BuildFromClause(TableRelations tableRelations, IEnumerable<IArgument> functionParameters)
+        private FromClauseNode BuildFromClause(TableRelations tableRelations)
         {
             var fromClauseNode = new FromClauseNode();
             var targetTable = tableRelations.TargetTable;
             var tableIdentifier = new TableIdentifier().SetArgs(
-                
-                (targetTable.ObjectType == DatabaseObjectType.Table || targetTable.ObjectType == DatabaseObjectType.View)
-                ? (AstNode) BuildFromClauseTable(tableRelations)
-                : new Function()
-                {
-                    Name = targetTable.Name
-                }.SetArgs(functionParameters.Select(p => new NamedParameterIdentifier() { Name = p.Name })));
+                BuildFromClauseTable(tableRelations));
 
             var leftOuterJoins = BuildJoins(tableRelations);
 
@@ -1036,9 +1027,18 @@ namespace SigQL
                     ).Concat(tableRelations.TargetTable.Columns.Select(c => BuildFromClauseSelectColumn(c, tableRelations.TargetTable.Columns)).ToList()).ToList()
                 );
 
-            var fromClause = new FromClause().SetArgs(new FromClauseNode().SetArgs(new TableIdentifier().SetArgs(new RelationalTable()
-                {Label = tableRelations.TableName})));
-
+            AstNode tableIdentifier = new TableIdentifier().SetArgs(new RelationalTable()
+                {Label = tableRelations.TableName});
+            if (tableRelations.TargetTable.ObjectType == DatabaseObjectType.Function)
+            {
+                tableIdentifier = new Function()
+                {
+                    Name = tableRelations.TableName
+                }.SetArgs(tableRelations.FunctionParameters.Select(p => new NamedParameterIdentifier()
+                    {Name = p.SqlParameterName}));
+            }
+            var fromClause = new FromClause().SetArgs(new FromClauseNode().SetArgs(tableIdentifier));
+            
             selectStatement.SelectClause = selectClause;
             selectStatement.FromClause = fromClause;
 

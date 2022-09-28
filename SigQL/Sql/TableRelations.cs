@@ -13,11 +13,13 @@ namespace SigQL.Sql
         {
             this.NavigationTables = new List<TableRelations>();
             this.ProjectedColumns = new List<TableRelationColumnDefinition>();
+            this.FunctionParameters = new List<ParameterPath>();
         }
         public IArgument Argument { get; set; }
         public ITableDefinition TargetTable { get; set; }
         public IEnumerable<TableRelations> NavigationTables { get; set; }
         public IEnumerable<TableRelationColumnIdentifierDefinition> ProjectedColumns { get; set; }
+        public IEnumerable<ParameterPath> FunctionParameters { get; set; }
         public IForeignKeyDefinition ForeignKeyToParent { get; set; }
         public string Alias => $"{TargetTable.Name}" + (RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{(Argument.Type != typeof(void) ? Argument.FullyQualifiedName() : Argument.Parent.FullyQualifiedName())}>" : null);
         public string TableName => TargetTable.Name;
@@ -33,7 +35,8 @@ namespace SigQL.Sql
                 ForeignKeyToParent = this.ForeignKeyToParent,
                 ProjectedColumns = matchingColumns,
                 TargetTable = this.TargetTable,
-                PrimaryKey = this.PrimaryKey
+                PrimaryKey = this.PrimaryKey,
+                FunctionParameters = this.FunctionParameters
             };
             var matchingNavigationTables = this.NavigationTables.Select(t => t.Filter(source, filter)).ToList();
             matchingNavigationTables.ForEach(t => t.Parent = filteredTableRelations);
@@ -156,6 +159,15 @@ namespace SigQL.Sql
             }
 
             return FindViaRelations(remainingTableNames, matchingTableRelation);
+        }
+
+        public void Traverse(Action<TableRelations> action)
+        {
+            action(this);
+            foreach (var navigationTable in this.NavigationTables)
+            {
+                navigationTable.Traverse(action);
+            }
         }
     }
 

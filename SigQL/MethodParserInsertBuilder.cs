@@ -240,7 +240,7 @@ namespace SigQL
                     var fromClauseRelations = resolvedSelectClause.FromClauseRelations;
                     var selectClause = resolvedSelectClause.Ast;
 
-                    var fromClauseNode = BuildFromClause(fromClauseRelations, new List<IArgument>());
+                    var fromClauseNode = BuildFromClause(fromClauseRelations);
                     
                     var primaryTable = fromClauseRelations.TargetTable;
                     var outputParameterTableSelectAlias = "i";

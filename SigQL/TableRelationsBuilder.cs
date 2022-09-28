@@ -63,7 +63,13 @@ namespace SigQL
                         source);
 
                 }).ToList<TableRelationColumnIdentifierDefinition>();
-
+            var functionParameterColumns = argument.ClassProperties.Where(a => ColumnAttributes.IsFunctionParameter(a));
+            var functionParameterPaths = functionParameterColumns.Select(a =>
+            {
+                var parameterPath = a.ToParameterPath();
+                parameterPath.SqlParameterName = parameterPath.GenerateSuggestedSqlIdentifierName();
+                return parameterPath;
+            }).ToList();
             IEnumerable<TableRelationColumnIdentifierDefinition> primaryKey = null;
 
             if (source == TableRelationsColumnSource.ReturnType)
@@ -104,7 +110,8 @@ namespace SigQL
                 TargetTable = tableDefinition,
                 NavigationTables = relations,
                 ProjectedColumns = columns,
-                PrimaryKey = primaryKey
+                PrimaryKey = primaryKey,
+                FunctionParameters = functionParameterPaths
             };
 
             IEnumerable<IForeignKeyDefinition> foreignKeys = null;
@@ -327,6 +334,7 @@ namespace SigQL
                 ProjectedColumns = tableRelationsCollection.SelectMany(t => t.ProjectedColumns).ToList(),
                 ForeignKeyToParent = tableRelationsCollection.Where(t => t.ForeignKeyToParent != null).Select(t => t.ForeignKeyToParent).Distinct(ForeignKeyDefinitionEqualityComparer.Default).FirstOrDefault(),
                 Parent = tableRelationsCollection.Select(p => p.Parent).FirstOrDefault(parent => parent != null),
+                FunctionParameters = tableRelationsCollection.SelectMany(t => t.FunctionParameters).GroupBy(k => k.SqlParameterName).Select(k => k.First()).ToList(),
             };
         }
 
@@ -362,7 +370,7 @@ namespace SigQL
         public static TableRelationsFilter FromClause =
             new TableRelationsFilter(
             (column, isTable) =>
-            !ColumnAttributes.IsDecoratedNonColumn(column));
+            ColumnAttributes.IsFunctionParameter(column));
 
         public static TableRelationsFilter OrderBy =
             new TableRelationsFilter(
@@ -384,13 +392,18 @@ namespace SigQL
                 argument.GetCustomAttribute<OffsetAttribute>() != null ||
                 argument.GetCustomAttribute<FetchAttribute>() != null ||
                 argument.GetCustomAttribute<ClrOnlyAttribute>() != null ||
-                argument.GetCustomAttribute<ParameterAttribute>() != null ||
+                IsFunctionParameter(argument) ||
                 IsDynamicOrderBy(argument);
         }
 
         public static bool IsViaRelation(IArgument property)
         {
             return property?.GetCustomAttribute<ViaRelationAttribute>() != null;
+        }
+
+        public static bool IsFunctionParameter(IArgument property)
+        {
+            return property?.GetCustomAttribute<ParameterAttribute>() != null;
         }
 
         public static bool IsOrderBy(IArgument property)

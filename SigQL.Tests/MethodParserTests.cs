@@ -271,7 +271,7 @@ namespace SigQL.Tests
         {
             var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithJoinRelationAttribute());
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"WorkLogEmployeeView\".\"WorkLogId\" \"View.WorkLogId\", \"WorkLogEmployeeView\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeId\" \"View.EmployeeId\", \"WorkLogEmployeeView\".\"EmployeeName\" \"View.EmployeeName\" from \"WorkLog\" left outer join \"WorkLogEmployeeView\" on ((\"WorkLog\".\"EmployeeId\" = \"WorkLogEmployeeView\".\"EmployeeId\"))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"View.RowNumber\", \"WorkLogEmployeeView\".\"WorkLogId\" \"View.WorkLogId\", \"WorkLogEmployeeView\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeId\" \"View.EmployeeId\", \"WorkLogEmployeeView\".\"EmployeeName\" \"View.EmployeeName\" from \"WorkLog\" left outer join (select ROW_NUMBER() over(order by \"WorkLogId\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on ((\"WorkLog\".\"EmployeeId\" = \"WorkLogEmployeeView\".\"EmployeeId\"))", sql);
         }
 
         [TestMethod]
@@ -287,7 +287,7 @@ namespace SigQL.Tests
         {
             var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithJoinRelationAttributeOnTableWithViewNavigationCollection());
 
-            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"View.RowNumber\", \"WorkLogEmployeeView\".\"RowNumber\" \"RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"View.EmployeeName\" from \"Employee\" left outer join (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on ((\"Employee\".\"Id\" = \"WorkLogEmployeeView\".\"EmployeeId\"))", sql);
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"View.RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"View.EmployeeName\" from \"Employee\" left outer join (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on ((\"Employee\".\"Id\" = \"WorkLogEmployeeView\".\"EmployeeId\"))", sql);
         }
 
         [TestMethod]
@@ -1063,7 +1063,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.itvf_GetWorkLogsByEmployeeId(2));
 
-            Assert.AreEqual("select \"itvf_GetWorkLogsByEmployeeId\".\"Id\" \"Id\" from itvf_GetWorkLogsByEmployeeId(@empId)", sql);
+            Assert.AreEqual("select \"itvf_GetWorkLogsByEmployeeId\".\"RowNumber\" \"RowNumber\", \"itvf_GetWorkLogsByEmployeeId\".\"Id\" \"Id\" from (select ROW_NUMBER() over(order by \"Id\") \"RowNumber\", \"Id\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"LocationId\" from itvf_GetWorkLogsByEmployeeId(@empId)) \"itvf_GetWorkLogsByEmployeeId\"", sql);
         }
 
         //[TestMethod]
@@ -1079,7 +1079,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.itvf_GetWorkLogsByEmployeeId(2, DateTime.Today));
 
-            Assert.AreEqual("select \"itvf_GetWorkLogsByEmployeeId\".\"Id\" \"Id\" from itvf_GetWorkLogsByEmployeeId(@empId) where ((\"itvf_GetWorkLogsByEmployeeId\".\"StartDate\" > @startDate))", sql);
+            Assert.AreEqual("select \"itvf_GetWorkLogsByEmployeeId\".\"RowNumber\" \"RowNumber\", \"itvf_GetWorkLogsByEmployeeId\".\"Id\" \"Id\" from (select ROW_NUMBER() over(order by \"Id\") \"RowNumber\", \"Id\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"LocationId\" from itvf_GetWorkLogsByEmployeeId(@empId)) \"itvf_GetWorkLogsByEmployeeId\" where ((\"itvf_GetWorkLogsByEmployeeId\".\"StartDate\" > @startDate))", sql);
         }
 
         [TestMethod]

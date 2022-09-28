@@ -202,17 +202,6 @@ namespace SigQL
             tableRelations.NavigationTables = navigationTables;
         }
         
-        public IEnumerable<IArgument> FindMatchingArguments(IEnumerable<IArgument> arguments,
-            Func<IArgument, bool> matchCondition)
-        {
-            var matches = new List<IArgument>();
-            var matchingArguments = arguments.Where(a => matchCondition(a)).ToList();
-            matches.AddRange(matchingArguments);
-            matches.AddRange(arguments.SelectMany(a => FindMatchingArguments(a.ClassProperties, matchCondition)).ToList());
-
-            return matches;
-        }
-        
         public class PropertyPath
         {
             public PropertyPath()

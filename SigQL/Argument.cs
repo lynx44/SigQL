@@ -200,6 +200,16 @@ namespace SigQL
             //var parameterList = arguments.ToList();
             //return parameterList.IndexOf(path.Parameter);
         }
+
+        internal static IEnumerable<IArgument> Filter(this IEnumerable<IArgument> arguments, Func<IArgument, bool> matchCondition)
+        {
+            var matches = new List<IArgument>();
+            var matchingArguments = arguments.Where(a => matchCondition(a)).ToList();
+            matches.AddRange(matchingArguments);
+            matches.AddRange(arguments.SelectMany(a => Filter(a.ClassProperties, matchCondition)).ToList());
+
+            return matches;
+        }
     }
 
     internal class ArgumentContainer
