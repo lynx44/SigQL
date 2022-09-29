@@ -68,6 +68,11 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string City { get; set; }
             public string State { get; set; }
         }
+
+        public interface IEmployeeToWorkLogView
+        {
+            Employee.IEmployeeToWorkLogView Employee { get; }
+        }
     }
 
     public enum AddressClassification

@@ -290,6 +290,15 @@ namespace SigQL.Tests
             Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"View.RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"View.EmployeeName\" from \"Employee\" left outer join (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on ((\"Employee\".\"Id\" = \"WorkLogEmployeeView\".\"EmployeeId\"))", sql);
         }
 
+
+        [TestMethod]
+        public void GetJoinRelationAttributeNestedNavigationCollection_ReturnsExpectedSql()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithNestedJoinRelationAttribute());
+
+            Assert.AreEqual("select \"Address\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"Employee.View.RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"Employee.View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"Employee.View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"Employee.View.EmployeeName\" from \"Address\" left outer join \"EmployeeAddress\" on ((\"EmployeeAddress\".\"AddressId\" = \"Address\".\"Id\")) left outer join \"Employee\" on ((\"EmployeeAddress\".\"EmployeeId\" = \"Employee\".\"Id\")) left outer join (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on ((\"Employee\".\"Id\" = \"WorkLogEmployeeView\".\"EmployeeId\"))", sql);
+        }
+
         [TestMethod]
         public void GetWithSingleNavigationPropertyInnerProjectionInterface_ViaInnerProjection_ReturnsExpectedSql()
         {

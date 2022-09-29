@@ -713,6 +713,60 @@ namespace SigQL.SqlServer.Tests
         }
         
         [TestMethod]
+        public void GetJoinRelationAttributeNestedNavigationCollection_ReturnsExpectedCollection()
+        {
+            var employee1 = new EFEmployee() { Name = "Name1", Addresses = new List<EFAddress>()
+            {
+                new EFAddress() { City = "1" },
+                new EFAddress() { City = "2" },
+                new EFAddress() { City = "3" }
+                }
+            };
+            var employee2 = new EFEmployee() { Name = "Name2", Addresses = new List<EFAddress>()
+            {
+                new EFAddress() { City = "4" },
+                new EFAddress() { City = "5" },
+                new EFAddress() { City = "6" }
+                }
+            };
+            
+            var workLog1 = new EFWorkLog()
+            {
+                Employee = employee1, 
+                StartDate = new DateTime(2022, 1, 1), 
+                EndDate = new DateTime(2022, 2, 2)
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                Employee = employee1, 
+                StartDate = new DateTime(2022, 3, 3), 
+                EndDate = new DateTime(2022, 4, 4)
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                Employee = employee1, 
+                StartDate = new DateTime(2022, 3, 3), 
+                EndDate = new DateTime(2022, 4, 4)
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                Employee = employee2, 
+                StartDate = new DateTime(2022, 3, 3), 
+                EndDate = new DateTime(2022, 4, 4)
+            };
+            this.laborDbContext.WorkLog.Add(workLog1);
+            this.laborDbContext.WorkLog.Add(workLog2);
+            this.laborDbContext.WorkLog.Add(workLog3);
+            this.laborDbContext.WorkLog.Add(workLog4);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetWithNestedJoinRelationAttribute();
+            
+            Assert.AreEqual(6, actual.Count());
+            Assert.AreEqual(3, actual.First().Employee.View.Count());
+            Assert.AreEqual(1, actual.Last().Employee.View.Count());
+        }
+        
+        [TestMethod]
         public void GetWithJoinRelationAttributeOnTableWithViewNavigationProperty_ReturnsExpectedCollection()
         {
             var employee1 = new EFEmployee() { Name = "Name1", Addresses = new List<EFAddress>()
