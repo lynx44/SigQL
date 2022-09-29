@@ -11,9 +11,9 @@ namespace SigQL
     {
         private DatabaseResolver databaseResolver;
 
-        public SelectClauseBuilder(IDatabaseConfiguration databaseConfiguration)
+        public SelectClauseBuilder(IDatabaseConfiguration databaseConfiguration, IPluralizationHelper pluralizationHelper)
         {
-            databaseResolver = new DatabaseResolver(databaseConfiguration);
+            databaseResolver = new DatabaseResolver(databaseConfiguration, pluralizationHelper);
         }
 
         internal SelectClauseBuilder(DatabaseResolver databaseResolver)

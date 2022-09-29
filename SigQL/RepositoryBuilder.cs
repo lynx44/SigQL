@@ -10,28 +10,37 @@ namespace SigQL
         private readonly IQueryExecutor queryExecutor;
         private readonly IDatabaseConfiguration databaseConfiguration;
         private readonly IQueryMaterializer queryMaterializer;
+        private readonly RepositoryBuilderOptions options;
         private readonly Action<PreparedSqlStatement> sqlLogger;
 
         public RepositoryBuilder(
             IQueryExecutor queryExecutor, 
             IDatabaseConfiguration databaseConfiguration, 
-            Action<PreparedSqlStatement> sqlLogger = null)
+            Action<PreparedSqlStatement> sqlLogger = null) :
+            this(queryExecutor, databaseConfiguration, new AdoMaterializer(queryExecutor, sqlLogger), new RepositoryBuilderOptions(), sqlLogger)
         {
-            this.queryExecutor = queryExecutor;
-            this.databaseConfiguration = databaseConfiguration;
-            this.sqlLogger = sqlLogger;
-            this.queryMaterializer = new AdoMaterializer(queryExecutor, sqlLogger);
         }
 
         public RepositoryBuilder(
             IQueryExecutor queryExecutor, 
             IDatabaseConfiguration databaseConfiguration,
             IQueryMaterializer queryMaterializer,
+            Action<PreparedSqlStatement> sqlLogger = null) : 
+            this(queryExecutor, databaseConfiguration, queryMaterializer, new RepositoryBuilderOptions(), sqlLogger)
+        {
+        }
+
+        public RepositoryBuilder(
+            IQueryExecutor queryExecutor, 
+            IDatabaseConfiguration databaseConfiguration,
+            IQueryMaterializer queryMaterializer,
+            RepositoryBuilderOptions options,
             Action<PreparedSqlStatement> sqlLogger = null)
         {
             this.queryExecutor = queryExecutor;
             this.databaseConfiguration = databaseConfiguration;
             this.queryMaterializer = queryMaterializer;
+            this.options = options;
             this.sqlLogger = sqlLogger;
         }
 
@@ -48,12 +57,12 @@ namespace SigQL
                 return new Castle.DynamicProxy.ProxyGenerator().CreateClassProxy(
                     tProxy,
                     new ProxyGenerationOptions(),
-                    new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, this.sqlLogger)
+                    new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, this.sqlLogger)
                 );
             }
 
             return new Castle.DynamicProxy.ProxyGenerator().CreateInterfaceProxyWithoutTarget(tProxy,
-                new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, this.sqlLogger)
+                new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, this.sqlLogger)
             );
         }
 
@@ -88,7 +97,7 @@ namespace SigQL
                 tProxy,
                 new ProxyGenerationOptions(),
                 constructorArguments,
-                new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, this.sqlLogger)
+                new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, this.sqlLogger)
             );
         }
 
@@ -96,6 +105,7 @@ namespace SigQL
         {
             private readonly IDatabaseConfiguration databaseConfiguration;
             private readonly IQueryMaterializer materializer;
+            private readonly IPluralizationHelper pluralizationHelper;
             private readonly Action<PreparedSqlStatement> sqlLogger;
             private readonly IQueryExecutor queryExecutor;
 
@@ -103,17 +113,19 @@ namespace SigQL
                 IQueryExecutor queryExecutor, 
                 IDatabaseConfiguration databaseConfiguration,
                 IQueryMaterializer materializer,
+                IPluralizationHelper pluralizationHelper,
                 Action<PreparedSqlStatement> sqlLogger = null)
             {
                 this.databaseConfiguration = databaseConfiguration;
                 this.materializer = materializer;
+                this.pluralizationHelper = pluralizationHelper;
                 this.sqlLogger = sqlLogger;
                 this.queryExecutor = queryExecutor;
             }
 
             public void Intercept(IInvocation invocation)
             {
-                var methodParser = new MethodParser(new SqlStatementBuilder(), databaseConfiguration);
+                var methodParser = new MethodParser(new SqlStatementBuilder(), databaseConfiguration, pluralizationHelper);
                 var sqlStatement = methodParser.SqlFor(invocation.Method);
                 var methodArgs = invocation.Method.GetParameters().Select((p, i) => new ParameterArg() { Parameter = p, Value = invocation.Arguments[i] });
                 if (sqlStatement.ReturnType != typeof(void))
@@ -130,5 +142,15 @@ namespace SigQL
                 }
             }
         }
+    }
+
+    public class RepositoryBuilderOptions
+    {
+        public RepositoryBuilderOptions()
+        {
+            this.PluralizationHelper = DefaultPluralizationHelper.Instance;
+        }
+
+        public IPluralizationHelper PluralizationHelper { get; set; }
     }
 }

@@ -33,7 +33,7 @@ namespace SigQL.SqlServer.Tests
             var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.DataSource, sqlConnection.Database);
             var sqlExecutor = new SqlQueryExecutor(() => laborDbConnection);
             materializer = new AdoMaterializer(sqlExecutor, (s) => sqlStatements.Add(s));
-            selectClauseBuilder = new SelectClauseBuilder(sqlDatabaseConfiguration);
+            selectClauseBuilder = new SelectClauseBuilder(sqlDatabaseConfiguration, DefaultPluralizationHelper.Instance);
         }
 
         [TestMethod]

@@ -15,7 +15,7 @@ namespace SigQL.Diagnostics
 
         public PreparedSqlStatement Build(IInvocation invocation)
         {
-            var methodParser = new MethodParser(new SqlStatementBuilder(), this.databaseConfiguration);
+            var methodParser = new MethodParser(new SqlStatementBuilder(), this.databaseConfiguration, DefaultPluralizationHelper.Instance);
             var sqlStatement = methodParser.SqlFor(invocation.Method);
             var methodArgs = invocation.Method.GetParameters().Select((p, i) => new ParameterArg() { Parameter = p, Value = invocation.Arguments[i] });
             return sqlStatement.GetPreparedStatement(methodArgs);

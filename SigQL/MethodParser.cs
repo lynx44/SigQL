@@ -21,11 +21,11 @@ namespace SigQL
         private readonly IDatabaseConfiguration databaseConfiguration;
         private DatabaseResolver databaseResolver;
 
-        public MethodParser(SqlStatementBuilder builder, IDatabaseConfiguration databaseConfiguration)
+        public MethodParser(SqlStatementBuilder builder, IDatabaseConfiguration databaseConfiguration, IPluralizationHelper pluralizationHelper)
         {
             this.builder = builder;
             this.databaseConfiguration = databaseConfiguration;
-            this.databaseResolver = new DatabaseResolver(this.databaseConfiguration);
+            this.databaseResolver = new DatabaseResolver(this.databaseConfiguration, pluralizationHelper);
         }
 
         public MethodSqlStatement SqlFor(MethodInfo methodInfo)

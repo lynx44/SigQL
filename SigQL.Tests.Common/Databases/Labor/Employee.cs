@@ -147,6 +147,14 @@ namespace SigQL.Tests.Common.Databases.Labor
         public int Id { get; set; }
     }
 
+    public class Employees
+    {
+        public interface IEmployeeFields
+        {
+            int Id { get; set; }
+            string Name { get; set; }
+        }
+    }
 
     // not yet used/supported
     // public class EmployeeInsertFields

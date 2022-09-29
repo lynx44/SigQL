@@ -16,10 +16,12 @@ namespace SigQL
     internal partial class DatabaseResolver
     {
         private readonly IDatabaseConfiguration databaseConfiguration;
+        private readonly IPluralizationHelper pluralizationHelper;
 
-        public DatabaseResolver(IDatabaseConfiguration databaseConfiguration)
+        public DatabaseResolver(IDatabaseConfiguration databaseConfiguration, IPluralizationHelper pluralizationHelper)
         {
             this.databaseConfiguration = databaseConfiguration;
+            this.pluralizationHelper = pluralizationHelper;
         }
 
         public IEnumerable<ColumnDefinitionWithPropertyPath> ResolveColumnsForSelectStatement(
@@ -97,7 +99,9 @@ namespace SigQL
             Type detectedType = null;
             if (this.TryDetectTargetTable(t, ref detectedType))
             {
-                return this.databaseConfiguration.Tables.FindByName(detectedType.Name);
+                var tableName = this.pluralizationHelper.AllCandidates(detectedType.Name).First(tableName =>
+                    this.databaseConfiguration.Tables.FindByName(tableName) != null);
+                return this.databaseConfiguration.Tables.FindByName(tableName);
             }
             
             throw new InvalidIdentifierException($"Unable to identify matching database table for type {GetParentTableClassQualifiedNameForType(t)}. Table {GetExpectedTableNameForType(t)} does not exist.");
@@ -121,7 +125,9 @@ namespace SigQL
                 return this.databaseConfiguration.Tables.FindByName(sqlIdentifier.Name) != null;
             }
             columnOutputType = UnwrapCollectionTargetType(columnOutputType);
-            if (this.databaseConfiguration.Tables.FindByName(columnOutputType.Name) != null)
+            var tableName = this.pluralizationHelper.AllCandidates(columnOutputType.Name).FirstOrDefault(tableName =>
+                this.databaseConfiguration.Tables.FindByName(tableName) != null);
+            if (tableName != null)
             {
                 detectedType = columnOutputType;
                 return true;

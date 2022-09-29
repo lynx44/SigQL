@@ -25,7 +25,7 @@ namespace SigQL.Tests
         {
             var builder = new SqlStatementBuilder();
             workLogDatabaseConfiguration = BuildWorkLogDatabase();
-            methodParser = new MethodParser(builder, workLogDatabaseConfiguration);
+            methodParser = new MethodParser(builder, workLogDatabaseConfiguration, DefaultPluralizationHelper.Instance);
             var preparedStatementCollectorFactory = new PreparedStatementCollectorFactory(workLogDatabaseConfiguration);
             preparedSqlStatements = new List<PreparedSqlStatement>();
             monolithicRepository = preparedStatementCollectorFactory.Build<IMonolithicRepository>(preparedSqlStatements);
@@ -42,6 +42,7 @@ namespace SigQL.Tests
             var diagnosticLogTable = new TableDefinition(dbo, nameof(DiagnosticLog), SetupColumns(typeof(DiagnosticLog).GetProperties()));
             var itvfGetWorkLogsByEmployeeIdFunction = new TableDefinition(dbo, nameof(itvf_GetWorkLogsByEmployeeId), SetupColumns(typeof(itvf_GetWorkLogsByEmployeeId).GetProperties()));
             var workLogEmployeeView = new TableDefinition(dbo, nameof(WorkLogEmployeeView), SetupColumns(typeof(WorkLogEmployeeView).GetProperties()));
+            var employeeStatusesTable = new TableDefinition(dbo, nameof(EmployeeStatuses), SetupColumns(typeof(EmployeeStatuses).GetProperties()));
             itvfGetWorkLogsByEmployeeIdFunction.ObjectType = DatabaseObjectType.Function;
             workLogTable.PrimaryKey = new TableKeyDefinition(workLogTable.Columns.FindByName(nameof(WorkLog.Id)));
             employeeTable.PrimaryKey = new TableKeyDefinition(employeeTable.Columns.FindByName(nameof(Employee.Id)));
@@ -51,6 +52,7 @@ namespace SigQL.Tests
             itvfGetWorkLogsByEmployeeIdFunction.PrimaryKey = new TableKeyDefinition();
             workLogEmployeeView.PrimaryKey = new TableKeyDefinition();
             streetAddressCoordinateTable.PrimaryKey = new TableKeyDefinition(streetAddressCoordinateTable.Columns.FindByName(nameof(StreetAddressCoordinate.Id)));
+            employeeStatusesTable.PrimaryKey = new TableKeyDefinition(employeeStatusesTable.Columns.FindByName(nameof(EmployeeStatuses.Id)));
             var employeeAddressTable = new TableDefinition(dbo, nameof(EmployeeAddress), typeof(EmployeeAddress).GetProperties().Select(p => p.Name));
             workLogTable.ForeignKeyCollection = new ForeignKeyDefinitionCollection().AddForeignKeys(
                 new ForeignKeyDefinition(employeeTable, new ForeignKeyPair(workLogTable.Columns.FindByName(nameof(WorkLog.EmployeeId)), employeeTable.Columns.FindByName(nameof(Employee.Id)))),
@@ -80,7 +82,8 @@ namespace SigQL.Tests
                 streetAddressCoordinateTable,
                 diagnosticLogTable,
                 itvfGetWorkLogsByEmployeeIdFunction,
-                workLogEmployeeView
+                workLogEmployeeView,
+                employeeStatusesTable
             }));
 
             return databaseConfiguration;
@@ -195,6 +198,22 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() => monolithicRepository.GetByNameNot(null));
 
             Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where ((\"Employee\".\"Name\" is not null))", sql);
+        }
+
+        [TestMethod]
+        public void GetSingle_WithPluralTableName_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeesPlural(1));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where ((\"Employee\".\"Id\" = @id))", sql);
+        }
+
+        [TestMethod]
+        public void GetSingle_WithSingularTableName_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeeStatusSingular(1));
+
+            Assert.AreEqual("select \"EmployeeStatuses\".\"Id\" \"Id\" from \"EmployeeStatuses\" where ((\"EmployeeStatuses\".\"Id\" = @id))", sql);
         }
 
         [TestMethod]
