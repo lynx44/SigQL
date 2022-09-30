@@ -363,7 +363,7 @@ namespace SigQL
 
             return dynamicOrderByParameterPaths.Select(argument =>
             {
-                return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindViaRelations)
+                return new OrderBySpec(resolveTableAlias, primaryTableRelations.FindByTablePaths)
                 {
                     ParameterPath = argument.ToParameterPath(),
                     IsDynamic = true,
@@ -395,7 +395,7 @@ namespace SigQL
                         var viaRelationPath = viaRelationAttribute.Path;
                         var viaRelationColumn = viaRelationAttribute.Column;
                         var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
-                            viaRelationColumn, fromTableRelations.FindViaRelations);
+                            viaRelationColumn, fromTableRelations.FindByTablePaths);
                         columnName = result.ColumnName;
                         tableName = result.TableName;
                         tableAliasName = result.TableAliasName;
@@ -416,7 +416,7 @@ namespace SigQL
                             $"Unable to identify matching database column for order by parameter \"{arg.FullyQualifiedTypeName()}\". Column \"{columnName}\" does not exist in table {tableName}.");
                     }
 
-                    return new OrderBySpec(resolveTableAlias, fromTableRelations.FindViaRelations)
+                    return new OrderBySpec(resolveTableAlias, fromTableRelations.FindByTablePaths)
                     {
                         TableName = tableAliasName ?? tableName ?? fromTableRelations.Alias,
                         ColumnName = column.Name,
@@ -428,7 +428,7 @@ namespace SigQL
                 }
                 else
                 {
-                    return new OrderBySpec(resolveTableAlias, fromTableRelations.FindViaRelations)
+                    return new OrderBySpec(resolveTableAlias, fromTableRelations.FindByTablePaths)
                     {
                         ParameterPath = arg.ToParameterPath(),
                         IsDynamic = true,
@@ -1105,14 +1105,14 @@ namespace SigQL
             var tableHierarchyAliases = new List<ITableHierarchyAlias>();
             tableHierarchyAliases.Add(tableRelations);
             tableHierarchyAliases.Add(navigationTableRelations);
-
+            
             var leftOuterJoin = new LeftOuterJoin().SetArgs(
                 new AndOperator().SetArgs(
                 navigationTableRelations.ForeignKeyToParent.KeyPairs.Select(kp =>
                             new EqualsOperator().SetArgs(
-                                new ColumnIdentifier().SetArgs(new RelationalTable() {Label = tableHierarchyAliases.Single(s => s.TableName == kp.ForeignTableColumn.Table.Name).Alias },
-                                    new RelationalColumn() {Label = kp.ForeignTableColumn.Name}),
-                                new ColumnIdentifier().SetArgs(new RelationalTable() {Label = tableHierarchyAliases.Single(s => s.TableName == kp.PrimaryTableColumn.Table.Name).Alias },
+                                new ColumnIdentifier().SetArgs(new RelationalTable() { Label = tableHierarchyAliases.Single(s => s.TableName == kp.ForeignTableColumn.Table.Name).Alias },
+                                    new RelationalColumn() { Label = kp.ForeignTableColumn.Name }),
+                                new ColumnIdentifier().SetArgs(new RelationalTable() { Label = tableHierarchyAliases.Single(s => s.TableName == kp.PrimaryTableColumn.Table.Name).Alias },
                                     new RelationalColumn() {Label = kp.PrimaryTableColumn.Name})))).AsEnumerable().Cast<AstNode>()
                     .Concat(navigationTableRelations != null ? BuildJoins(navigationTableRelations) : new LeftOuterJoin[0]));
             //var rightTableAlias = tableHierarchyAliases.Single(s => s.TableName == navigationTableRelations.TableName).Alias;

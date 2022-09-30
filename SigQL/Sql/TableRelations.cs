@@ -136,7 +136,17 @@ namespace SigQL.Sql
             return null;
         }
 
-        public TableRelations FindViaRelations(IEnumerable<string> tableRelationPath)
+        public TableRelations GetSingularEndpoint()
+        {
+            if (!this.NavigationTables.Any())
+            {
+                return this;
+            }
+
+            return this.NavigationTables.Single().GetSingularEndpoint();
+        }
+        
+        public TableRelations FindByTablePaths(IEnumerable<string> tableRelationPath)
         {
             if (tableRelationPath.FirstOrDefault() == this.TableName)
             {

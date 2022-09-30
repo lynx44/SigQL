@@ -1548,7 +1548,7 @@ namespace SigQL.Tests
                 }
                 catch (InvalidIdentifierException ex)
                 {
-                    Assert.AreEqual("Unable to identify matching database table for parameter locationId with [ViaRelation(\"Employee->NonExistent\", \"Id\")]. Table NonExistent does not exist.",
+                    Assert.AreEqual("Unable to identify matching database table for parameter locationId with relational path \"Employee->NonExistent\". Table NonExistent does not exist.",
                         ex.Message);
                     throw;
                 }

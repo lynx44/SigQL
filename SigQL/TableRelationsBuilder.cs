@@ -39,7 +39,22 @@ namespace SigQL
             var relations = unprocessedNavigationTables
                 .Select(p =>
                 {
-                    var navigationTableRelations = BuildTableRelations(this.DetectTable(p.Column.Argument.Type), p.Column.Argument, source, tableKeyDefinitions);
+                    var joinRelationAttribute = p.Column.Argument.GetCustomAttribute<JoinRelationAttribute>();
+                    TableRelations navigationTableRelations;
+
+                    navigationTableRelations = BuildTableRelations(this.DetectTable(p.Column.Argument.Type), p.Column.Argument, source, tableKeyDefinitions);
+                    if (joinRelationAttribute != null)
+                    {
+                        var joinTableRelations = BuildTableRelationsFromRelationalPath(p.Column.Argument, joinRelationAttribute.Path,
+                            null, TableRelationsColumnSource.ReturnType, tableKeyDefinitions);
+                        var endpointTableRelations = joinTableRelations.GetSingularEndpoint();
+                        var mergedTableRelations = MergeTableRelations(endpointTableRelations, navigationTableRelations);
+                        endpointTableRelations.Parent.NavigationTables =
+                            new List<TableRelations>() {mergedTableRelations};
+                        navigationTableRelations = joinTableRelations;
+                        //foreignKey = joinTableRelations.NavigationTables.Single().ForeignKeyToParent;
+                    }
+                    
                     return navigationTableRelations;
                 }).ToList();
             var columns = columnDescriptions.Where(t => !t.IsTable)
@@ -128,18 +143,18 @@ namespace SigQL
                 if (!TableEqualityComparer.Default.Equals(navigationTableRelations.TargetTable,
                         tableRelations.TargetTable))
                 {
-                    var joinRelationAttribute = navigationTableRelations.Argument.GetCustomAttribute<JoinRelationAttribute>();
-                    IForeignKeyDefinition foreignKey;
-                    if (joinRelationAttribute != null)
-                    {
-                        var joinTableRelations = BuildTableRelationsFromRelationalPath(navigationTableRelations.Argument, joinRelationAttribute.Path,
-                            null, TableRelationsColumnSource.ReturnType, tableKeyDefinitions);
-                        foreignKey = joinTableRelations.NavigationTables.Single().ForeignKeyToParent;
-                    }
-                    else
-                    {
-                        foreignKey = this.FindPrimaryForeignKeyMatchForTables(tableDefinition, navigationTableRelations.TargetTable);
-                    }
+                    //var joinRelationAttribute = navigationTableRelations.Argument.GetCustomAttribute<JoinRelationAttribute>();
+                    //IForeignKeyDefinition foreignKey;
+                    //if (joinRelationAttribute != null)
+                    //{
+                    //    var joinTableRelations = BuildTableRelationsFromRelationalPath(navigationTableRelations.Argument, joinRelationAttribute.Path,
+                    //        null, TableRelationsColumnSource.ReturnType, tableKeyDefinitions);
+                    //    foreignKey = joinTableRelations.NavigationTables.Single().ForeignKeyToParent;
+                    //}
+                    //else
+                    //{
+                        var foreignKey = navigationTableRelations.ForeignKeyToParent ?? this.FindPrimaryForeignKeyMatchForTables(tableDefinition, navigationTableRelations.TargetTable);
+                    //}
                     if (foreignKey == null)
                     {
                         foreignKeys = FindManyToManyForeignKeyMatchesForTables(tableDefinition, navigationTableRelations.TargetTable);
@@ -152,7 +167,7 @@ namespace SigQL
 
                         var oneToManyFk = foreignKeys.First(fk => TableEqualityComparer.Default.Equals(fk.PrimaryKeyTable, navigationTableRelations.TargetTable));
                         var manyToOneFk = foreignKeys.Except(new[] { oneToManyFk }).First();
-                        tableRelations.ForeignKeyToParent = oneToManyFk;
+                        //tableRelations.ForeignKeyToParent = oneToManyFk;
 
                         this.BuildManyToManyTableRelations(manyToOneFk, tableRelations, navigationTableRelations);
                     }
@@ -196,10 +211,12 @@ namespace SigQL
         {
             public ViaRelationColumns()
             {
-                this.RelationColumns = new List<IColumnDefinition>();
+                this.RightRelationColumns = new List<IColumnDefinition>();
+                this.LeftRelationColumns = new List<IColumnDefinition>();
             }
             public TableRelations TableRelations { get; set; }
-            public List<IColumnDefinition> RelationColumns { get; set; }
+            public List<IColumnDefinition> RightRelationColumns { get; set; }
+            public List<IColumnDefinition> LeftRelationColumns { get; set; }
         }
 
         internal TableRelations BuildTableRelationsFromRelationalPath(IArgument argument,
@@ -220,13 +237,18 @@ namespace SigQL
                 var patternMatch = Regex.Match(relation,
                     @"(\((?<inputcolumns>([\w]+,{0,1})+)\)){0,1}(?<tablename>[\w]+)(\((?<outputcolumns>([\w]+,{0,1})+)\)){0,1}");
                 var tableName = patternMatch.Groups["tablename"].Value;
-                var relationColumnName = (patternMatch.Groups["inputcolumns"]?.Value.NullForEmptyOrWhiteSpace() ?? patternMatch.Groups["outputcolumns"]?.Value.NullForEmptyOrWhiteSpace());
+                var leftRelationalColumnNames =
+                    patternMatch.Groups["inputcolumns"]?.Value.Split(',')
+                        .Select(c => c.Trim()).Where(c => !string.IsNullOrWhiteSpace(c)).ToList() ?? new List<string>();
+                var rightRelationalColumnNames =
+                    patternMatch.Groups["outputcolumns"]?.Value.Split(',')
+                        .Select(c => c.Trim()).Where(c => !string.IsNullOrWhiteSpace(c)).ToList() ?? new List<string>();
 
                 var targetTable = this.databaseConfiguration.Tables.FindByName(tableName);
                 if (targetTable == null)
                 {
                     throw new InvalidIdentifierException(
-                        $"Unable to identify matching database table for parameter {argument.Name} with [ViaRelation(\"{relationalPath}\", \"{endpointColumnName}\")]. Table {tableName} does not exist.");
+                        $"Unable to identify matching database table for parameter {argument.Name} with relational path \"{relationalPath}\". Table {tableName} does not exist.");
                 }
                 
                 var tableRelations = new TableRelations()
@@ -242,16 +264,27 @@ namespace SigQL
                 };
                 relationColumnsList.Add(relationColumns);
 
-                if (!string.IsNullOrEmpty(relationColumnName))
+                foreach (var relationColumnName in rightRelationalColumnNames)
                 {
                     var column = targetTable.Columns.FindByName(relationColumnName);
                     if (column == null)
                     {
                         throw new InvalidIdentifierException(
-                            $"Unable to identify matching database column for parameter {argument.Name} with [ViaRelation(\"{relationalPath}\", \"{endpointColumnName}\")]. Column {endpointColumnName} does not exist in table {targetTable.Name}.");
+                            $"Unable to identify matching database column for parameter {argument.Name} with relational path \"{relationalPath}\". Column {relationColumnName} does not exist in table {targetTable.Name}.");
                     }
 
-                    relationColumns.RelationColumns.Add(column);
+                    relationColumns.RightRelationColumns.Add(column);
+                }
+                foreach (var relationColumnName in leftRelationalColumnNames)
+                {
+                    var column = targetTable.Columns.FindByName(relationColumnName);
+                    if (column == null)
+                    {
+                        throw new InvalidIdentifierException(
+                            $"Unable to identify matching database column for parameter {argument.Name} with relational path \"{relationalPath}\". Column {relationColumnName} does not exist in table {targetTable.Name}.");
+                    }
+
+                    relationColumns.LeftRelationColumns.Add(column);
                 }
 
                 if (endpointColumnName != null && relationsReversed.IndexOf(relation) == 0)
@@ -274,7 +307,6 @@ namespace SigQL
 
                 if (previousRelation != null)
                 {
-                    tableRelations.Parent = previousRelation;
                     tableRelations.NavigationTables = new List<TableRelations>()
                     {
                         previousRelation
@@ -295,11 +327,11 @@ namespace SigQL
                     var relationColumns = relationColumnsList.Single(c => c.TableRelations == tableRelation);
                     var previousRelationColumns = relationColumnsList.Single(c => c.TableRelations == previousRelation);
                     // use the specified columns to join if specified
-                    if (relationColumns.RelationColumns.Any() && previousRelationColumns.RelationColumns.Any())
+                    if (previousRelationColumns.RightRelationColumns.Any() && relationColumns.LeftRelationColumns.Any())
                     {
                         tableRelation.ForeignKeyToParent = new ForeignKeyDefinition(relationColumns.TableRelations.TargetTable,
-                            new ForeignKeyPair(previousRelationColumns.RelationColumns.Single(),
-                                relationColumns.RelationColumns.Single()));
+                            new ForeignKeyPair(previousRelationColumns.RightRelationColumns.Single(),
+                                relationColumns.LeftRelationColumns.Single()));
                     }
                     // otherwise, autodetect the relationship
                     else
@@ -327,6 +359,12 @@ namespace SigQL
 
                     }
                 }
+
+                if (previousRelation != null)
+                {
+                    tableRelation.Parent = previousRelation;
+                }
+
                 previousRelation = tableRelation;
             }
 

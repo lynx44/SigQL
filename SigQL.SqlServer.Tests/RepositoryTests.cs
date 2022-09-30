@@ -713,7 +713,7 @@ namespace SigQL.SqlServer.Tests
         }
         
         [TestMethod]
-        public void GetJoinRelationAttributeNestedNavigationCollection_ReturnsExpectedCollection()
+        public void GetJoinRelationAttributeMultiTableRelationalPath_ReturnsExpectedCollection()
         {
             var employee1 = new EFEmployee() { Name = "Name1", Addresses = new List<EFAddress>()
             {
@@ -725,8 +725,7 @@ namespace SigQL.SqlServer.Tests
             var employee2 = new EFEmployee() { Name = "Name2", Addresses = new List<EFAddress>()
             {
                 new EFAddress() { City = "4" },
-                new EFAddress() { City = "5" },
-                new EFAddress() { City = "6" }
+                new EFAddress() { City = "5" }
                 }
             };
             
@@ -759,11 +758,11 @@ namespace SigQL.SqlServer.Tests
             this.laborDbContext.WorkLog.Add(workLog3);
             this.laborDbContext.WorkLog.Add(workLog4);
             this.laborDbContext.SaveChanges();
-            var actual = this.monolithicRepository.GetWithNestedJoinRelationAttribute();
+            var actual = this.monolithicRepository.GetJoinAttributeWithMultiTableRelationalPath();
             
-            Assert.AreEqual(6, actual.Count());
-            Assert.AreEqual(3, actual.First().Employee.View.Count());
-            Assert.AreEqual(1, actual.Last().Employee.View.Count());
+            Assert.AreEqual(4, actual.Count());
+            Assert.AreEqual(3, actual.First().Addresses.Count());
+            Assert.AreEqual(2, actual.Last().Addresses.Count());
         }
         
         [TestMethod]
