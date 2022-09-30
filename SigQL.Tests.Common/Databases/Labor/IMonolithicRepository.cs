@@ -84,6 +84,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyId(IEnumerable<int?> id);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyIdIgnoreIfNull([IgnoreIfNull] IEnumerable<int> id);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyIdIgnoreIfNullOrEmpty([IgnoreIfNullOrEmpty] IEnumerable<int> id);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyIdPlural(IEnumerable<int> ids);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesWithIn(WorkLog.GetEmployeeNamesInFilter filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsGreaterThanStartDate([GreaterThan] DateTime startDate);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsGreaterThanOrEqualToStartDate([GreaterThanOrEqual] DateTime startDate);

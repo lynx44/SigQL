@@ -1196,6 +1196,25 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void InParameter_PluralParameterName()
+        {
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog(),
+                new EFWorkLog() { },
+                new EFWorkLog() { },
+                new EFWorkLog() { },
+                new EFWorkLog() { }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.WorkLog.Skip(1).Take(1).Select(e => e.Id).ToList().Concat(laborDbContext.WorkLog.Skip(3).Take(2).Select(e => e.Id).ToList()).ToList();
+            var actual = this.monolithicRepository.GetWorkLogsWithAnyIdPlural(expected.ToList()).Select(e => e.Id);
+            
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
         public void InParameter_WhenNull_ReturnsNoResults()
         {
             this.laborDbContext.WorkLog.AddRange(

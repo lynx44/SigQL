@@ -48,6 +48,13 @@ namespace SigQL
                     var tableColumn = tableDefinition.Columns.FindByName(columnName);
                     if (tableColumn == null)
                     {
+                        var pluralCandidates = pluralizationHelper.AllCandidates(columnName).ToList();
+                        var pluralName = pluralCandidates.FirstOrDefault(c => tableDefinition.Columns.FindByName(c) != null);
+                        tableColumn = tableDefinition.Columns.FindByName(pluralName);
+                    }
+
+                    if (tableColumn == null)
+                    {
                         if (IsColumnType(d.Column.Type))
                             throw new InvalidIdentifierException(
                                 $"Unable to identify matching database column for {d.Column.Argument.GetCallsiteTypeName()} {d.Column.Argument.FullyQualifiedTypeName()}. Column {d.Column.Name} does not exist in table {tableDefinition.Name}.");
