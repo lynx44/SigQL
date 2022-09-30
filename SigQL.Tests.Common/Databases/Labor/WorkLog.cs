@@ -227,9 +227,15 @@ namespace SigQL.Tests.Common.Databases.Labor
             Address.IAddressId Address { get; set; }
         }
 
-        public interface IAddresses
+        public interface IAddressesEF
         {
             [JoinRelation("WorkLog(EmployeeId)->(Id)Employee(Id)->(EmployeesId)EFAddressEFEmployee(AddressesId)->(Id)Address")]
+            IEnumerable<Address.IAddressId> Addresses { get; }
+        }
+
+        public interface IAddresses
+        {
+            [JoinRelation("WorkLog(EmployeeId)->(Id)Employee(Id)->(EmployeeId)EmployeeAddress(AddressId)->(Id)Address")]
             IEnumerable<Address.IAddressId> Addresses { get; }
         }
 

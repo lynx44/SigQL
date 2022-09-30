@@ -70,6 +70,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicEnumerableOrderByViaClassFilter(WorkLog.DynamicOrderByEnumerable filter);
         IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogsWithDynamicEnumerableOrderByViaNavigationClassFilter(WorkLog.NavigationDynamicOrderByEnumerable filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeWithAddress> GetWorkLogsOrderedByAddressId([ViaRelation(nameof(WorkLog) + "->" + nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address), nameof(Address.Id))] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.IAddressesEF> GetJoinAttributeWithMultiTableRelationalPathEF();
         IEnumerable<WorkLog.IAddresses> GetJoinAttributeWithMultiTableRelationalPath();
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithLike(Like name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithNotLike([Not] Like name);

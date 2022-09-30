@@ -294,6 +294,14 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void GetJoinRelationAttribute_WithMultiTableRelationalPath_ReturnsExpectedSql()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetJoinAttributeWithMultiTableRelationalPath());
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Address\".\"Id\" \"Addresses.Id\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) left outer join \"EmployeeAddress\" on ((\"Employee\".\"Id\" = \"EmployeeAddress\".\"EmployeeId\")) left outer join \"Address\" on ((\"EmployeeAddress\".\"AddressId\" = \"Address\".\"Id\"))", sql);
+        }
+
+        [TestMethod]
         public void GetJoinRelationAttributeOnViewWithTableNavigationCollection_ReturnsExpectedSql()
         {
             var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithJoinRelationAttributeOnViewWithTableNavigationCollection());

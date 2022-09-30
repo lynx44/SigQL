@@ -758,7 +758,7 @@ namespace SigQL.SqlServer.Tests
             this.laborDbContext.WorkLog.Add(workLog3);
             this.laborDbContext.WorkLog.Add(workLog4);
             this.laborDbContext.SaveChanges();
-            var actual = this.monolithicRepository.GetJoinAttributeWithMultiTableRelationalPath();
+            var actual = this.monolithicRepository.GetJoinAttributeWithMultiTableRelationalPathEF();
             
             Assert.AreEqual(4, actual.Count());
             Assert.AreEqual(3, actual.First().Addresses.Count());
