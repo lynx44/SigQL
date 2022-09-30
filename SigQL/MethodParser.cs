@@ -959,7 +959,7 @@ namespace SigQL
             string viaRelationColumnName,
             Func<IEnumerable<string>, TableRelations> resolveTableRelationsAliasFunc)
         {
-            var tableRelations = this.databaseResolver.BuildTableRelationsFromViaParameter(
+            var tableRelations = this.databaseResolver.BuildTableRelationsFromRelationalPath(
                 parameterArgument,
                 viaRelationPath,
                 viaRelationColumnName,

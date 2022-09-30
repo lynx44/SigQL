@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using SigQL.Exceptions;
 using SigQL.Extensions;
 using SigQL.Schema;
@@ -131,7 +132,7 @@ namespace SigQL
                     IForeignKeyDefinition foreignKey;
                     if (joinRelationAttribute != null)
                     {
-                        var joinTableRelations = BuildTableRelationsFromViaParameter(navigationTableRelations.Argument, joinRelationAttribute.Path,
+                        var joinTableRelations = BuildTableRelationsFromRelationalPath(navigationTableRelations.Argument, joinRelationAttribute.Path,
                             null, TableRelationsColumnSource.ReturnType, tableKeyDefinitions);
                         foreignKey = joinTableRelations.NavigationTables.Single().ForeignKeyToParent;
                     }
@@ -183,7 +184,7 @@ namespace SigQL
             {
                 IArgument argument = c.Column.Argument;
                 var viaRelationAttribute = argument.GetCustomAttribute<ViaRelationAttribute>();
-                return BuildTableRelationsFromViaParameter(argument,
+                return BuildTableRelationsFromRelationalPath(argument,
                     viaRelationAttribute.Path, viaRelationAttribute.Column, source, tableKeyDefinitions);
             }).ToList();
 
@@ -201,11 +202,11 @@ namespace SigQL
             public List<IColumnDefinition> RelationColumns { get; set; }
         }
 
-        internal TableRelations BuildTableRelationsFromViaParameter(IArgument argument,
-            string viaRelationPath, string endpointColumnName, TableRelationsColumnSource source, ConcurrentDictionary<string, ITableKeyDefinition> tableKeyDefinitions)
+        internal TableRelations BuildTableRelationsFromRelationalPath(IArgument argument,
+            string relationalPath, string endpointColumnName, TableRelationsColumnSource source, ConcurrentDictionary<string, ITableKeyDefinition> tableKeyDefinitions)
         {
             var relations =
-                viaRelationPath.
+                relationalPath.
                     Split(new[] { "->" }, StringSplitOptions.RemoveEmptyEntries)
                     .ToList();
 
@@ -216,14 +217,16 @@ namespace SigQL
             var relationColumnsList = new List<ViaRelationColumns>();
             foreach (var relation in relationsReversed)
             {
-                var tableName = relation.Split('.').First();
-                var relationColumnName = relation.Split('.').Skip(1).FirstOrDefault();
+                var patternMatch = Regex.Match(relation,
+                    @"(\((?<inputcolumns>([\w]+,{0,1})+)\)){0,1}(?<tablename>[\w]+)(\((?<outputcolumns>([\w]+,{0,1})+)\)){0,1}");
+                var tableName = patternMatch.Groups["tablename"].Value;
+                var relationColumnName = (patternMatch.Groups["inputcolumns"]?.Value.NullForEmptyOrWhiteSpace() ?? patternMatch.Groups["outputcolumns"]?.Value.NullForEmptyOrWhiteSpace());
 
                 var targetTable = this.databaseConfiguration.Tables.FindByName(tableName);
                 if (targetTable == null)
                 {
                     throw new InvalidIdentifierException(
-                        $"Unable to identify matching database table for parameter {argument.Name} with [ViaRelation(\"{viaRelationPath}\", \"{endpointColumnName}\")]. Table {tableName} does not exist.");
+                        $"Unable to identify matching database table for parameter {argument.Name} with [ViaRelation(\"{relationalPath}\", \"{endpointColumnName}\")]. Table {tableName} does not exist.");
                 }
                 
                 var tableRelations = new TableRelations()
@@ -245,7 +248,7 @@ namespace SigQL
                     if (column == null)
                     {
                         throw new InvalidIdentifierException(
-                            $"Unable to identify matching database column for parameter {argument.Name} with [ViaRelation(\"{viaRelationPath}\", \"{endpointColumnName}\")]. Column {endpointColumnName} does not exist in table {targetTable.Name}.");
+                            $"Unable to identify matching database column for parameter {argument.Name} with [ViaRelation(\"{relationalPath}\", \"{endpointColumnName}\")]. Column {endpointColumnName} does not exist in table {targetTable.Name}.");
                     }
 
                     relationColumns.RelationColumns.Add(column);
@@ -257,7 +260,7 @@ namespace SigQL
                     if (column == null)
                     {
                         throw new InvalidIdentifierException(
-                            $"Unable to identify matching database column for parameter {argument.Name} with [ViaRelation(\"{viaRelationPath}\", \"{endpointColumnName}\")]. Column {endpointColumnName} does not exist in table {targetTable.Name}.");
+                            $"Unable to identify matching database column for parameter {argument.Name} with [ViaRelation(\"{relationalPath}\", \"{endpointColumnName}\")]. Column {endpointColumnName} does not exist in table {targetTable.Name}.");
                     }
                     
                     tableRelations.ProjectedColumns = new List<TableRelationColumnDefinition>()
@@ -307,7 +310,7 @@ namespace SigQL
                     
                     if (tableRelation.ForeignKeyToParent == null)
                         throw new InvalidIdentifierException(
-                            $"Unable to identify matching database foreign key for parameter {argument.Name} with [ViaRelation(\"{viaRelationPath}\", \"{endpointColumnName}\")]. No foreign key between {previousRelation.TargetTable.Name} and {tableRelation.TargetTable.Name} could be found.");
+                            $"Unable to identify matching database foreign key for parameter {argument.Name} with [ViaRelation(\"{relationalPath}\", \"{endpointColumnName}\")]. No foreign key between {previousRelation.TargetTable.Name} and {tableRelation.TargetTable.Name} could be found.");
                     
                     if (!tableKeyDefinitions.ContainsKey(tableRelation.Argument.Name))
                     {

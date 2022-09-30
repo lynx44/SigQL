@@ -41,7 +41,7 @@ namespace SigQL.Tests.Common.Databases.Labor
             DateTime StartDate { get; }
             DateTime EndDate { get; }
             string EmployeeName { get; }
-            [JoinRelation("WorkLogEmployeeView.EmployeeId->Employee.Id")]
+            [JoinRelation("WorkLogEmployeeView(EmployeeId)->(Id)Employee")]
             IEnumerable<Employee.IEmployeeWithAddresses> Employees { get; set; }
         }
     }
