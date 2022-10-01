@@ -21,8 +21,8 @@ namespace SigQL
             var statement = new List<AstNode>();
             var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
 
-            var insertColumnList = insertSpec.ColumnParameters.Select(cp => 
-                new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = cp.Column.Name })).ToList();
+            var insertColumnList = insertSpec.ParameterTableRelations.ProjectedColumns
+                .Select(cp => new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = cp.Name})).ToList();
             
             var tokens = new List<TokenPath>();
             var multipleInsertParameters = insertSpec.ColumnParameters.Where(c =>
@@ -39,10 +39,10 @@ namespace SigQL
             {
                 valuesListClause.SetArgs(
                     new ValuesList().SetArgs(
-                        insertSpec.ColumnParameters.Select(cp => 
+                        insertSpec.ParameterTableRelations.ProjectedColumns.Select(cp => 
                             new NamedParameterIdentifier()
                             {
-                                Name = cp.ParameterPath.SqlParameterName
+                                Name = cp.Arguments.GetArguments(TableRelationsColumnSource.Parameters).First().ToParameterPath().GenerateSuggestedSqlIdentifierName()
                             })
                     )
                 );
@@ -68,10 +68,10 @@ namespace SigQL
                     Parameter = new NamedParameterIdentifier() { Name = lookupParameterTableName },
                     DataType = new DataType() { Type = new Literal() { Value = "table" } }
                         .SetArgs(
-                            insertSpec.ColumnParameters.Select(c =>
+                            insertSpec.ParameterTableRelations.ProjectedColumns.Select(c =>
                                 new ColumnDeclaration().SetArgs(
-                                    new RelationalColumn() { Label = c.Column.Name },
-                                    new DataType() { Type = new Literal() { Value = c.Column.DataTypeDeclaration } }
+                                    new RelationalColumn() { Label = c.Name },
+                                    new DataType() { Type = new Literal() { Value = c.DataTypeDeclaration } }
                                 )
                             ).Concat(new ColumnDeclaration().SetArgs(
                                 new RelationalColumn() { Label = mergeIndexColumnName },
@@ -85,9 +85,9 @@ namespace SigQL
                 var lookupParameterTableInsert = new Insert()
                 {
                     Object = new TableIdentifier().SetArgs(new NamedParameterIdentifier() { Name = lookupParameterTableName }),
-                    ColumnList = insertSpec.ColumnParameters.Select(c =>
+                    ColumnList = insertSpec.ParameterTableRelations.ProjectedColumns.Select(c =>
                         new ColumnIdentifier().SetArgs(
-                            new RelationalColumn() {Label = c.Column.Name}
+                            new RelationalColumn() {Label = c.Name}
                         )).AppendOne(new ColumnIdentifier().SetArgs(
                         new RelationalColumn() {Label = mergeIndexColumnName }
                     )).ToList(),
@@ -105,9 +105,9 @@ namespace SigQL
                             new Select()
                             {
                                 SelectClause = new SelectClause().SetArgs(
-                                    insertSpec.ColumnParameters.Select(c =>
+                                    insertSpec.ParameterTableRelations.ProjectedColumns.Select(c =>
                                         new ColumnIdentifier().SetArgs(
-                                            new RelationalColumn() { Label = c.Column.Name }
+                                            new RelationalColumn() { Label = c.Name }
                                         )
                                     ).AppendOne(new ColumnIdentifier().SetArgs(
                                             new RelationalColumn() { Label = mergeIndexColumnName }
@@ -120,9 +120,9 @@ namespace SigQL
                             },
                         As = new TableAliasDefinition() {Alias = mergeTableAlias}
                             .SetArgs(
-                                insertSpec.ColumnParameters.Select(cp =>
+                                insertSpec.ParameterTableRelations.ProjectedColumns.Select(cp =>
                                     new ColumnDeclaration().SetArgs(
-                                        new RelationalColumn() {Label = cp.Column.Name }
+                                        new RelationalColumn() {Label = cp.Name }
                                     )
                                 ).AppendOne(
                                     new ColumnDeclaration().SetArgs(
@@ -146,10 +146,10 @@ namespace SigQL
 
                 valuesListClause.SetArgs(
                     new ValuesList().SetArgs(
-                        insertSpec.ColumnParameters.Select(cp =>
+                        insertSpec.ParameterTableRelations.ProjectedColumns.Select(cp =>
                             new ColumnIdentifier().SetArgs(
                                 new RelationalTable() { Label = mergeTableAlias }, 
-                                new RelationalColumn() { Label = cp.Column.Name }
+                                new RelationalColumn() { Label = cp.Name }
                                 )
                         )
                     )
@@ -168,12 +168,12 @@ namespace SigQL
                             mergeValuesParametersList.SetArgs(allItems.Select((item, i) =>
                             {
                                 return new ValuesList().SetArgs(
-                                    insertSpec.ColumnParameters.Select(cp =>
+                                    insertSpec.ParameterTableRelations.ProjectedColumns.Select(cp =>
                                     {
                                         if(i == 0)
-                                            parameterPaths.RemoveAll(p => p.SqlParameterName == cp.ParameterPath.SqlParameterName);
-                                        var sqlParameterName = $"{insertSpec.RelationalPrefix}{cp.ParameterPath.SqlParameterName}{i}";
-                                        var parameterValue = MethodSqlStatement.GetValueForParameterPath(item, cp.ParameterPath.Properties);
+                                            parameterPaths.RemoveAll(p => p.SqlParameterName == cp.Arguments.GetArguments(TableRelationsColumnSource.Parameters).First().ToParameterPath().GenerateSuggestedSqlIdentifierName());
+                                        var sqlParameterName = $"{insertSpec.RelationalPrefix}{cp.Arguments.GetArguments(TableRelationsColumnSource.Parameters).First().ToParameterPath().GenerateSuggestedSqlIdentifierName()}{i}";
+                                        var parameterValue = MethodSqlStatement.GetValueForParameterPath(item, cp.Arguments.GetArguments(TableRelationsColumnSource.Parameters).First().ToParameterPath().Properties);
                                         sqlParameters[sqlParameterName] = parameterValue;
                                         return new NamedParameterIdentifier()
                                         {
@@ -334,7 +334,24 @@ namespace SigQL
                 {
                     insertSpec.Table = this.databaseConfiguration.Tables.FindByName(insertAttribute.TableName);
                 }
-
+                else
+                {
+                    if (methodInfo.ReturnType != typeof(void))
+                    {
+                        insertSpec.Table = this.databaseResolver.DetectTable(methodInfo.ReturnType);
+                    }
+                    else
+                    {
+                        insertSpec.Table =
+                            this.databaseResolver.DetectTable(methodInfo.GetParameters().First().ParameterType);
+                    }
+                }
+                
+                insertSpec.ParameterTableRelations = this.databaseResolver.BuildTableRelations(insertSpec.Table,
+                    new TableArgument(insertSpec.Table,
+                        methodInfo.GetParameters().AsArguments(this.databaseResolver)),
+                    TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, ITableKeyDefinition>());
+                
                 var methodParameters = methodInfo.GetParameters();
                 var tableTypeParameters = methodParameters.Where(p => this.databaseResolver.IsTableOrTableProjection(OutputFactory.UnwrapType(p.ParameterType)));
                 if (tableTypeParameters.Any())
@@ -399,6 +416,7 @@ namespace SigQL
             public ITableDefinition Table { get; set; }
             public IList<InsertColumnParameter> ColumnParameters { get; set; }
             public TableRelations TableRelations { get; set; }
+            public TableRelations ParameterTableRelations { get; set; }
             public Type ReturnType { get; set; }
             public Type UnwrappedReturnType { get; set; }
             public MethodInfo RootMethodInfo { get; set; }

@@ -343,6 +343,14 @@ namespace SigQL.Tests.Common.Databases.Labor
             [JoinRelation("WorkLog(EmployeeId)->(EmployeeId)WorkLogEmployeeView")]
             WorkLogEmployeeView.IFieldsMismatchingCase View { get; }
         }
+
+        public class InsertFieldsWithEmployeeAndLocation
+        {
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
+            public Employee.InsertFieldsWithAddress Employee { get; set; }
+            public Location.Insert Location { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

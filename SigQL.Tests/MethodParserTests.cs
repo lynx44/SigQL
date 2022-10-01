@@ -1167,7 +1167,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.InsertEmployeeWithAttributeWithValuesByDetectedClass));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("insert \"Employee\"(\"Name\") values(@Name)", sql);
+            Assert.AreEqual("insert \"Employee\"(\"Name\") values(@valuesName)", sql);
         }
 
         [TestMethod]
@@ -1178,7 +1178,7 @@ namespace SigQL.Tests
 
             AssertSqlEqual("declare @insertedEmployee table(\"Id\" int, \"_index\" int)\n" +
                            "declare @EmployeeLookup table(\"Name\" nvarchar(max), \"_index\" int)\n" +
-                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@Name0, 0)\n" +
+                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@valuesName0, 0)\n" +
                            "merge \"Employee\" using (select \"Name\", \"_index\" from @EmployeeLookup) as i (\"Name\",\"_index\") on (1 = 0)\n" +
                            " when not matched then\n" +
                            " insert (\"Name\") values(\"i\".\"Name\") output \"inserted\".\"Id\", \"i\".\"_index\" into @insertedEmployee(\"Id\", \"_index\");\n" +
@@ -1192,7 +1192,7 @@ namespace SigQL.Tests
                 new Employee.InsertFields[] { new Employee.InsertFields() { Name = "bah" }, new Employee.InsertFields() { Name = "baah" } }));
 
             AssertSqlEqual("declare @EmployeeLookup table(\"Name\" nvarchar(max), \"_index\" int)\n" +
-                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@Name0, 0), (@Name1, 1)\n" +
+                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@employeesName0, 0), (@employeesName1, 1)\n" +
                            "merge \"Employee\" using (select \"Name\", \"_index\" from @EmployeeLookup) as i (\"Name\",\"_index\") on (1 = 0)\n" +
                            " when not matched then\n" +
                            " insert (\"Name\") values(\"i\".\"Name\");", sql);
@@ -1209,7 +1209,7 @@ namespace SigQL.Tests
                 }));
 
             AssertSqlEqual("declare @AddressLookup table(\"StreetAddress\" nvarchar(max), \"City\" nvarchar(max), \"State\" nvarchar(max), \"_index\" int)\n" +
-                           "insert @AddressLookup(\"StreetAddress\", \"City\", \"State\", \"_index\") values(@StreetAddress0, @City0, @State0, 0), (@StreetAddress1, @City1, @State1, 1)\n" +
+                           "insert @AddressLookup(\"StreetAddress\", \"City\", \"State\", \"_index\") values(@addressesStreetAddress0, @addressesCity0, @addressesState0, 0), (@addressesStreetAddress1, @addressesCity1, @addressesState1, 1)\n" +
                            "merge \"Address\" using (select \"StreetAddress\", \"City\", \"State\", \"_index\" from @AddressLookup) as i (\"StreetAddress\",\"City\",\"State\",\"_index\") on (1 = 0)\n" +
                            " when not matched then\n" +
                            " insert (\"StreetAddress\", \"City\", \"State\") values(\"i\".\"StreetAddress\", \"i\".\"City\", \"i\".\"State\");", sql);
@@ -1222,7 +1222,7 @@ namespace SigQL.Tests
 
             AssertSqlEqual("declare @insertedEmployee table(\"Id\" int, \"_index\" int)\n" +
                            "declare @EmployeeLookup table(\"Name\" nvarchar(max), \"_index\" int)\n" +
-                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@Name0, 0), (@Name1, 1), (@Name2, 2)\n" +
+                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@employeesName0, 0), (@employeesName1, 1), (@employeesName2, 2)\n" +
                             "merge \"Employee\" using (select \"Name\", \"_index\" from @EmployeeLookup) as i (\"Name\",\"_index\") on (1 = 0)\n" +
                             " when not matched then\n" +
                             " insert (\"Name\") values(\"i\".\"Name\") output \"inserted\".\"Id\", \"i\".\"_index\" into @insertedEmployee(\"Id\", \"_index\");\n" +
