@@ -22,293 +22,320 @@ namespace SigQL
             var statement = new List<AstNode>();
             var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
 
-            var insertTableRelations = insertSpec.InsertTableRelationsCollection.First();
-            var insertColumnList = insertTableRelations.ColumnParameters.Select(cp =>
-                new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = cp.Column.Name })).ToList();
-
             var tokens = new List<TokenPath>();
-            var multipleInsertParameters = insertTableRelations.ColumnParameters.Where(c =>
+
+            foreach (var insertTableRelations in insertSpec.InsertTableRelationsCollection)
             {
-                return this.databaseResolver.IsTableOrTableProjection(c.ParameterPath.Parameter.ParameterType) && TableEqualityComparer.Default.Equals(
-                           this.databaseResolver.DetectTable(c.ParameterPath.Parameter.ParameterType),
-                           insertSpec.Table);
-            }).ToList();
-            if (multipleInsertParameters.Any(p => p.ParameterPath.Parameter != insertTableRelations.ColumnParameters.First().ParameterPath.Parameter))
-            {
-                throw new InvalidOperationException($"Only one parameter can represent multiple inserts for target table {insertSpec.Table.Name}");
-            }
-            if (!multipleInsertParameters.Any(p => p.ParameterPath.Parameter.ParameterType.IsCollectionType()) && insertSpec.RootMethodInfo.ReturnType == typeof(void))
-            {
-                valuesListClause.SetArgs(
-                    new ValuesList().SetArgs(
-                        insertTableRelations.ColumnParameters.Select(cp =>
-                            new NamedParameterIdentifier()
-                            {
-                                Name = cp.ParameterPath.SqlParameterName
-                            })
-                    )
-                );
-                statement.Add(new Insert()
+
+                var insertColumnList = insertTableRelations.ColumnParameters.Select(cp =>
+                    new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = cp.Column.Name})).ToList();
+
+                var multipleInsertParameters = insertTableRelations.ColumnParameters.Where(c =>
                 {
-                    Object = new TableIdentifier().SetArgs(new RelationalTable() { Label = insertSpec.Table.Name }),
-                    ColumnList =
-                        insertColumnList,
-                    ValuesList = valuesListClause
-                });
-            }
-            else
-            {
-                var mergeIndexColumnName = "_index";
-                var mergeTableAlias = "i";
-
-                var insertColumnParameter = multipleInsertParameters.FirstOrDefault();
-
-
-                //var lookupParameterTableName = $"{insertSpec.RelationalPrefix}{insertSpec.Table.Name}Lookup";
-                var lookupParameterTableName = insertTableRelations.LookupTableName;
-                var declareLookupParameterStatement = new DeclareStatement()
+                    return this.databaseResolver.IsTableOrTableProjection(c.ParameterPath.Parameter.ParameterType) &&
+                           TableEqualityComparer.Default.Equals(
+                               this.databaseResolver.DetectTable(c.ParameterPath.Parameter.ParameterType),
+                               insertSpec.Table);
+                }).ToList();
+                if (multipleInsertParameters.Any(p =>
+                        p.ParameterPath.Parameter !=
+                        insertTableRelations.ColumnParameters.First().ParameterPath.Parameter))
                 {
-                    Parameter = new NamedParameterIdentifier() { Name = lookupParameterTableName },
-                    DataType = new DataType() { Type = new Literal() { Value = "table" } }
-                        .SetArgs(
-                            insertTableRelations.ColumnParameters.Select(c =>
-                                new ColumnDeclaration().SetArgs(
-                                    new RelationalColumn() { Label = c.Column.Name },
-                                    new DataType() { Type = new Literal() { Value = c.Column.DataTypeDeclaration } }
-                                )
-                            ).Concat(new ColumnDeclaration().SetArgs(
-                                new RelationalColumn() { Label = mergeIndexColumnName },
-                                new DataType() { Type = new Literal() { Value = "int" } }
-                            ).AsEnumerable())
+                    throw new InvalidOperationException(
+                        $"Only one parameter can represent multiple inserts for target table {insertSpec.Table.Name}");
+                }
+
+                if (!multipleInsertParameters.Any(p => p.ParameterPath.Parameter.ParameterType.IsCollectionType()) &&
+                    insertSpec.RootMethodInfo.ReturnType == typeof(void))
+                {
+                    valuesListClause.SetArgs(
+                        new ValuesList().SetArgs(
+                            insertTableRelations.ColumnParameters.Select(cp =>
+                                new NamedParameterIdentifier()
+                                {
+                                    Name = cp.ParameterPath.SqlParameterName
+                                })
                         )
-                };
-                statement.Insert(0, declareLookupParameterStatement);
-
-                var mergeValuesParametersList = new ValuesListClause();
-                var lookupParameterTableInsert = new Insert()
-                {
-                    Object = new TableIdentifier().SetArgs(new NamedParameterIdentifier() { Name = lookupParameterTableName }),
-                    ColumnList = insertTableRelations.ColumnParameters.Select(c =>
-                        new ColumnIdentifier().SetArgs(
-                            new RelationalColumn() { Label = c.Column.Name }
-                        )).AppendOne(new ColumnIdentifier().SetArgs(
-                        new RelationalColumn() { Label = mergeIndexColumnName }
-                    )).ToList(),
-                    ValuesList = mergeValuesParametersList
-                };
-
-                statement.Add(lookupParameterTableInsert);
-
-                var merge = new Merge()
-                {
-                    Table = new TableIdentifier().SetArgs(new RelationalTable() { Label = insertSpec.Table.Name }),
-                    Using = new MergeUsing()
+                    );
+                    statement.Add(new Insert()
                     {
-                        Values =
-                            new Select()
-                            {
-                                SelectClause = new SelectClause().SetArgs(
-                                    insertTableRelations.ColumnParameters.Select(c =>
-                                        new ColumnIdentifier().SetArgs(
-                                            new RelationalColumn() { Label = c.Column.Name }
-                                        )
-                                    ).AppendOne(new ColumnIdentifier().SetArgs(
-                                            new RelationalColumn() { Label = mergeIndexColumnName }
-                                    ))),
-                                FromClause =
-                                    new FromClause().SetArgs(
-                                        new FromClauseNode().SetArgs(
-                                            new TableIdentifier().SetArgs(
-                                                new NamedParameterIdentifier() { Name = lookupParameterTableName })))
-                            },
-                        As = new TableAliasDefinition() { Alias = mergeTableAlias }
+                        Object = new TableIdentifier().SetArgs(new RelationalTable() {Label = insertSpec.Table.Name}),
+                        ColumnList =
+                            insertColumnList,
+                        ValuesList = valuesListClause
+                    });
+                }
+                else
+                {
+                    var mergeIndexColumnName = "_index";
+                    var mergeTableAlias = "i";
+
+                    var insertColumnParameter = multipleInsertParameters.FirstOrDefault();
+
+
+                    //var lookupParameterTableName = $"{insertSpec.RelationalPrefix}{insertSpec.Table.Name}Lookup";
+                    var lookupParameterTableName = insertTableRelations.LookupTableName;
+                    var declareLookupParameterStatement = new DeclareStatement()
+                    {
+                        Parameter = new NamedParameterIdentifier() {Name = lookupParameterTableName},
+                        DataType = new DataType() {Type = new Literal() {Value = "table"}}
                             .SetArgs(
-                                insertTableRelations.ColumnParameters.Select(cp =>
+                                insertTableRelations.ColumnParameters.Select(c =>
                                     new ColumnDeclaration().SetArgs(
-                                        new RelationalColumn() { Label = cp.Column.Name }
-                                    )
-                                ).AppendOne(
-                                    new ColumnDeclaration().SetArgs(
-                                        new RelationalColumn() { Label = mergeIndexColumnName })
-                                )
-                            )
-                    },
-                    On = new EqualsOperator().SetArgs(
-                        new Literal() { Value = "1" },
-                        new Literal() { Value = "0" }
-                    ),
-                    WhenNotMatched = new WhenNotMatched()
-                    {
-                        Insert = new MergeInsert()
-                        {
-                            ColumnList = insertColumnList,
-                            ValuesList = valuesListClause
-                        }
-                    }
-                };
-
-                valuesListClause.SetArgs(
-                    new ValuesList().SetArgs(
-                        insertTableRelations.ColumnParameters.Select(cp =>
-                            new ColumnIdentifier().SetArgs(
-                                new RelationalTable() { Label = mergeTableAlias },
-                                new RelationalColumn() { Label = cp.Column.Name }
-                                )
-                        )
-                    )
-                );
-
-                var tokenPath = new TokenPath(insertColumnParameter.ParameterPath.Argument.FindParameter())
-                {
-                    SqlParameterName = insertColumnParameter.ParameterPath.SqlParameterName,
-                    UpdateNodeFunc = (parameterValue, tokenPath) =>
-                    {
-                        var enumerable = tokenPath.Argument.Type.IsCollectionType() ? parameterValue as IEnumerable : parameterValue.AsEnumerable();
-                        var sqlParameters = new Dictionary<string, object>();
-                        var allItems = enumerable?.Cast<object>();
-                        if (allItems != null && allItems.Any())
-                        {
-                            mergeValuesParametersList.SetArgs(allItems.Select((item, i) =>
-                            {
-                                return new ValuesList().SetArgs(
-                                    insertTableRelations.ColumnParameters.Select(cp =>
-                                    {
-                                        if (i == 0)
-                                            parameterPaths.RemoveAll(p => p.SqlParameterName == cp.ParameterPath.SqlParameterName);
-                                        var sqlParameterName = $"{cp.ParameterPath.SqlParameterName}{i}";
-                                        var parameterValue = MethodSqlStatement.GetValueForParameterPath(item, cp.ParameterPath.Properties);
-                                        sqlParameters[sqlParameterName] = parameterValue;
-                                        return new NamedParameterIdentifier()
-                                        {
-                                            Name = sqlParameterName
-                                        };
-                                    }).Cast<AstNode>().AppendOne(new Literal() { Value = i.ToString() })
-                                );
-                            }));
-                        }
-                        else
-                        {
-                            throw new ArgumentException($"Unable to insert items for {insertSpec.Table.Name} (via method {insertSpec.RootMethodInfo.Name}) from null or empty list.");
-                        }
-
-                        return sqlParameters;
-                    }
-                };
-
-                tokens.Add(tokenPath);
-                statement.Add(merge);
-
-                if (insertSpec.ReturnType != typeof(void))
-                {
-                    var outputParameterTableName = insertTableRelations.InsertedTableName;
-                    var declareOutputParameterStatement = new DeclareStatement()
-                    {
-                        Parameter = new NamedParameterIdentifier() { Name = outputParameterTableName },
-                        DataType = new DataType() { Type = new Literal() { Value = "table" } }
-                            .SetArgs(
-                                insertSpec.Table.PrimaryKey.Columns.Select(c =>
-                                    new ColumnDeclaration().SetArgs(
-                                        new RelationalColumn() { Label = c.Name },
-                                        new DataType() { Type = new Literal() { Value = c.DataTypeDeclaration } }
+                                        new RelationalColumn() {Label = c.Column.Name},
+                                        new DataType() {Type = new Literal() {Value = c.Column.DataTypeDeclaration}}
                                     )
                                 ).Concat(new ColumnDeclaration().SetArgs(
-                                    new RelationalColumn() { Label = mergeIndexColumnName },
-                                    new DataType() { Type = new Literal() { Value = "int" } }
+                                    new RelationalColumn() {Label = mergeIndexColumnName},
+                                    new DataType() {Type = new Literal() {Value = "int"}}
                                 ).AsEnumerable())
                             )
                     };
-                    statement.Insert(0, declareOutputParameterStatement);
+                    statement.Insert(0, declareLookupParameterStatement);
 
-                    var insertedTableName = "inserted";
-                    merge.WhenNotMatched.Insert.Output = new OutputClause()
+                    var mergeValuesParametersList = new ValuesListClause();
+                    var lookupParameterTableInsert = new Insert()
                     {
-                        Into = new IntoClause() {Object = new NamedParameterIdentifier() {Name = outputParameterTableName}}.SetArgs(
-                            insertSpec.Table.PrimaryKey.Columns.Select(c => 
-                            new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = c.Name}))
-                                .AppendOne(
-                                    new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = mergeIndexColumnName })))
-                    }.SetArgs(
-                        insertSpec.Table.PrimaryKey.Columns.Select(c =>
-                        new ColumnIdentifier().SetArgs(new RelationalTable() {Label = insertedTableName},
-                            new RelationalColumn() {Label = c.Name}))
-                            .AppendOne(
+                        Object = new TableIdentifier().SetArgs(new NamedParameterIdentifier()
+                            {Name = lookupParameterTableName}),
+                        ColumnList = insertTableRelations.ColumnParameters.Select(c =>
+                            new ColumnIdentifier().SetArgs(
+                                new RelationalColumn() {Label = c.Column.Name}
+                            )).AppendOne(new ColumnIdentifier().SetArgs(
+                            new RelationalColumn() {Label = mergeIndexColumnName}
+                        )).ToList(),
+                        ValuesList = mergeValuesParametersList
+                    };
+
+                    statement.Add(lookupParameterTableInsert);
+
+                    var merge = new Merge()
+                    {
+                        Table = new TableIdentifier().SetArgs(new RelationalTable() {Label = insertSpec.Table.Name}),
+                        Using = new MergeUsing()
+                        {
+                            Values =
+                                new Select()
+                                {
+                                    SelectClause = new SelectClause().SetArgs(
+                                        insertTableRelations.ColumnParameters.Select(c =>
+                                            new ColumnIdentifier().SetArgs(
+                                                new RelationalColumn() {Label = c.Column.Name}
+                                            )
+                                        ).AppendOne(new ColumnIdentifier().SetArgs(
+                                            new RelationalColumn() {Label = mergeIndexColumnName}
+                                        ))),
+                                    FromClause =
+                                        new FromClause().SetArgs(
+                                            new FromClauseNode().SetArgs(
+                                                new TableIdentifier().SetArgs(
+                                                    new NamedParameterIdentifier() {Name = lookupParameterTableName})))
+                                },
+                            As = new TableAliasDefinition() {Alias = mergeTableAlias}
+                                .SetArgs(
+                                    insertTableRelations.ColumnParameters.Select(cp =>
+                                        new ColumnDeclaration().SetArgs(
+                                            new RelationalColumn() {Label = cp.Column.Name}
+                                        )
+                                    ).AppendOne(
+                                        new ColumnDeclaration().SetArgs(
+                                            new RelationalColumn() {Label = mergeIndexColumnName})
+                                    )
+                                )
+                        },
+                        On = new EqualsOperator().SetArgs(
+                            new Literal() {Value = "1"},
+                            new Literal() {Value = "0"}
+                        ),
+                        WhenNotMatched = new WhenNotMatched()
+                        {
+                            Insert = new MergeInsert()
+                            {
+                                ColumnList = insertColumnList,
+                                ValuesList = valuesListClause
+                            }
+                        }
+                    };
+
+                    valuesListClause.SetArgs(
+                        new ValuesList().SetArgs(
+                            insertTableRelations.ColumnParameters.Select(cp =>
                                 new ColumnIdentifier().SetArgs(
-                                    new RelationalTable() { Label = mergeTableAlias },
-                                    new RelationalColumn() { Label = mergeIndexColumnName }
+                                    new RelationalTable() {Label = mergeTableAlias},
+                                    new RelationalColumn() {Label = cp.Column.Name}
+                                )
+                            )
+                        )
+                    );
+
+                    var tokenPath = new TokenPath(insertColumnParameter.ParameterPath.Argument.FindParameter())
+                    {
+                        SqlParameterName = insertColumnParameter.ParameterPath.SqlParameterName,
+                        UpdateNodeFunc = (parameterValue, tokenPath) =>
+                        {
+                            var enumerable = tokenPath.Argument.Type.IsCollectionType()
+                                ? parameterValue as IEnumerable
+                                : parameterValue.AsEnumerable();
+                            var sqlParameters = new Dictionary<string, object>();
+                            var allItems = enumerable?.Cast<object>();
+                            if (allItems != null && allItems.Any())
+                            {
+                                mergeValuesParametersList.SetArgs(allItems.Select((item, i) =>
+                                {
+                                    return new ValuesList().SetArgs(
+                                        insertTableRelations.ColumnParameters.Select(cp =>
+                                        {
+                                            if (i == 0)
+                                                parameterPaths.RemoveAll(p =>
+                                                    p.SqlParameterName == cp.ParameterPath.SqlParameterName);
+                                            var sqlParameterName = $"{cp.ParameterPath.SqlParameterName}{i}";
+                                            var parameterValue =
+                                                MethodSqlStatement.GetFlattenedValuesForCollectionParameterPath(item,
+                                                    tokenPath.Argument.GetParameterInfo().ParameterType,
+                                                    cp.ParameterPath.Properties);
+                                            sqlParameters[sqlParameterName] = parameterValue;
+                                            return new NamedParameterIdentifier()
+                                            {
+                                                Name = sqlParameterName
+                                            };
+                                        }).Cast<AstNode>().AppendOne(new Literal() {Value = i.ToString()})
+                                    );
+                                }));
+                            }
+                            else
+                            {
+                                throw new ArgumentException(
+                                    $"Unable to insert items for {insertSpec.Table.Name} (via method {insertSpec.RootMethodInfo.Name}) from null or empty list.");
+                            }
+
+                            return sqlParameters;
+                        }
+                    };
+
+                    tokens.Add(tokenPath);
+                    statement.Add(merge);
+
+                    if (insertSpec.ReturnType != typeof(void))
+                    {
+                        var outputParameterTableName = insertTableRelations.InsertedTableName;
+                        var declareOutputParameterStatement = new DeclareStatement()
+                        {
+                            Parameter = new NamedParameterIdentifier() {Name = outputParameterTableName},
+                            DataType = new DataType() {Type = new Literal() {Value = "table"}}
+                                .SetArgs(
+                                    insertSpec.Table.PrimaryKey.Columns.Select(c =>
+                                        new ColumnDeclaration().SetArgs(
+                                            new RelationalColumn() {Label = c.Name},
+                                            new DataType() {Type = new Literal() {Value = c.DataTypeDeclaration}}
+                                        )
+                                    ).Concat(new ColumnDeclaration().SetArgs(
+                                        new RelationalColumn() {Label = mergeIndexColumnName},
+                                        new DataType() {Type = new Literal() {Value = "int"}}
+                                    ).AsEnumerable())
+                                )
+                        };
+                        statement.Insert(0, declareOutputParameterStatement);
+
+                        var insertedTableName = "inserted";
+                        merge.WhenNotMatched.Insert.Output = new OutputClause()
+                        {
+                            Into = new IntoClause()
+                                {Object = new NamedParameterIdentifier() {Name = outputParameterTableName}}.SetArgs(
+                                insertSpec.Table.PrimaryKey.Columns.Select(c =>
+                                        new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = c.Name}))
+                                    .AppendOne(
+                                        new ColumnIdentifier().SetArgs(new RelationalColumn()
+                                            {Label = mergeIndexColumnName})))
+                        }.SetArgs(
+                            insertSpec.Table.PrimaryKey.Columns.Select(c =>
+                                    new ColumnIdentifier().SetArgs(new RelationalTable() {Label = insertedTableName},
+                                        new RelationalColumn() {Label = c.Name}))
+                                .AppendOne(
+                                    new ColumnIdentifier().SetArgs(
+                                        new RelationalTable() {Label = mergeTableAlias},
+                                        new RelationalColumn() {Label = mergeIndexColumnName}
                                     ))
                         );
 
-                    var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
-                    var resolvedSelectClause = selectClauseBuilder.Build(targetTableType);
-                    var fromClauseRelations = resolvedSelectClause.FromClauseRelations;
-                    var selectClause = resolvedSelectClause.Ast;
+                        var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
+                        var resolvedSelectClause = selectClauseBuilder.Build(targetTableType);
+                        var fromClauseRelations = resolvedSelectClause.FromClauseRelations;
+                        var selectClause = resolvedSelectClause.Ast;
 
-                    var fromClauseNode = BuildFromClause(fromClauseRelations);
-                    
-                    var primaryTable = fromClauseRelations.TargetTable;
-                    var outputParameterTableSelectAlias = "i";
-                    fromClauseNode.SetArgs(fromClauseNode.Args.AppendOne(new InnerJoin()
-                    {
-                        RightNode =
-                            new TableIdentifier().SetArgs(new Alias() { Label = outputParameterTableSelectAlias }.SetArgs(new NamedParameterIdentifier() {Name = outputParameterTableName }))
-                    }.SetArgs(
-                        primaryTable.PrimaryKey.Columns.Select(pks =>
-                            new AndOperator().SetArgs(
-                                new EqualsOperator().SetArgs(
-                                    new ColumnIdentifier().SetArgs(new RelationalTable() {Label = fromClauseRelations.Alias},
-                                        new RelationalColumn() {Label = pks.Name}),
-                                    new ColumnIdentifier().SetArgs(new RelationalTable() { Label = outputParameterTableSelectAlias }, new RelationalColumn() {Label = pks.Name})
-                                )))
-                    )));
-                    var fromClause = new FromClause().SetArgs(fromClauseNode);
+                        var fromClauseNode = BuildFromClause(fromClauseRelations);
 
-                    var selectStatement = new Select()
-                    {
-                        SelectClause = selectClause,
-                        FromClause = fromClause,
-                        OrderByClause = new OrderByClause().SetArgs(
-                            primaryTable.PrimaryKey.Columns.Select(pks => 
+                        var primaryTable = fromClauseRelations.TargetTable;
+                        var outputParameterTableSelectAlias = "i";
+                        fromClauseNode.SetArgs(fromClauseNode.Args.AppendOne(new InnerJoin()
+                        {
+                            RightNode =
+                                new TableIdentifier().SetArgs(
+                                    new Alias() {Label = outputParameterTableSelectAlias}.SetArgs(
+                                        new NamedParameterIdentifier() {Name = outputParameterTableName}))
+                        }.SetArgs(
+                            primaryTable.PrimaryKey.Columns.Select(pks =>
+                                new AndOperator().SetArgs(
+                                    new EqualsOperator().SetArgs(
+                                        new ColumnIdentifier().SetArgs(
+                                            new RelationalTable() {Label = fromClauseRelations.Alias},
+                                            new RelationalColumn() {Label = pks.Name}),
+                                        new ColumnIdentifier().SetArgs(
+                                            new RelationalTable() {Label = outputParameterTableSelectAlias},
+                                            new RelationalColumn() {Label = pks.Name})
+                                    )))
+                        )));
+                        var fromClause = new FromClause().SetArgs(fromClauseNode);
+
+                        var selectStatement = new Select()
+                        {
+                            SelectClause = selectClause,
+                            FromClause = fromClause,
+                            OrderByClause = new OrderByClause().SetArgs(
+                                primaryTable.PrimaryKey.Columns.Select(pks =>
                                     new OrderByIdentifier().SetArgs(
-                                        new ColumnIdentifier().SetArgs(new RelationalTable() { Label = outputParameterTableSelectAlias }, new RelationalColumn() { Label = mergeIndexColumnName })
+                                        new ColumnIdentifier().SetArgs(
+                                            new RelationalTable() {Label = outputParameterTableSelectAlias},
+                                            new RelationalColumn() {Label = mergeIndexColumnName})
                                     )
                                 )
                             )
-                    };
+                        };
 
-                    statement.Add(selectStatement);
+                        statement.Add(selectStatement);
+                    }
+
+                    //var manyTables = insertTableRelations.TableRelations.NavigationTables.Where(nt =>
+                    //    TableEqualityComparer.Default.Equals(nt.ForeignKeyToParent.PrimaryKeyTable, insertSpec.Table)).ToList();
+
+                    //var manyTableInsertSpecs = manyTables.Select(t => new InsertSpec()
+                    //{
+                    //    Table = t.TargetTable,
+                    //    InsertTableRelationsCollection = new List<InsertTableRelations>()
+                    //    {
+                    //        new InsertTableRelations() {
+                    //            TableRelations = t,
+                    //            ColumnParameters = t.ForeignKeyToParent.KeyPairs.Select(c => new InsertColumnParameter()
+                    //            {
+                    //                Column = c.ForeignTableColumn,
+                    //                ParameterPath = new ParameterPath(t.Argument)
+                    //                {
+                    //                    SqlParameterName = $"{t.TargetTable.Name}"
+                    //                }
+                    //            }).ToList(),
+                    //        }
+                    //    },
+                    //    ReturnType = typeof(void),
+                    //    UnwrappedReturnType = typeof(void),
+                    //    RootMethodInfo = insertSpec.RootMethodInfo
+                    //}).ToList();
+
+                    //// parameterPaths.AddRange(manyTableInsertSpecs.SelectMany(m => m.ColumnParameters.Select(c => c.ParameterPath)).ToList());
+                    //var methodSqlStatements = manyTableInsertSpecs.Select(tis =>
+                    //    BuildInsertStatement(tis, parameterPaths)).ToList();
+
+                    //statement.AddRange(methodSqlStatements.SelectMany(mst => mst.CommandAst));
+                    //tokens.AddRange(methodSqlStatements.SelectMany(mst => mst.Tokens));
                 }
-
-                var manyTables = insertTableRelations.TableRelations.NavigationTables.Where(nt =>
-                    TableEqualityComparer.Default.Equals(nt.ForeignKeyToParent.PrimaryKeyTable, insertSpec.Table)).ToList();
-
-                var manyTableInsertSpecs = manyTables.Select(t => new InsertSpec()
-                {
-                    Table = t.TargetTable,
-                    InsertTableRelationsCollection = new List<InsertTableRelations>()
-                    {
-                        new InsertTableRelations() {
-                            TableRelations = t,
-                            ColumnParameters = t.ForeignKeyToParent.KeyPairs.Select(c => new InsertColumnParameter()
-                            {
-                                Column = c.ForeignTableColumn,
-                                ParameterPath = new ParameterPath(t.Argument)
-                                {
-                                    SqlParameterName = $"{t.TargetTable.Name}"
-                                }
-                            }).ToList(),
-                        }
-                    },
-                    ReturnType = typeof(void),
-                    UnwrappedReturnType = typeof(void),
-                    RootMethodInfo = insertSpec.RootMethodInfo
-                }).ToList();
-
-                // parameterPaths.AddRange(manyTableInsertSpecs.SelectMany(m => m.ColumnParameters.Select(c => c.ParameterPath)).ToList());
-                var methodSqlStatements = manyTableInsertSpecs.Select(tis =>
-                    BuildInsertStatement(tis, parameterPaths)).ToList();
-
-                statement.AddRange(methodSqlStatements.SelectMany(mst => mst.CommandAst));
-                tokens.AddRange(methodSqlStatements.SelectMany(mst => mst.Tokens));
             }
 
             var sqlStatement = new MethodSqlStatement()
