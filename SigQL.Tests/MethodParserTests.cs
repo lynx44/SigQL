@@ -1230,37 +1230,37 @@ namespace SigQL.Tests
         }
 
         // WIP
-        // [TestMethod]
-        // public void InsertMultipleWithNavigationProperty_Void_ReturnsExpectedSql()
-        // {
-        //     var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(
-        //             new Employee.InsertFieldsWithWorkLogs[]
-        //             {
-        //                 new Employee.InsertFieldsWithWorkLogs() 
-        //                 { 
-        //                     Name = "bah", 
-        //                     WorkLogs = new []
-        //                     {
-        //                         new WorkLog.DataFields() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) },
-        //                         new WorkLog.DataFields() { StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) }
-        //                     }
-        //                 }
-        //             }));
-        //
-        //     AssertSqlEqual("declare @insertedEmployee table(Id int, _index int)\n" +
-        //                    "declare @EmployeeLookup table(Name nvarchar(max), _index int)\n" +
-        //                    "insert @EmployeeLookup(Name, _index) values(@Name0, 0), (@Name1, 1), (@Name2, 2)\n" +
-        //                    "merge Employee using (select Name, _index from @EmployeeLookup) as i (Name,_index) on (1 = 0)\n" +
-        //                    " when not matched then\n" +
-        //                    " insert (Name) values(i.Name) output inserted.Id, i._index into @insertedEmployee(Id, _index);\n" +
-        //                    "declare @insertedEmployeeWorkLog table(Id int, _index int)\n" +
-        //                    "declare @EmployeeWorkLogLookup table(Id int, StartDate datetime, EndDate datetime, _index int, EmployeeIndex int, EmployeeId int)\n" +
-        //                    "insert @EmployeeWorkLogLookup(StartDate, EndDate, _index, EmployeeIndex) values (@WorkLogStartDate0, @WorkLogEndDate0, 0, 2)\n" +
-        //                    "update @EmployeeWorkLogLookup set EmployeeId=i.Id from @EmployeeWorkLogLookup inner join @insertedEmployee i on i._index = EmployeeIndex\n" +
-        //                    "merge WorkLog using(select StartDate, EndDate, _index, EmployeeId  from @EmployeeWorkLogLookup) as i(StartDate, EndDate, _index, EmployeeId) on (1 = 0)\n" +
-        //                    " when not matched then\n" +
-        //                    " insert (StartDate, EndDate, EmployeeId) values(i.StartDate, i.EndDate, i.EmployeeId) output inserted.Id, i._index into @insertedEmployeeWorkLog(Id, _index);", sql);
-        // }
+        [TestMethod]
+        public void InsertMultipleWithNavigationProperty_Void_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(
+                    new Employee.InsertFieldsWithWorkLogs[]
+                    {
+                         new Employee.InsertFieldsWithWorkLogs()
+                         {
+                             Name = "bah",
+                             WorkLogs = new []
+                             {
+                                 new WorkLog.DataFields() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) },
+                                 new WorkLog.DataFields() { StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) }
+                             }
+                         }
+                    }));
+
+            AssertSqlEqual("declare @insertedEmployee table(Id int, _index int)\n" +
+                           "declare @EmployeeLookup table(Name nvarchar(max), _index int)\n" +
+                           "insert @EmployeeLookup(Name, _index) values(@Name0, 0), (@Name1, 1), (@Name2, 2)\n" +
+                           "merge Employee using (select Name, _index from @EmployeeLookup) as i (Name,_index) on (1 = 0)\n" +
+                           " when not matched then\n" +
+                           " insert (Name) values(i.Name) output inserted.Id, i._index into @insertedEmployee(Id, _index);\n" +
+                           "declare @insertedEmployeeWorkLog table(Id int, _index int)\n" +
+                           "declare @EmployeeWorkLogLookup table(Id int, StartDate datetime, EndDate datetime, _index int, EmployeeIndex int, EmployeeId int)\n" +
+                           "insert @EmployeeWorkLogLookup(StartDate, EndDate, _index, EmployeeIndex) values (@WorkLogStartDate0, @WorkLogEndDate0, 0, 2)\n" +
+                           "update @EmployeeWorkLogLookup set EmployeeId=i.Id from @EmployeeWorkLogLookup inner join @insertedEmployee i on i._index = EmployeeIndex\n" +
+                           "merge WorkLog using(select StartDate, EndDate, _index, EmployeeId  from @EmployeeWorkLogLookup) as i(StartDate, EndDate, _index, EmployeeId) on (1 = 0)\n" +
+                           " when not matched then\n" +
+                           " insert (StartDate, EndDate, EmployeeId) values(i.StartDate, i.EndDate, i.EmployeeId) output inserted.Id, i._index into @insertedEmployeeWorkLog(Id, _index);", sql);
+        }
 
         // [TestMethod]
         // public void InsertMultiple_WithNavigationEntities_ReturnsExpectedSql()

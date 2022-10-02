@@ -34,7 +34,7 @@ namespace SigQL
             if (statementType == StatementType.Insert)
             {
                 var insertSpec = GetInsertSpec(methodInfo);
-                return BuildInsertStatement(insertSpec, Enumerable.Select<InsertColumnParameter, ParameterPath>(insertSpec.ColumnParameters, cp => cp.ParameterPath).ToList());
+                return BuildInsertStatement(insertSpec, Enumerable.Select<InsertColumnParameter, ParameterPath>(insertSpec.InsertTableRelationsCollection.First().ColumnParameters, cp => cp.ParameterPath).ToList());
             }
             if (statementType == StatementType.Delete)
             {
