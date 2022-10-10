@@ -108,11 +108,11 @@ namespace SigQL
 
         internal static IEnumerable<object> GetFlattenedValuesForCollectionParameterPath(object value, Type valueType, IEnumerable<PropertyInfo> propertyPaths)
         {
-            return value.AsEnumerable().SelectMany(v =>
+            return !propertyPaths.Any() ? value.AsEnumerable() : value.AsEnumerable().SelectMany(v =>
             {
-                var propertyInvo = propertyPaths.First();
+                var propertyInfo = propertyPaths.First();
                 return GetFlattenedValuesForCollectionParameterPath(
-                    propertyInvo.GetMethod.Invoke(v, null), propertyInvo.PropertyType,
+                    propertyInfo.GetMethod.Invoke(v, null), propertyInfo.PropertyType,
                     propertyPaths.Skip(1).ToList());
             });
             //var values = new List<object>();

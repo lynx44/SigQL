@@ -8,7 +8,7 @@ namespace SigQL.Extensions
     {
         public static IEnumerable<T> AsEnumerable<T>(this T item)
         {
-            if (typeof(T).IsCollectionType())
+            if ((item?.GetType().IsCollectionType()).GetValueOrDefault(false) || typeof(T).IsCollectionType())
             {
                 var currentEnumerable = item as IEnumerable<T>;
                 return currentEnumerable ?? ((IEnumerable) item).Cast<T>();

@@ -210,6 +210,18 @@ namespace SigQL
 
             return matches;
         }
+
+        internal static bool EquivalentTo(this IArgument arg1, IArgument arg2)
+        {
+            return (arg1 == null && arg2 == null) || 
+                   (
+                       arg1 != null && arg2 != null &&
+                       arg1.GetType() == arg2.GetType() &&
+                       arg1.Type == arg2.Type &&
+                       arg1.Name == arg2.Name &&
+                       arg1.Parent.EquivalentTo(arg2.Parent)
+                   );
+        }
     }
 
     internal class ArgumentContainer
