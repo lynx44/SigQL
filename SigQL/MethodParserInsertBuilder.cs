@@ -4,7 +4,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography.X509Certificates;
 using System.Security.Principal;
+using Castle.Components.DictionaryAdapter;
 using SigQL.Exceptions;
 using SigQL.Extensions;
 using SigQL.Schema;
@@ -181,20 +183,21 @@ namespace SigQL
                         )
                     );
 
-                    var tokenPath = new TokenPath(insertColumnParameter.ParameterPath.Argument.FindParameter())
+                    var tokenPath = new TokenPath(FindRootArgument(insertTableRelations.TableRelations.Argument).FindParameter())
                     {
                         SqlParameterName = insertColumnParameter.ParameterPath.SqlParameterName,
                         UpdateNodeFunc = (parameterValue, tokenPath) =>
                         {
-                            var orderedParameterValues = OrderParameterValues(parameterValue,
-                                insertColumnParameter.ParameterPath.Argument.FindParameter());
+                            var orderedParameterLookup = new OrderedParameterValueLookup();
+                            OrderParameterValues(orderedParameterLookup, parameterValue,
+                                FindRootArgument(insertTableRelations.TableRelations.Argument).FindParameter(), null);
 
-                            var orderedParametersForInsert = FindOrderedParameters(orderedParameterValues, insertTableRelations.TableRelations.Argument);
+                            var orderedParametersForInsert = orderedParameterLookup.FindOrderedParameters(FindRootArgument(insertTableRelations.TableRelations.Argument));
                             var parentIndexMappings = orderedParametersForInsert.Select(op =>
                             {
                                 var parentArguments = insertTableRelations.ForeignTableColumns.Select(fc =>
                                 {
-                                    var primaryTableKeyIndex = FindArgumentIndex(op, insertTableRelations.TableRelations.Argument, fc.PrimaryTableRelations.Argument, fc.Direction);
+                                    var primaryTableKeyIndex = orderedParameterLookup.FindArgumentIndex(op, FindRootArgument(insertTableRelations.TableRelations.Argument), FindRootArgument(fc.PrimaryTableRelations.Argument), fc.Direction);
                                     var foreignColumns = fc.ForeignKey.KeyPairs.Select(kp => kp.ForeignTableColumn).ToList();
                                     return new
                                     {
@@ -391,82 +394,126 @@ namespace SigQL
             return sqlStatement;
         }
 
-        private IEnumerable<OrderedParameterValue> OrderParameterValues(object parameterValue, IArgument parameter, OrderedParameterValue parent = null)
+        private static IArgument FindRootArgument(IArgument argument)
         {
-            var distinctValues = MethodSqlStatement.GetFlattenedValuesForCollectionParameterPath(parameterValue, parameter.Type,
-                parameter.ToParameterPath().Properties).Distinct();
-            return distinctValues.Select((v, i) =>
+            return argument is TableArgument ? argument.ClassProperties.First() : argument;
+        }
+
+        private class OrderedParameterValueLookup
+        {
+            private List<OrderedParameterValue> orderedParameterValues;
+
+            public OrderedParameterValueLookup()
             {
-                var orderedParameterValue = new OrderedParameterValue()
+                this.orderedParameterValues = new List<OrderedParameterValue>();
+            }
+
+            public void AddValue(IArgument argument, object value, object parentValue)
+            {
+                var currentIndex = this.orderedParameterValues.FindIndex(v => HasMatchingArgument(v.Argument, argument));
+                var item = new OrderedParameterValue()
                 {
-                    Index = i,
-                    Argument = parameter,
-                    Value = v,
-                    Parent = parent
+                    Argument = argument,
+                    Index = currentIndex + 1,
+                    Value = value
                 };
-                orderedParameterValue.Children = parameter.ClassProperties.Select(c => OrderParameterValues(parameterValue, c, orderedParameterValue)).ToList();
-                return orderedParameterValue;
-            }).ToList();
-        }
-
-        private IEnumerable<OrderedParameterValue> FindOrderedParameters(IEnumerable<OrderedParameterValue> orderedParameterValues, IArgument argument) 
-        {
-            if (orderedParameterValues.Any() && HasMatchingArgument(orderedParameterValues.First().Argument, argument))
-            {
-                return orderedParameterValues;
-            }
-
-
-            foreach (var childrenParameterValues in orderedParameterValues.SelectMany(v => v.Children))
-            {
-                var findOrderedParameters = FindOrderedParameters(childrenParameterValues, argument);
-                if (findOrderedParameters.Any())
+                this.orderedParameterValues.Add(item);
+                var parent = this.orderedParameterValues.FirstOrDefault(v => v.Value == parentValue);
+                if (parent != null)
                 {
-                    return findOrderedParameters;
-                }
-            }
-
-            return new OrderedParameterValue[0];
-            //return orderedParameterValues.Select(p => 
-            //    p.Children.SelectMany(c => 
-            //        FindOrderedParameters(c, argument)));
-        }
-
-        private static bool HasMatchingArgument(IArgument orderedParameterArgument, IArgument argument)
-        {
-            return (orderedParameterArgument.EquivalentTo(argument) || (argument is TableArgument && argument.ClassProperties.First().EquivalentTo(orderedParameterArgument)));
-        }
-
-        private int? FindArgumentIndex(OrderedParameterValue orderedParameterValue,
-            IArgument foreignTableArgument, IArgument primaryTableArgument, ForeignTablePropertyDirection direction)
-        {
-            if (HasMatchingArgument(orderedParameterValue.Argument, primaryTableArgument))
-            {
-                return orderedParameterValue.Index;
-            }
-
-            if (direction == ForeignTablePropertyDirection.Parent)
-            {
-                if (orderedParameterValue.Parent != null)
-                {
-                    return FindArgumentIndex(orderedParameterValue.Parent, foreignTableArgument, primaryTableArgument,
-                        direction);
+                    var existingChildrenList = parent.Children.ContainsKey(argument) ? parent.Children[argument] : null;
+                    if (existingChildrenList == null)
+                    {
+                        existingChildrenList = new List<OrderedParameterValue>();
+                        parent.Children[argument] = existingChildrenList;
+                    }
+                    existingChildrenList.Add(item);
+                    item.Parent = parent;
                 }
                 
-                return null;
-                
+            }
+            
+            public IEnumerable<OrderedParameterValue> FindOrderedParameters(IArgument argument)
+            {
+                return this.orderedParameterValues.Where(v => HasMatchingArgument(argument, v.Argument)).ToList();
+            }
+            
+            private static bool HasMatchingArgument(IArgument orderedParameterArgument, IArgument argument)
+            {
+                return (orderedParameterArgument.EquivalentTo(argument) || (argument is TableArgument && argument.ClassProperties.First().EquivalentTo(orderedParameterArgument)));
             }
 
-            return orderedParameterValue.Children.SelectMany(c => c).Select(c =>
-                FindArgumentIndex(c, foreignTableArgument, primaryTableArgument, direction)).FirstOrDefault(c => c.HasValue);
+            public int? FindArgumentIndex(OrderedParameterValue orderedParameterValue,
+                IArgument foreignTableArgument, IArgument primaryTableArgument, ForeignTablePropertyDirection direction)
+            {
+                if (HasMatchingArgument(orderedParameterValue.Argument, primaryTableArgument))
+                {
+                    return orderedParameterValue.Index;
+                }
+
+                if (direction == ForeignTablePropertyDirection.Parent)
+                {
+                    if (orderedParameterValue.Parent != null)
+                    {
+                        return FindArgumentIndex(orderedParameterValue.Parent, foreignTableArgument, primaryTableArgument,
+                            direction);
+                    }
+
+                    return null;
+                }
+
+                return orderedParameterValue.Children.SelectMany(c => c.Value).Select(c =>
+                    FindArgumentIndex(c, foreignTableArgument, primaryTableArgument, direction)).FirstOrDefault(c => c.HasValue);
+            }
+        }
+
+        private void OrderParameterValues(OrderedParameterValueLookup indexLookup, object value, IArgument argument, object parentValue)
+        {
+            var distinctValues = value.AsEnumerable().ToList();
+            //var currentValuesList = new List<OrderedParameterValue>();
+            for (var index = 0; index < distinctValues.Count; index++)
+            {
+                indexLookup.AddValue(argument, distinctValues[index], parentValue);
+            }
+            
+            argument.ClassProperties.ToList().ForEach(c =>
+                distinctValues.ForEach(v =>
+                    OrderParameterValues(indexLookup, MethodSqlStatement.GetValueForParameterPath(v, c.GetPropertyInfo().AsEnumerable()), c, v)
+                )
+            );
+
+            //foreach (var childrenPropertyValue in childrenPropertyValues)
+            //{
+            //    var childrenByParent = childrenPropertyValue.GroupBy(g => g.Parent);
+            //    OrderParameterValues(dictionary, childrenByParent.Select(a => a.).ToList(), childrenPropertyValue.Select(c => c.Argument).First(), childrenByParent.Select(c => c.Key).First());
+            //}
+
+
+            //return distinctValues.Select((v, i) =>
+            //{
+            //    var orderedParameterValue = new OrderedParameterValue()
+            //    {
+            //        Index = i,
+            //        Argument = parameter,
+            //        Value = v,
+            //        Parent = parent
+            //    };
+            //    orderedParameterValue.Children = parameter.ClassProperties.Select(c => OrderParameterValues(parameterValue, c, orderedParameterValue)).ToList();
+            //    return orderedParameterValue;
+            //}).ToList();
         }
 
         private class OrderedParameterValue
         {
+            public OrderedParameterValue()
+            {
+                Children = new ConcurrentDictionary<IArgument, List<OrderedParameterValue>>();
+            }
+
             public IArgument Argument { get; set; }
             public object Value { get; set; }
             public int Index { get; set; }
-            public IEnumerable<IEnumerable<OrderedParameterValue>> Children { get; set; }
+            public IDictionary<IArgument, List<OrderedParameterValue>> Children { get; set; }
             public OrderedParameterValue Parent { get; set; }
         }
 

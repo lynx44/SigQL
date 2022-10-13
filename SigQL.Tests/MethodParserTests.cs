@@ -1244,6 +1244,15 @@ namespace SigQL.Tests
                                  new WorkLog.DataFields() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) },
                                  new WorkLog.DataFields() { StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) }
                              }
+                         },
+                         new Employee.InsertFieldsWithWorkLogs()
+                         {
+                             Name = "2bah",
+                             WorkLogs = new []
+                             {
+                                 new WorkLog.DataFields() { StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2) },
+                                 new WorkLog.DataFields() { StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2) }
+                             }
                          }
                     }));
 
