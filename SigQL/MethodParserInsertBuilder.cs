@@ -459,11 +459,11 @@ namespace SigQL
 
             public void AddValue(IArgument argument, object value, object parentValue)
             {
-                var currentIndex = this.orderedParameterValues.FindIndex(v => HasMatchingArgument(v.Argument, argument));
+                var currentIndex = this.orderedParameterValues.Where(v => HasMatchingArgument(v.Argument, argument)).Count();
                 var item = new OrderedParameterValue()
                 {
                     Argument = argument,
-                    Index = currentIndex + 1,
+                    Index = currentIndex,
                     Value = value
                 };
                 this.orderedParameterValues.Add(item);
@@ -530,26 +530,6 @@ namespace SigQL
                     OrderParameterValues(indexLookup, MethodSqlStatement.GetValueForParameterPath(v, c.GetPropertyInfo().AsEnumerable()), c, v)
                 )
             );
-
-            //foreach (var childrenPropertyValue in childrenPropertyValues)
-            //{
-            //    var childrenByParent = childrenPropertyValue.GroupBy(g => g.Parent);
-            //    OrderParameterValues(dictionary, childrenByParent.Select(a => a.).ToList(), childrenPropertyValue.Select(c => c.Argument).First(), childrenByParent.Select(c => c.Key).First());
-            //}
-
-
-            //return distinctValues.Select((v, i) =>
-            //{
-            //    var orderedParameterValue = new OrderedParameterValue()
-            //    {
-            //        Index = i,
-            //        Argument = parameter,
-            //        Value = v,
-            //        Parent = parent
-            //    };
-            //    orderedParameterValue.Children = parameter.ClassProperties.Select(c => OrderParameterValues(parameterValue, c, orderedParameterValue)).ToList();
-            //    return orderedParameterValue;
-            //}).ToList();
         }
 
         private class OrderedParameterValue
@@ -666,9 +646,7 @@ namespace SigQL
                 remainingTableRelations.ForEach(t =>
                 {
                     var hasPendingDependency =
-                        HasPendingForeignKey(t.TargetTable, t.ForeignKeyToParent, orderedTableRelations) ||
-                        t.NavigationTables.Any(n =>
-                            HasPendingForeignKey(t.TargetTable, t.ForeignKeyToParent, orderedTableRelations));
+                        HasPendingForeignKey(t, remainingTableRelations);
                     if (!hasPendingDependency)
                     {
                         orderedTableRelations.Add(t);
@@ -679,22 +657,13 @@ namespace SigQL
             return orderedTableRelations.ToList();
         }
 
-        private bool HasPendingForeignKey(ITableDefinition table, IForeignKeyDefinition foreignKey, List<TableRelations> currentList)
+        private bool HasPendingForeignKey(TableRelations tableRelations, List<TableRelations> remainingTableRelations)
         {
-            if (foreignKey == null)
-            {
-                return false;
-            }
-
-            var foreignTableKeys = foreignKey.KeyPairs.Where(kp =>
-                TableEqualityComparer.Default.Equals(table, kp.ForeignTableColumn.Table)).ToList();
-            // check and see if any of these keys have not yet had their dependencies resolved
-            if(foreignTableKeys.Any(kp => !currentList.Any(tr => TableEqualityComparer.Default.Equals(kp.PrimaryTableColumn.Table, tr.TargetTable))))
-            {
-                return true;
-            }
-
-            return false;
+            var allForeignKeys = 
+                remainingTableRelations.Select(c => c.ForeignKeyToParent)
+                    .Where(fk => fk != null && fk.KeyPairs.Any(kp => remainingTableRelations.Any(tr => TableEqualityComparer.Default.Equals(kp.PrimaryTableColumn.Table, tr.TargetTable)) )).ToList();
+            return allForeignKeys.Any(fk => fk.KeyPairs.Any(kp =>
+                TableEqualityComparer.Default.Equals(tableRelations.TargetTable, kp.ForeignTableColumn.Table)));
         }
 
         private IEnumerable<ForeignTableColumn> GetRequiredForeignKeys(TableRelations tableRelations, List<TableRelations> dependencyList)
@@ -718,7 +687,7 @@ namespace SigQL
                     return foreignKeyDefinition != null ? new ForeignTableColumn()
                     {
                         ForeignKey = foreignKeyDefinition,
-                        PrimaryTableRelations = tableRelations,
+                        PrimaryTableRelations = nt,
                         Direction = ForeignTablePropertyDirection.Navigation
                     } : null;
                 })

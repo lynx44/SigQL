@@ -195,6 +195,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         void InsertMultipleAddressesWithAttributeWithValuesByDetectedClass(IEnumerable<Address.InsertFields> addresses);
         [Insert]
         void InsertMultipleEmployeesWithWorkLogs(IEnumerable<Employee.InsertFieldsWithWorkLogs> employees);
+        [Insert]
+        void InsertMultipleWorkLogsWithEmployees(IEnumerable<WorkLog.InsertFieldsWithEmployee> worklogs);
         void InsertMultipleWorkLogsWithRelations(IEnumerable<WorkLog.InsertFieldsWithEmployeeAndLocation> employees);
         // not yet supported
         // [Insert(TableName = nameof(Employee))]

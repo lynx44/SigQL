@@ -2305,7 +2305,7 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void InsertMultiple_Void_ValuesWithNavigationTables_ReturnsExpected()
+        public void InsertMultiple_Void_ValuesWithOneToManyNavigationTables_ReturnsExpected()
         {
             var insertFields = new Employee.InsertFieldsWithWorkLogs[]
             {
@@ -2338,6 +2338,35 @@ namespace SigQL.SqlServer.Tests
             Assert.AreEqual(2, actual.Count);
             AreSame(actual.Select(p => p.Name).ToList(), insertFields.Select(e => e.Name).ToList());
             actual.ForEach(employee => Assert.AreEqual(2, employee.WorkLogs.Count));
+        }
+
+        [TestMethod]
+        public void InsertMultiple_Void_ValuesWithManyToOneNavigationTables_ReturnsExpected()
+        {
+            var insertFields = new[]
+            {
+                new WorkLog.InsertFieldsWithEmployee()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee = 
+                        new Employee.InsertFields()
+                            { Name = "bah" }
+                },
+                new WorkLog.InsertFieldsWithEmployee()
+                {
+                    StartDate = new DateTime(2021, 3, 1), 
+                    EndDate = new DateTime(2021, 1, 2),
+                    Employee = 
+                        new Employee.InsertFields()
+                            { Name = "2bah" }
+                }
+            };
+            this.monolithicRepository.InsertMultipleWorkLogsWithEmployees(insertFields);
+            var actual = this.laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+
+            Assert.AreEqual(2, actual.Count);
+            AreSame(actual.Select(p => p.Name).ToList(), insertFields.Select(wl => wl.Employee.Name).ToList());
+            actual.ForEach(employee => Assert.AreEqual(1, employee.WorkLogs.Count));
         }
 
         [TestMethod]

@@ -344,6 +344,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             WorkLogEmployeeView.IFieldsMismatchingCase View { get; }
         }
 
+        public class InsertFieldsWithEmployee
+        {
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
+            public Employee.InsertFields Employee { get; set; }
+        }
+
         public class InsertFieldsWithEmployeeAndLocation
         {
             public DateTime? StartDate { get; set; }
