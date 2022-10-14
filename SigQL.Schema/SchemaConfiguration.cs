@@ -255,6 +255,14 @@ namespace SigQL.Schema
         public IEnumerable<IForeignKeyPair> KeyPairs { get; set; }
     }
 
+    public static class ForeignKeyDefinitionExtensions
+    {
+        public static IEnumerable<IColumnDefinition> GetForeignColumns(this IForeignKeyDefinition foreignKey)
+        {
+            return foreignKey.KeyPairs.Select(kp => kp.ForeignTableColumn).ToList();
+        }
+    }
+
     public interface IForeignKeyPair
     {
         IColumnDefinition ForeignTableColumn { get; }

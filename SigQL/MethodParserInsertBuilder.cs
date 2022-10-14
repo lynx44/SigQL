@@ -21,7 +21,7 @@ namespace SigQL
         {
             var targetTableType = insertSpec.UnwrappedReturnType;
 
-            var valuesListClause = new ValuesListClause();
+            
             var statement = new List<AstNode>();
             var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
 
@@ -29,6 +29,7 @@ namespace SigQL
 
             for (var index = 0; index < insertSpec.InsertTableRelationsCollection.Count; index++)
             {
+                var valuesListClause = new ValuesListClause();
                 var insertTableRelations = insertSpec.InsertTableRelationsCollection[index];
                 var insertColumnList = insertTableRelations.ColumnParameters.Select(cp =>
                     new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = cp.Column.Name})).ToList();
@@ -92,6 +93,12 @@ namespace SigQL
                                     new RelationalColumn() {Label = mergeIndexColumnName},
                                     new DataType() {Type = new Literal() {Value = "int"}}
                                 ).AsEnumerable())
+                                .Concat(insertTableRelations.ForeignTableColumns.SelectMany(fk => 
+                                        fk.ForeignKey.GetForeignColumns().Select(fc =>
+                                            new ColumnDeclaration().SetArgs(
+                                                new RelationalColumn() { Label = fc.Name },
+                                                new DataType() { Type = new Literal() { Value = fc.DataTypeDeclaration } }))
+                                )).ToList()
                             )
                     };
                     statement.Add(declareLookupParameterStatement);
@@ -104,6 +111,7 @@ namespace SigQL
                         )).AppendOne(new ColumnIdentifier().SetArgs(
                         new RelationalColumn() { Label = mergeIndexColumnName }
                     ));
+
                     var foreignColumns = insertTableRelations.ForeignTableColumns.SelectMany(fk =>
                         fk.ForeignKey.KeyPairs.Select(kp =>
                             new ColumnIdentifier()
@@ -193,7 +201,7 @@ namespace SigQL
                                 FindRootArgument(insertTableRelations.TableRelations.Argument).FindParameter(), null);
 
                             var orderedParametersForInsert = orderedParameterLookup.FindOrderedParameters(FindRootArgument(insertTableRelations.TableRelations.Argument));
-                            var parentIndexMappings = orderedParametersForInsert.Select(op =>
+                            var parentIndexMappings = orderedParametersForInsert.SelectMany((op, i) =>
                             {
                                 var parentArguments = insertTableRelations.ForeignTableColumns.Select(fc =>
                                 {
@@ -201,7 +209,7 @@ namespace SigQL
                                     var foreignColumns = fc.ForeignKey.KeyPairs.Select(kp => kp.ForeignTableColumn).ToList();
                                     return new
                                     {
-                                        PrimaryTableIndex = primaryTableKeyIndex, ForeignColumns = foreignColumns
+                                        PrimaryTableIndex = primaryTableKeyIndex, ForeignColumns = foreignColumns, InsertedIndex = i
                                     };
                                 }).ToList();
 
@@ -234,7 +242,7 @@ namespace SigQL
                                         }).Cast<AstNode>().AppendOne(new Literal() {Value = i.ToString()})
                                             .Concat(
                                                 parentIndexMappings
-                                                    .SelectMany(pl => pl)
+                                                    .Where(p => p.InsertedIndex == i)
                                                     .Select(p => 
                                                         new Literal() { Value = p.PrimaryTableIndex.ToString() }).ToList()));
                                 }));
