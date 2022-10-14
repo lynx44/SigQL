@@ -32,7 +32,13 @@ namespace SigQL
                 var valuesListClause = new ValuesListClause();
                 var insertTableRelations = insertSpec.InsertTableRelationsCollection[index];
                 var insertColumnList = insertTableRelations.ColumnParameters.Select(cp =>
-                    new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = cp.Column.Name})).ToList();
+                    new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = cp.Column.Name}))
+                    .Concat(insertTableRelations.ForeignTableColumns.SelectMany(fk =>
+                        fk.ForeignKey.GetForeignColumns().Select(fc =>
+                            new ColumnIdentifier().SetArgs(
+                                new RelationalColumn() { Label = fc.Name }))
+                    ))
+                    .ToList();
 
                 var multipleInsertParameters = insertTableRelations.ColumnParameters.Where(c =>
                 {
@@ -78,7 +84,7 @@ namespace SigQL
 
 
                     //var lookupParameterTableName = $"{insertSpec.RelationalPrefix}{insertSpec.Table.Name}Lookup";
-                    var lookupParameterTableName = insertTableRelations.LookupTableName;
+                    var lookupParameterTableName = GetLookupTableName(insertTableRelations.TableRelations);
                     var declareLookupParameterStatement = new DeclareStatement()
                     {
                         Parameter = new NamedParameterIdentifier() {Name = lookupParameterTableName},
@@ -96,8 +102,8 @@ namespace SigQL
                                 .Concat(insertTableRelations.ForeignTableColumns.SelectMany(fk => 
                                         fk.ForeignKey.GetForeignColumns().Select(fc =>
                                             new ColumnDeclaration().SetArgs(
-                                                new RelationalColumn() { Label = fc.Name },
-                                                new DataType() { Type = new Literal() { Value = fc.DataTypeDeclaration } }))
+                                                new RelationalColumn() { Label = GetForeignColumnIndexName(fc.Name) },
+                                                new DataType() { Type = new Literal() { Value = "int" } }))
                                 )).ToList()
                             )
                     };
@@ -113,11 +119,11 @@ namespace SigQL
                     ));
 
                     var foreignColumns = insertTableRelations.ForeignTableColumns.SelectMany(fk =>
-                        fk.ForeignKey.KeyPairs.Select(kp =>
+                        fk.ForeignKey.GetForeignColumns().Select(fc =>
                             new ColumnIdentifier()
                                 .SetArgs(new RelationalColumn()
                                 {
-                                    Label = kp.ForeignTableColumn.Name
+                                    Label = GetForeignColumnIndexName(fc.Name)
                                 })
                         ));
                     var lookupParameterTableInsert = new Insert()
@@ -147,7 +153,8 @@ namespace SigQL
                                             )
                                         ).AppendOne(new ColumnIdentifier().SetArgs(
                                             new RelationalColumn() {Label = mergeIndexColumnName}
-                                        ))),
+                                        ))
+                                        .Concat(foreignColumns)),
                                     FromClause =
                                         new FromClause().SetArgs(
                                             new FromClauseNode().SetArgs(
@@ -157,13 +164,13 @@ namespace SigQL
                             As = new TableAliasDefinition() {Alias = mergeTableAlias}
                                 .SetArgs(
                                     insertTableRelations.ColumnParameters.Select(cp =>
-                                        new ColumnDeclaration().SetArgs(
+                                        (AstNode) new ColumnDeclaration().SetArgs(
                                             new RelationalColumn() {Label = cp.Column.Name}
                                         )
                                     ).AppendOne(
                                         new ColumnDeclaration().SetArgs(
                                             new RelationalColumn() {Label = mergeIndexColumnName})
-                                    )
+                                    ).Concat(foreignColumns)
                                 )
                         },
                         On = new EqualsOperator().SetArgs(
@@ -180,14 +187,43 @@ namespace SigQL
                         }
                     };
 
+                    var foreignSelectValueStatements = insertTableRelations.ForeignTableColumns.SelectMany(fk =>
+                        fk.ForeignKey.KeyPairs.Select(kp =>
+                        {
+                            var selectStatement = new Select();
+                            selectStatement.SelectClause =
+                                new SelectClause().SetArgs(
+                                    new ColumnIdentifier().SetArgs(
+                                        new RelationalColumn() {Label = kp.PrimaryTableColumn.Name}));
+                            selectStatement.FromClause =
+                                new FromClause().SetArgs(
+                                    new Alias() {Label = GetInsertedTableName(fk.PrimaryTableRelations)}
+                                        .SetArgs(new NamedParameterIdentifier()
+                                            {Name = GetInsertedTableName(fk.PrimaryTableRelations)}));
+                            selectStatement.WhereClause =
+                                new WhereClause().SetArgs(
+                                    new EqualsOperator().SetArgs(
+
+                                        new ColumnIdentifier().SetArgs(
+                                            new RelationalTable()
+                                                {Label = GetInsertedTableName(fk.PrimaryTableRelations)},
+                                            new RelationalColumn() {Label = mergeIndexColumnName}),
+                                        new ColumnIdentifier().SetArgs(
+                                            new RelationalTable() {Label = mergeTableAlias},
+                                            new RelationalColumn() {Label = GetForeignColumnIndexName(kp.ForeignTableColumn.Name) })
+                                    )
+                                );
+                            return new LogicalGrouping().SetArgs(selectStatement);
+                        })).ToList();
+
                     valuesListClause.SetArgs(
                         new ValuesList().SetArgs(
                             insertTableRelations.ColumnParameters.Select(cp =>
-                                new ColumnIdentifier().SetArgs(
+                                (AstNode) new ColumnIdentifier().SetArgs(
                                     new RelationalTable() {Label = mergeTableAlias},
                                     new RelationalColumn() {Label = cp.Column.Name}
                                 )
-                            )
+                            ).Concat(foreignSelectValueStatements)
                         )
                     );
 
@@ -262,7 +298,7 @@ namespace SigQL
 
                     if (insertSpec.ReturnType != typeof(void) || index != insertSpec.InsertTableRelationsCollection.Count - 1)
                     {
-                        var outputParameterTableName = insertTableRelations.InsertedTableName;
+                        var outputParameterTableName = GetInsertedTableName(insertTableRelations.TableRelations);
                         var declareOutputParameterStatement = new DeclareStatement()
                         {
                             Parameter = new NamedParameterIdentifier() {Name = outputParameterTableName},
@@ -400,6 +436,11 @@ namespace SigQL
             };
 
             return sqlStatement;
+        }
+
+        private static string GetForeignColumnIndexName(string columnName)
+        {
+            return $"{columnName}_index";
         }
 
         private static IArgument FindRootArgument(IArgument argument)
@@ -702,18 +743,19 @@ namespace SigQL
         {
             public IList<InsertColumnParameter> ColumnParameters { get; set; }
             public TableRelations TableRelations { get; set; }
-            public string LookupTableName => TableRelations.Alias.Replace("<", "$").Replace(">", "$") + "Lookup";
-            public string InsertedTableName => "inserted" + TableRelations.Alias.Replace("<", "$").Replace(">", "$");
+            
             public IEnumerable<ForeignTableColumn> ForeignTableColumns { get; set; }
+            
+        }
 
-            public int RowIndexFor(IArgument thisTableColumn)
-            {
-                throw new NotImplementedException();
-            }
-            public int ParentRowIndexFor(IArgument thisTableColumn, TableRelations parent)
-            {
-                throw new NotImplementedException();
-            }
+        private static string GetLookupTableName(TableRelations tableRelations)
+        {
+            return tableRelations.Alias.Replace("<", "$").Replace(">", "$") + "Lookup";
+        }
+
+        private static string GetInsertedTableName(TableRelations tableRelations)
+        {
+            return "inserted" + tableRelations.Alias.Replace("<", "$").Replace(">", "$");
         }
 
         private class ForeignTableColumn
