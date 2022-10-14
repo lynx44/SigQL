@@ -2305,6 +2305,42 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void InsertMultiple_Void_ValuesWithNavigationTables_ReturnsExpected()
+        {
+            var insertFields = new Employee.InsertFieldsWithWorkLogs[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "bah",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "2bah",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(insertFields);
+            var actual = this.laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+
+            Assert.AreEqual(2, actual.Count);
+            AreSame(actual.Select(p => p.Name).ToList(), insertFields.Select(e => e.Name).ToList());
+            actual.ForEach(employee => Assert.AreEqual(2, employee.WorkLogs.Count));
+        }
+
+        [TestMethod]
         public void InsertMultiple_OutputIds_ReturnsExpected()
         {
             var insertFields = new List<Employee.InsertFields>() 

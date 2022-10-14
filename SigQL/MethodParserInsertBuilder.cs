@@ -270,7 +270,7 @@ namespace SigQL
                                                     p.SqlParameterName == cp.ParameterPath.SqlParameterName);
                                             var sqlParameterName = $"{cp.ParameterPath.SqlParameterName}{i}";
                                             var parameterValue = param.Value;
-                                            sqlParameters[sqlParameterName] = parameterValue;
+                                            sqlParameters[sqlParameterName] = MethodSqlStatement.GetValueForParameterPath(parameterValue, cp.ParameterPath.Properties.Last().AsEnumerable());
                                             return new NamedParameterIdentifier()
                                             {
                                                 Name = sqlParameterName
