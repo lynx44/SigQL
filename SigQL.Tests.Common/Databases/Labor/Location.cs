@@ -21,7 +21,7 @@
 
         public class Insert
         {
-            string Name { get; }
+            public string Name { get; set; }
         }
 
         public interface ILocationWithAddress

@@ -2311,7 +2311,7 @@ namespace SigQL.SqlServer.Tests
             {
                 new Employee.InsertFieldsWithWorkLogs()
                 {
-                    Name = "bah",
+                    Name = "Mike",
                     WorkLogs = new[]
                     {
                         new WorkLog.DataFields()
@@ -2322,7 +2322,7 @@ namespace SigQL.SqlServer.Tests
                 },
                 new Employee.InsertFieldsWithWorkLogs()
                 {
-                    Name = "2bah",
+                    Name = "Lester",
                     WorkLogs = new[]
                     {
                         new WorkLog.DataFields()
@@ -2350,7 +2350,7 @@ namespace SigQL.SqlServer.Tests
                     StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
                     Employee = 
                         new Employee.InsertFields()
-                            { Name = "bah" }
+                            { Name = "Mike" }
                 },
                 new WorkLog.InsertFieldsWithEmployee()
                 {
@@ -2358,7 +2358,7 @@ namespace SigQL.SqlServer.Tests
                     EndDate = new DateTime(2021, 1, 2),
                     Employee = 
                         new Employee.InsertFields()
-                            { Name = "2bah" }
+                            { Name = "Lester" }
                 }
             };
             this.monolithicRepository.InsertMultipleWorkLogsWithEmployees(insertFields);
@@ -2368,6 +2368,69 @@ namespace SigQL.SqlServer.Tests
             AreSame(actual.Select(p => p.Name).ToList(), insertFields.Select(wl => wl.Employee.Name).ToList());
             actual.ForEach(employee => Assert.AreEqual(1, employee.WorkLogs.Count));
         }
+
+        [TestMethod]
+        public void InsertMultiple_Void_ValuesWithManyToOneAdjacentAndNestedNavigationTables_ReturnsExpected()
+        {
+            var insertFields = new[]
+            {
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee =
+                        new Employee.InsertFieldsWithAddress()
+                        {
+                            Name = "Mike",
+                            Addresses = new Address.InsertFields[]
+                            {
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "123 fake st",
+                                    City = "Pennsylvania",
+                                    State = "PA"
+                                }
+                            }
+
+                        },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Ice Queen"
+                    }
+                },
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 3, 1), 
+                    EndDate = new DateTime(2021, 1, 2),
+                    Employee = 
+                        new Employee.InsertFieldsWithAddress()
+                            { 
+                                Name = "Lester", 
+                                Addresses = new Address.InsertFields[]
+                                {
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "234 fake st", 
+                                        City = "New York",
+                                        State = "NY"
+                                    }
+                                }
+
+                            },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Burger Hut"
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleWorkLogsWithAdjacentAndNestedRelations(insertFields);
+            var actual = this.laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+
+            Assert.AreEqual(2, actual.Count);
+            AreSame(actual.Select(p => p.Name).ToList(), insertFields.Select(wl => wl.Employee.Name).ToList());
+            actual.ForEach(employee => Assert.AreEqual(1, employee.WorkLogs.Count));
+        }
+
+        // test insert when empty collections are passed
 
         [TestMethod]
         public void InsertMultiple_OutputIds_ReturnsExpected()
