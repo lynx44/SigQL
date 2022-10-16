@@ -2370,7 +2370,7 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void InsertMultiple_Void_ValuesWithManyToOneAdjacentAndNestedNavigationTables_ReturnsExpected()
+        public void InsertMultiple_Void_ValuesWithManyToOneAdjacentAndNestedManyToManyNavigationTables_ReturnsExpected()
         {
             var insertFields = new[]
             {
