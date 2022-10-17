@@ -142,7 +142,7 @@ namespace SigQL
                                 {
                                     Label = GetForeignColumnIndexName(fc.Name)
                                 })
-                        ));
+                        )).ToList();
                     var lookupParameterTableInsert = new Insert()
                     {
                         Object = new TableIdentifier().SetArgs(new NamedParameterIdentifier()
@@ -307,12 +307,15 @@ namespace SigQL
                                 // them for the many-to-many lookup table variable
                                 parentIndexMappings = distinctValues.Select((v, i) =>
                                 {
-                                    v.Parent.InsertedIndex = i;
-                                    v.Navigation.InsertedIndex = i;
-                                    return new[] {v.Parent, v.Navigation};
+                                    return new[]
+                                    {
+                                        new TableIndexReference(v.Parent.InsertedIndex, v.Parent.ForeignColumns, i),
+                                        new TableIndexReference(v.Navigation.InsertedIndex, v.Navigation.ForeignColumns, i)
+                                    };
                                 }).SelectMany(v => v).ToList();
 
-                                // fake the data for this table by padding it with the same number of indexed rows from above
+                                // fake the data for this table by padding it with the same number of indexed rows from above.
+                                // since there is no row data, only the Foreign Columns will be populated
                                 orderedParametersForInsert = parentIndexMappings.Select(p => p.InsertedIndex).Distinct().Select(p => new OrderedParameterValue()
                                 {
                                     Index = p
@@ -345,8 +348,9 @@ namespace SigQL
                                             };
                                         }).Cast<AstNode>().AppendOne(new Literal() {Value = param.Index.ToString()})
                                             .Concat(
-                                                parentIndexMappings
+                                                OrderIndexReferences(insertTableRelations, parentIndexMappings)
                                                     .Where(p => p.InsertedIndex == param.Index)
+                                                    
                                                     .Select(p => 
                                                         new Literal() { Value = p.PrimaryTableIndex.ToString() }).ToList()));
                                 }));
@@ -504,6 +508,24 @@ namespace SigQL
             };
 
             return sqlStatement;
+        }
+
+        private static IEnumerable<TableIndexReference> OrderIndexReferences(InsertTableRelations insertTableRelations, IEnumerable<TableIndexReference> parentIndexMappings)
+        {
+            var columnCollectionComparer = new FuncEqualityComparer<IEnumerable<IColumnDefinition>>((l1, l2) => Enumerable.SequenceEqual(l1, l2, ColumnEqualityComparer.Default));
+            var result = insertTableRelations.ForeignTableColumns
+                .SelectMany(ftc => parentIndexMappings.Where(pi =>
+                    columnCollectionComparer.Equals(pi.ForeignColumns, ftc.ForeignKey.GetForeignColumns())))
+                .ToList();
+                //.Join(parentIndexMappings, 
+                //    fc => fc.ForeignKey.GetForeignColumns(),
+                //    pi => pi.ForeignColumns,
+                //    (ftc, pi) =>
+                //    {
+                //        return pi;
+                //    },
+                //    columnCollectionComparer).ToList();
+            return result;
         }
 
         private static IEnumerable<TableIndexReference> GetTableIndexReferences(IEnumerable<OrderedParameterValue> orderedParametersForInsert, InsertTableRelations insertTableRelations, OrderedParameterValueLookup orderedParameterLookup)
@@ -845,6 +867,25 @@ namespace SigQL
         {
             public IColumnDefinition Column { get; set; }
             public ParameterPath ParameterPath { get; set; }
+        }
+
+        private class FuncEqualityComparer<T> : IEqualityComparer<T>
+        {
+            private readonly Func<T, T, bool> comparisonFunc;
+
+            public FuncEqualityComparer(Func<T, T, bool> comparisonFunc)
+            {
+                this.comparisonFunc = comparisonFunc;
+            }
+            public bool Equals(T x, T y)
+            {
+                return comparisonFunc(x, y);
+            }
+
+            public int GetHashCode(T obj)
+            {
+                return obj.GetHashCode();
+            }
         }
     }
 }

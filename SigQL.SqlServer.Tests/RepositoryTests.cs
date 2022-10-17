@@ -2388,6 +2388,18 @@ namespace SigQL.SqlServer.Tests
                                     StreetAddress = "123 fake st",
                                     City = "Pennsylvania",
                                     State = "PA"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "456 fake st",
+                                    City = "Portland",
+                                    State = "OR"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "567 fake st",
+                                    City = "San Diego",
+                                    State = "CA"
                                 }
                             }
 
@@ -2412,6 +2424,12 @@ namespace SigQL.SqlServer.Tests
                                         StreetAddress = "234 fake st", 
                                         City = "New York",
                                         State = "NY"
+                                    },
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "345 fake st", 
+                                        City = "Manchester",
+                                        State = "NH"
                                     }
                                 }
 
@@ -2423,11 +2441,21 @@ namespace SigQL.SqlServer.Tests
                 }
             };
             this.monolithicRepository.InsertMultipleWorkLogsWithAdjacentAndNestedRelations(insertFields);
-            var actual = this.laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+            var actual = this.laborDbContext.Employee
+                    .Include(e => e.WorkLogs)
+                    .ThenInclude(wl => wl.Location)
+                    .Include(e => e.Addresses)
+                    //.Include(e => e.WorkLogs.Select(wl => wl.Location))
+                    .ToList();
 
             Assert.AreEqual(2, actual.Count);
             AreSame(actual.Select(p => p.Name).ToList(), insertFields.Select(wl => wl.Employee.Name).ToList());
             actual.ForEach(employee => Assert.AreEqual(1, employee.WorkLogs.Count));
+            var efEmployee1 = actual.Single(e => e.Name == "Mike");
+            Assert.AreEqual(new DateTime(2021, 1, 1), efEmployee1.WorkLogs.First().StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 2), efEmployee1.WorkLogs.First().EndDate);
+            Assert.AreEqual(3, efEmployee1.Addresses.Count); 
+
         }
 
         // test insert when empty collections are passed
