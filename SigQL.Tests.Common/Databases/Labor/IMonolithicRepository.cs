@@ -160,6 +160,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<DiagnosticLog.IFields> FetchDiagnosticLogs([Fetch] int take);
 
         IEnumerable<WorkLog.IWorkLogToView> GetWithJoinRelationAttribute();
+        IEnumerable<WorkLog.IWorkLogWithMultipleJoinRelationAttributes> GetWithMultipleJoinRelationAttributes();
         IEnumerable<WorkLogEmployeeView.IDataFieldsWithWorkLogs> GetWithJoinRelationAttributeOnViewWithTableNavigationCollection();
         IEnumerable<Employee.IEmployeeToWorkLogView> GetWithJoinRelationAttributeOnTableWithViewNavigationCollection();
         IEnumerable<Address.IEmployeeToWorkLogView> GetWithNestedJoinRelationAttribute();

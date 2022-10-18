@@ -709,6 +709,30 @@ namespace SigQL.SqlServer.Tests
         }
         
         [TestMethod]
+        public void GetWithMultipleJoinRelationAttributes()
+        {
+            var employee = new EFEmployee() { Name = "Name" };
+            var workLog = new EFWorkLog()
+            {
+                Employee = employee, 
+                StartDate = new DateTime(2022, 1, 1), 
+                EndDate = new DateTime(2022, 2, 2)
+            };
+            this.laborDbContext.WorkLog.Add(workLog);
+            this.laborDbContext.SaveChanges();
+            var expected = workLog;
+            var actual = this.monolithicRepository.GetWithMultipleJoinRelationAttributes().First();
+            
+            Assert.AreEqual(expected.Id, actual.Id);
+            Assert.AreEqual(expected.Employee.Id, actual.View.EmployeeId);
+            Assert.AreEqual(expected.Employee.Name, actual.View.EmployeeName);
+            Assert.AreEqual(expected.StartDate, actual.View.StartDate);
+            Assert.AreEqual(expected.EndDate, actual.View.EndDate);
+            Assert.AreEqual(expected.Id, actual.View.WorkLogId);
+            Assert.IsTrue(actual.WorkLogs.Any());
+        }
+        
+        [TestMethod]
         public void GetWithJoinRelationAttributeOnViewWithTableNavigationProperty_ReturnsExpectedCollection()
         {
             var employee1 = new EFEmployee() { Name = "Name1", Addresses = new List<EFAddress>()
