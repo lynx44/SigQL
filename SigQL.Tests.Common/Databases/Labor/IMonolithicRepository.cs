@@ -39,6 +39,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         WorkLog.IWorkLogWithEmployeeNames GetWorkLogWithEmployeeNames();
         WorkLog.IWorkLogWithEmployeeAndLocation GetWorkLogWithEmployeeAndLocation();
         IEnumerable<WorkLog.IWorkLogWithEmployeeAndLocation> GetWorkLogsWithEmployeeAndLocation();
+        IEnumerable<Employee.IEmployeeWithAliasedWorkLogs> GetEmployeesWithAliasedWorkLogs();
         WorkLog.IWorkLogWithLocationAndLocationAddress GetWorkLogWithLocationAndLocationAddress();
         Address.IAddressIdWithLocations GetAddressWithLocations();
         Employee.IEmployeeWithAddresses GetEmployeeWithAddresses();
@@ -162,6 +163,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLogEmployeeView.IDataFieldsWithWorkLogs> GetWithJoinRelationAttributeOnViewWithTableNavigationCollection();
         IEnumerable<Employee.IEmployeeToWorkLogView> GetWithJoinRelationAttributeOnTableWithViewNavigationCollection();
         IEnumerable<Address.IEmployeeToWorkLogView> GetWithNestedJoinRelationAttribute();
+        IEnumerable<Employee.EmployeeToAddressJoinRelationAttribute> GetWithMultiPathJoinRelationAttribute();
         IEnumerable<WorkLog.IWorkLogToViewMismatchingCase> GetWithJoinRelationAttributeMismatchingKeyCase();
 
         // view

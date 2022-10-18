@@ -596,6 +596,54 @@ namespace SigQL.SqlServer.Tests
             Assert.AreEqual(expected.Id, actual.Id);
             Assert.AreEqual(0, actual.Locations.Count());
         }
+        
+        [TestMethod]
+        public void GetWithAliasedOneToManyCollection_ReturnsExpectedCollection()
+        {
+            var employee1 = new EFEmployee()
+            {
+                Name = "Name1"
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "Name2"
+            };
+
+            var workLog1 = new EFWorkLog()
+            {
+                Employee = employee1,
+                StartDate = new DateTime(2022, 1, 1),
+                EndDate = new DateTime(2022, 2, 2)
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                Employee = employee1,
+                StartDate = new DateTime(2022, 3, 3),
+                EndDate = new DateTime(2022, 4, 4)
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                Employee = employee1,
+                StartDate = new DateTime(2022, 3, 3),
+                EndDate = new DateTime(2022, 4, 4)
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                Employee = employee2,
+                StartDate = new DateTime(2022, 3, 3),
+                EndDate = new DateTime(2022, 4, 4)
+            };
+            this.laborDbContext.WorkLog.Add(workLog1);
+            this.laborDbContext.WorkLog.Add(workLog2);
+            this.laborDbContext.WorkLog.Add(workLog3);
+            this.laborDbContext.WorkLog.Add(workLog4);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetEmployeesWithAliasedWorkLogs();
+
+            Assert.AreEqual(2, actual.Count());
+            Assert.AreEqual(3, actual.First().WorkLogs.Count());
+            Assert.AreEqual(1, actual.Last().WorkLogs.Count());
+        }
 
         [TestMethod]
         public void GetSingleRowWithManyToManyEnumerableNavigationProperty()
