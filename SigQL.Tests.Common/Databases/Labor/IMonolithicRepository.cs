@@ -39,6 +39,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         WorkLog.IWorkLogWithEmployeeNames GetWorkLogWithEmployeeNames();
         WorkLog.IWorkLogWithEmployeeAndLocation GetWorkLogWithEmployeeAndLocation();
         IEnumerable<WorkLog.IWorkLogWithEmployeeAndLocation> GetWorkLogsWithEmployeeAndLocation();
+        IEnumerable<Employee.IEmployeeWithAliasedWorkLogs> GetEmployeesWithAliasedWorkLogs();
         WorkLog.IWorkLogWithLocationAndLocationAddress GetWorkLogWithLocationAndLocationAddress();
         Address.IAddressIdWithLocations GetAddressWithLocations();
         Employee.IEmployeeWithAddresses GetEmployeeWithAddresses();
@@ -159,10 +160,13 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<DiagnosticLog.IFields> FetchDiagnosticLogs([Fetch] int take);
 
         IEnumerable<WorkLog.IWorkLogToView> GetWithJoinRelationAttribute();
+        IEnumerable<WorkLog.IWorkLogWithMultipleJoinRelationAttributes> GetWithMultipleJoinRelationAttributes();
         IEnumerable<WorkLogEmployeeView.IDataFieldsWithWorkLogs> GetWithJoinRelationAttributeOnViewWithTableNavigationCollection();
         IEnumerable<Employee.IEmployeeToWorkLogView> GetWithJoinRelationAttributeOnTableWithViewNavigationCollection();
         IEnumerable<Address.IEmployeeToWorkLogView> GetWithNestedJoinRelationAttribute();
+        IEnumerable<Employee.EmployeeToAddressJoinRelationAttribute> GetWithMultiPathJoinRelationAttribute();
         IEnumerable<WorkLog.IWorkLogToViewMismatchingCase> GetWithJoinRelationAttributeMismatchingKeyCase();
+        IEnumerable<WorkLog.IWorkLogToViewToEmployee> GetWithJoinRelationAttributeAndFilterToSameTable([ViaRelation("WorkLog(EmployeeId)->(Id)Employee", "Id")] int id);
 
         // view
         IEnumerable<WorkLogEmployeeView.IFields> GetWorkLogEmployeeView();

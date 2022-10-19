@@ -138,11 +138,14 @@ namespace SigQL
             };
 
             IEnumerable<IForeignKeyDefinition> foreignKeys = null;
+            var navigationTablesToFlatten = tableRelations.NavigationTables.Where(nt => TableEqualityComparer.Default.Equals(
+                nt.TargetTable,
+                tableRelations.TargetTable)).ToList();
+            tableRelations.NavigationTables = tableRelations.NavigationTables.Except(navigationTablesToFlatten);
+            tableRelations = MergeTableRelations(tableRelations.AsEnumerable().Concat(navigationTablesToFlatten).ToArray());
             foreach (var navigationTableRelations in tableRelations.NavigationTables)
             {
-                if (!TableEqualityComparer.Default.Equals(navigationTableRelations.TargetTable,
-                        tableRelations.TargetTable))
-                {
+                
                     //var joinRelationAttribute = navigationTableRelations.Argument.GetCustomAttribute<JoinRelationAttribute>();
                     //IForeignKeyDefinition foreignKey;
                     //if (joinRelationAttribute != null)
@@ -175,13 +178,7 @@ namespace SigQL
                     {
                         navigationTableRelations.ForeignKeyToParent = foreignKey;
                     }
-                }
-                else
-                {
-                    ;
-                    tableRelations.NavigationTables = tableRelations.NavigationTables.Except(new [] { navigationTableRelations}).ToList();
-                    tableRelations = MergeTableRelations(tableRelations, navigationTableRelations);
-                }
+                
             }
             
             foreach (var navigationTable in tableRelations.NavigationTables)
@@ -383,6 +380,7 @@ namespace SigQL
                 ForeignKeyToParent = tableRelationsCollection.Where(t => t.ForeignKeyToParent != null).Select(t => t.ForeignKeyToParent).Distinct(ForeignKeyDefinitionEqualityComparer.Default).FirstOrDefault(),
                 Parent = tableRelationsCollection.Select(p => p.Parent).FirstOrDefault(parent => parent != null),
                 FunctionParameters = tableRelationsCollection.SelectMany(t => t.FunctionParameters).GroupBy(k => k.SqlParameterName).Select(k => k.First()).ToList(),
+                MasterRelations = tableRelationsCollection.Select(t => t.MasterRelations).Any(tr => tr != null) ? MergeTableRelations(tableRelationsCollection.Select(t => t.MasterRelations).Where(tr => tr != null).ToArray()) : null
             };
         }
 

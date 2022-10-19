@@ -9,7 +9,7 @@ jobs:
 
     env:
       VERSIONDATE: $(date +'%Y%m%d')
-      Configuration: Release
+      Configuration: Debug
       
     steps:
     - uses: actions/checkout@v2

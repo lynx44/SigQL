@@ -294,6 +294,14 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void GetWithMultipleJoinRelationAttributes_ReturnsExpectedSql()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithMultipleJoinRelationAttributes());
+
+            Assert.AreEqual("select \"WorkLog<IWorkLogWithMultipleJoinRelationAttributes>\".\"Id\" \"Id\", \"WorkLogEmployeeView<IWorkLogWithMultipleJoinRelationAttributes.View>\".\"RowNumber\" \"View.RowNumber\", \"WorkLogEmployeeView<IWorkLogWithMultipleJoinRelationAttributes.View>\".\"WorkLogId\" \"View.WorkLogId\", \"WorkLogEmployeeView<IWorkLogWithMultipleJoinRelationAttributes.View>\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView<IWorkLogWithMultipleJoinRelationAttributes.View>\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView<IWorkLogWithMultipleJoinRelationAttributes.View>\".\"EmployeeId\" \"View.EmployeeId\", \"WorkLogEmployeeView<IWorkLogWithMultipleJoinRelationAttributes.View>\".\"EmployeeName\" \"View.EmployeeName\", \"WorkLog<IWorkLogWithMultipleJoinRelationAttributes.WorkLogs>\".\"Id\" \"WorkLogs.Id\" from \"WorkLog\" \"WorkLog<IWorkLogWithMultipleJoinRelationAttributes>\" left outer join (select ROW_NUMBER() over(order by \"WorkLogId\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView<IWorkLogWithMultipleJoinRelationAttributes.View>\" on ((\"WorkLog<IWorkLogWithMultipleJoinRelationAttributes>\".\"EmployeeId\" = \"WorkLogEmployeeView<IWorkLogWithMultipleJoinRelationAttributes.View>\".\"EmployeeId\")) left outer join \"WorkLog\" \"WorkLog<IWorkLogWithMultipleJoinRelationAttributes.WorkLogs>\" on ((\"WorkLogEmployeeView<IWorkLogWithMultipleJoinRelationAttributes.View>\".\"WorkLogId\" = \"WorkLog<IWorkLogWithMultipleJoinRelationAttributes.WorkLogs>\".\"Id\"))", sql);
+        }
+
+        [TestMethod]
         public void GetJoinRelationAttribute_WithMultiTableRelationalPath_ReturnsExpectedSql()
         {
             var sql = this.GetSqlForCall(() => this.monolithicRepository.GetJoinAttributeWithMultiTableRelationalPath());

@@ -91,13 +91,14 @@ namespace SigQL
         
         public ITableDefinition DetectTable(Type t)
         {
-            var sqlIdentifier = t.GetCustomAttribute<SqlIdentifierAttribute>();
+            var type = UnwrapCollectionTargetType(t);
+            var sqlIdentifier = type.GetCustomAttribute<SqlIdentifierAttribute>();
             if (sqlIdentifier != null)
             {
                 return this.databaseConfiguration.Tables.FindByName(sqlIdentifier.Name);
             }
             Type detectedType = null;
-            if (this.TryDetectTargetTable(t, ref detectedType))
+            if (this.TryDetectTargetTable(type, ref detectedType))
             {
                 var tableName = this.pluralizationHelper.AllCandidates(detectedType.Name).First(tableName =>
                     this.databaseConfiguration.Tables.FindByName(tableName) != null);
@@ -119,21 +120,21 @@ namespace SigQL
 
         public bool TryDetectTargetTable(Type columnOutputType, ref Type detectedType)
         {
-            var sqlIdentifier = columnOutputType.GetCustomAttribute<SqlIdentifierAttribute>();
+            var type = UnwrapCollectionTargetType(columnOutputType);
+            var sqlIdentifier = type.GetCustomAttribute<SqlIdentifierAttribute>();
             if (sqlIdentifier != null)
             {
                 return this.databaseConfiguration.Tables.FindByName(sqlIdentifier.Name) != null;
             }
-            columnOutputType = UnwrapCollectionTargetType(columnOutputType);
-            var tableName = this.pluralizationHelper.AllCandidates(columnOutputType.Name).FirstOrDefault(tableName =>
+            var tableName = this.pluralizationHelper.AllCandidates(type.Name).FirstOrDefault(tableName =>
                 this.databaseConfiguration.Tables.FindByName(tableName) != null);
             if (tableName != null)
             {
-                detectedType = columnOutputType;
+                detectedType = type;
                 return true;
             }
 
-            return columnOutputType.DeclaringType != null && columnOutputType.DeclaringType.IsClass && TryDetectTargetTable(columnOutputType.DeclaringType, ref detectedType);
+            return type.DeclaringType != null && type.DeclaringType.IsClass && TryDetectTargetTable(type.DeclaringType, ref detectedType);
         }
 
         public bool IsTableOrTableProjection(Type columnOutputType)

@@ -344,6 +344,22 @@ namespace SigQL.Tests.Common.Databases.Labor
             WorkLogEmployeeView.IFieldsMismatchingCase View { get; }
         }
 
+        public interface IWorkLogWithMultipleJoinRelationAttributes
+        {
+            int Id { get; }
+            [JoinRelation("WorkLog(EmployeeId)->(EmployeeId)WorkLogEmployeeView")]
+            WorkLogEmployeeView.IFields View { get; }
+            [JoinRelation("WorkLog(EmployeeId)->(EmployeeId)WorkLogEmployeeView(WorkLogId)->(Id)WorkLog")]
+            IEnumerable<WorkLog.IWorkLogId> WorkLogs { get; }
+        }
+
+        public interface IWorkLogToViewToEmployee
+        {
+            int Id { get; }
+            [JoinRelation("WorkLog(EmployeeId)->(EmployeeId)WorkLogEmployeeView(EmployeeId)->(Id)Employee")]
+            IEnumerable<Employee.IEmployeeFields> Employee { get; }
+        }
+
         public class InsertFieldsWithEmployee
         {
             public DateTime? StartDate { get; set; }

@@ -21,12 +21,13 @@ namespace SigQL.Sql
         public IEnumerable<TableRelationColumnIdentifierDefinition> ProjectedColumns { get; set; }
         public IEnumerable<ParameterPath> FunctionParameters { get; set; }
         public IForeignKeyDefinition ForeignKeyToParent { get; set; }
-        public string Alias => $"{TargetTable.Name}" + (RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{(Argument.Type != typeof(void) ? Argument.FullyQualifiedName() : Argument.Parent.FullyQualifiedName())}>" : null);
+        public string Alias => $"{TargetTable.Name}" + ((this.MasterRelations ?? this).RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{(Argument.Type != typeof(void) ? Argument.FullyQualifiedName() : Argument.Parent.FullyQualifiedName())}>" : null);
         public string TableName => TargetTable.Name;
         public TableRelations Parent { get; set; }
         public IEnumerable<TableRelationColumnIdentifierDefinition> PrimaryKey { get; set; }
+        internal TableRelations MasterRelations { get; set; }
         
-        public TableRelations Filter(TableRelationsColumnSource source, TableRelationsFilter filter)
+        public TableRelations Mask(TableRelationsColumnSource source, TableRelationsFilter filter, TableRelations masterRelations = null)
         {
             var matchingColumns = this.ProjectedColumns.Where(c => c.Source == source && (!c.Arguments.All.Any() || c.Arguments.All.Any(arg => filter.IsMatch(arg, false)))).ToList();
             var filteredTableRelations = new TableRelations()
@@ -36,9 +37,10 @@ namespace SigQL.Sql
                 ProjectedColumns = matchingColumns,
                 TargetTable = this.TargetTable,
                 PrimaryKey = this.PrimaryKey,
-                FunctionParameters = this.FunctionParameters
+                FunctionParameters = this.FunctionParameters,
+                MasterRelations = masterRelations ?? MasterRelations ?? this
             };
-            var matchingNavigationTables = this.NavigationTables.Select(t => t.Filter(source, filter)).ToList();
+            var matchingNavigationTables = this.NavigationTables.Select(t => t.Mask(source, filter, filteredTableRelations.MasterRelations)).ToList();
             matchingNavigationTables.ForEach(t => t.Parent = filteredTableRelations);
             filteredTableRelations.NavigationTables = matchingNavigationTables;
 
@@ -101,6 +103,8 @@ namespace SigQL.Sql
             {
                 root = root.Parent;
             }
+
+            root = root.MasterRelations ?? root;
 
             List<ITableDefinition> tables = new List<ITableDefinition>();
             AppendTables(root, tables);
