@@ -352,6 +352,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             [JoinRelation("WorkLog(EmployeeId)->(EmployeeId)WorkLogEmployeeView(WorkLogId)->(Id)WorkLog")]
             IEnumerable<WorkLog.IWorkLogId> WorkLogs { get; }
         }
+
+        public interface IWorkLogToViewToEmployee
+        {
+            int Id { get; }
+            [JoinRelation("WorkLog(EmployeeId)->(EmployeeId)WorkLogEmployeeView(EmployeeId)->(Id)Employee")]
+            IEnumerable<Employee.IEmployeeFields> Employee { get; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

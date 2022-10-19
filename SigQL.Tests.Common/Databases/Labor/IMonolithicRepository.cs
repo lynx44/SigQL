@@ -166,6 +166,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Address.IEmployeeToWorkLogView> GetWithNestedJoinRelationAttribute();
         IEnumerable<Employee.EmployeeToAddressJoinRelationAttribute> GetWithMultiPathJoinRelationAttribute();
         IEnumerable<WorkLog.IWorkLogToViewMismatchingCase> GetWithJoinRelationAttributeMismatchingKeyCase();
+        IEnumerable<WorkLog.IWorkLogToViewToEmployee> GetWithJoinRelationAttributeAndFilterToSameTable([ViaRelation("WorkLog(EmployeeId)->(Id)Employee", "Id")] int id);
 
         // view
         IEnumerable<WorkLogEmployeeView.IFields> GetWorkLogEmployeeView();

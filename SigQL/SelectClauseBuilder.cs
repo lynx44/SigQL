@@ -32,7 +32,7 @@ namespace SigQL
 
         internal ResolvedSelectClause Build(TableRelations projectionTableRelations, ConcurrentDictionary<string, ITableKeyDefinition> primaryKeyDefinitions)
         {
-            var tableRelations = projectionTableRelations.Filter(TableRelationsColumnSource.ReturnType, ColumnFilters.SelectClause);
+            var tableRelations = projectionTableRelations.Mask(TableRelationsColumnSource.ReturnType, ColumnFilters.SelectClause);
             var tablePrimaryKeyDefinitions = primaryKeyDefinitions;
 
             var selectClauseAst = BuildSelectClause(tableRelations, tablePrimaryKeyDefinitions);

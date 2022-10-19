@@ -733,6 +733,24 @@ namespace SigQL.SqlServer.Tests
         }
         
         [TestMethod]
+        public void GetWithJoinRelationAttributeAndFilterToSameTable()
+        {
+            var employee = new EFEmployee() { Name = "Name" };
+            var workLog = new EFWorkLog()
+            {
+                Employee = employee, 
+                StartDate = new DateTime(2022, 1, 1), 
+                EndDate = new DateTime(2022, 2, 2)
+            };
+            this.laborDbContext.WorkLog.Add(workLog);
+            this.laborDbContext.SaveChanges();
+            var expected = workLog;
+            var actual = this.monolithicRepository.GetWithJoinRelationAttributeAndFilterToSameTable(1).First();
+            
+            Assert.AreEqual(expected.Id, actual.Id);
+        }
+        
+        [TestMethod]
         public void GetWithJoinRelationAttributeOnViewWithTableNavigationProperty_ReturnsExpectedCollection()
         {
             var employee1 = new EFEmployee() { Name = "Name1", Addresses = new List<EFAddress>()
