@@ -1175,7 +1175,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.InsertEmployeeWithAttributeWithValuesByDetectedClass));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("insert \"Employee\"(\"Name\") values(@Name)", sql);
+            Assert.AreEqual("insert \"Employee\"(\"Name\") values(@valuesName)", sql);
         }
 
         [TestMethod]
@@ -1186,7 +1186,7 @@ namespace SigQL.Tests
 
             AssertSqlEqual("declare @insertedEmployee table(\"Id\" int, \"_index\" int)\n" +
                            "declare @EmployeeLookup table(\"Name\" nvarchar(max), \"_index\" int)\n" +
-                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@Name0, 0)\n" +
+                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@valuesName0, 0)\n" +
                            "merge \"Employee\" using (select \"Name\", \"_index\" from @EmployeeLookup) as i (\"Name\",\"_index\") on (1 = 0)\n" +
                            " when not matched then\n" +
                            " insert (\"Name\") values(\"i\".\"Name\") output \"inserted\".\"Id\", \"i\".\"_index\" into @insertedEmployee(\"Id\", \"_index\");\n" +
@@ -1200,7 +1200,7 @@ namespace SigQL.Tests
                 new Employee.InsertFields[] { new Employee.InsertFields() { Name = "bah" }, new Employee.InsertFields() { Name = "baah" } }));
 
             AssertSqlEqual("declare @EmployeeLookup table(\"Name\" nvarchar(max), \"_index\" int)\n" +
-                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@Name0, 0), (@Name1, 1)\n" +
+                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@employeesName0, 0), (@employeesName1, 1)\n" +
                            "merge \"Employee\" using (select \"Name\", \"_index\" from @EmployeeLookup) as i (\"Name\",\"_index\") on (1 = 0)\n" +
                            " when not matched then\n" +
                            " insert (\"Name\") values(\"i\".\"Name\");", sql);
@@ -1217,7 +1217,7 @@ namespace SigQL.Tests
                 }));
 
             AssertSqlEqual("declare @AddressLookup table(\"StreetAddress\" nvarchar(max), \"City\" nvarchar(max), \"State\" nvarchar(max), \"_index\" int)\n" +
-                           "insert @AddressLookup(\"StreetAddress\", \"City\", \"State\", \"_index\") values(@StreetAddress0, @City0, @State0, 0), (@StreetAddress1, @City1, @State1, 1)\n" +
+                           "insert @AddressLookup(\"StreetAddress\", \"City\", \"State\", \"_index\") values(@addressesStreetAddress0, @addressesCity0, @addressesState0, 0), (@addressesStreetAddress1, @addressesCity1, @addressesState1, 1)\n" +
                            "merge \"Address\" using (select \"StreetAddress\", \"City\", \"State\", \"_index\" from @AddressLookup) as i (\"StreetAddress\",\"City\",\"State\",\"_index\") on (1 = 0)\n" +
                            " when not matched then\n" +
                            " insert (\"StreetAddress\", \"City\", \"State\") values(\"i\".\"StreetAddress\", \"i\".\"City\", \"i\".\"State\");", sql);
@@ -1230,56 +1230,280 @@ namespace SigQL.Tests
 
             AssertSqlEqual("declare @insertedEmployee table(\"Id\" int, \"_index\" int)\n" +
                            "declare @EmployeeLookup table(\"Name\" nvarchar(max), \"_index\" int)\n" +
-                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@Name0, 0), (@Name1, 1), (@Name2, 2)\n" +
+                           "insert @EmployeeLookup(\"Name\", \"_index\") values(@employeesName0, 0), (@employeesName1, 1), (@employeesName2, 2)\n" +
                             "merge \"Employee\" using (select \"Name\", \"_index\" from @EmployeeLookup) as i (\"Name\",\"_index\") on (1 = 0)\n" +
                             " when not matched then\n" +
                             " insert (\"Name\") values(\"i\".\"Name\") output \"inserted\".\"Id\", \"i\".\"_index\" into @insertedEmployee(\"Id\", \"_index\");\n" +
                             "select \"Employee\".\"Id\" \"Id\" from \"Employee\" inner join @insertedEmployee \"i\" on ((\"Employee\".\"Id\" = \"i\".\"Id\")) order by \"i\".\"_index\"", sql);
         }
+        
+        [TestMethod]
+        public void InsertMultipleWithOneToManyNavigationProperty_Void_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(
+                    new Employee.InsertFieldsWithWorkLogs[]
+                    {
+                         new Employee.InsertFieldsWithWorkLogs()
+                         {
+                             Name = "bah",
+                             WorkLogs = new []
+                             {
+                                 new WorkLog.DataFields() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) },
+                                 new WorkLog.DataFields() { StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) }
+                             }
+                         },
+                         new Employee.InsertFieldsWithWorkLogs()
+                         {
+                             Name = "2bah",
+                             WorkLogs = new []
+                             {
+                                 new WorkLog.DataFields() { StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2) },
+                                 new WorkLog.DataFields() { StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2) }
+                             }
+                         }
+                    }));
 
-        // WIP
-        // [TestMethod]
-        // public void InsertMultipleWithNavigationProperty_Void_ReturnsExpectedSql()
-        // {
-        //     var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(
-        //             new Employee.InsertFieldsWithWorkLogs[]
-        //             {
-        //                 new Employee.InsertFieldsWithWorkLogs() 
-        //                 { 
-        //                     Name = "bah", 
-        //                     WorkLogs = new []
-        //                     {
-        //                         new WorkLog.DataFields() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) },
-        //                         new WorkLog.DataFields() { StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) }
-        //                     }
-        //                 }
-        //             }));
-        //
-        //     AssertSqlEqual("declare @insertedEmployee table(Id int, _index int)\n" +
-        //                    "declare @EmployeeLookup table(Name nvarchar(max), _index int)\n" +
-        //                    "insert @EmployeeLookup(Name, _index) values(@Name0, 0), (@Name1, 1), (@Name2, 2)\n" +
-        //                    "merge Employee using (select Name, _index from @EmployeeLookup) as i (Name,_index) on (1 = 0)\n" +
-        //                    " when not matched then\n" +
-        //                    " insert (Name) values(i.Name) output inserted.Id, i._index into @insertedEmployee(Id, _index);\n" +
-        //                    "declare @insertedEmployeeWorkLog table(Id int, _index int)\n" +
-        //                    "declare @EmployeeWorkLogLookup table(Id int, StartDate datetime, EndDate datetime, _index int, EmployeeIndex int, EmployeeId int)\n" +
-        //                    "insert @EmployeeWorkLogLookup(StartDate, EndDate, _index, EmployeeIndex) values (@WorkLogStartDate0, @WorkLogEndDate0, 0, 2)\n" +
-        //                    "update @EmployeeWorkLogLookup set EmployeeId=i.Id from @EmployeeWorkLogLookup inner join @insertedEmployee i on i._index = EmployeeIndex\n" +
-        //                    "merge WorkLog using(select StartDate, EndDate, _index, EmployeeId  from @EmployeeWorkLogLookup) as i(StartDate, EndDate, _index, EmployeeId) on (1 = 0)\n" +
-        //                    " when not matched then\n" +
-        //                    " insert (StartDate, EndDate, EmployeeId) values(i.StartDate, i.EndDate, i.EmployeeId) output inserted.Id, i._index into @insertedEmployeeWorkLog(Id, _index);", sql);
-        // }
+            AssertSqlEqual(@"declare @insertedWorkLog table(""Id"" int, ""_index"" int)
+declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Name"", ""_index"") values(@employeesName0, 0), (@employeesName1, 1)
+merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup) as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+declare @WorkLogLookup table(""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
+insert @WorkLogLookup(""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") values(@employeesWorkLogs_StartDate0, @employeesWorkLogs_EndDate0, 0, 0), (@employeesWorkLogs_StartDate1, @employeesWorkLogs_EndDate1, 1, 0), (@employeesWorkLogs_StartDate2, @employeesWorkLogs_EndDate2, 2, 1), (@employeesWorkLogs_StartDate3, @employeesWorkLogs_EndDate3, 3, 1)
+merge ""WorkLog"" using (select ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"" from @WorkLogLookup) as i (""StartDate"",""EndDate"",""_index"",""EmployeeId_index"") on (1 = 0)
+ when not matched then
+ insert (""StartDate"", ""EndDate"", ""EmployeeId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @insertedEmployee ""insertedEmployee"" where (""insertedEmployee"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");", sql);
+        }
 
-        // [TestMethod]
-        // public void InsertMultiple_WithNavigationEntities_ReturnsExpectedSql()
-        // {
-        //     var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleEmployeesAndReturnIds(new Employee.InsertFields[] { new Employee.InsertFields() { Name = "bah" }}));
-        //
-        //     AssertSqlEqual("declare @insertedEmployee table(Id int)\n" +
-        //                    "insert into Employee(Name) output inserted.Id into @insertedEmployee(Id) values(@Name0)\n" +
-        //                    "select Employee.Id \"Id\" from \"Employee\" where exists (select 1 from @insertedEmployee where ((Employee.Id = Id)))", sql);
-        // }
+        [TestMethod]
+        public void InsertMultipleWithManyToOneNavigationProperty_Void_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleWorkLogsWithEmployees(
+                new[]
+                {
+                    new WorkLog.InsertFieldsWithEmployee()
+                    {
+                        StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                        Employee =
+                            new Employee.InsertFields()
+                                { Name = "Mike" }
+                    },
+                    new WorkLog.InsertFieldsWithEmployee()
+                    {
+                        StartDate = new DateTime(2021, 3, 1),
+                        EndDate = new DateTime(2021, 1, 2),
+                        Employee =
+                            new Employee.InsertFields()
+                                { Name = "Lester" }
+                    }
+                }));
 
+            AssertSqlEqual(@"declare @insertedWorkLog table(""Id"" int, ""_index"" int)
+declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Name"", ""_index"") values(@worklogsEmployee_Name0, 0), (@worklogsEmployee_Name1, 1)
+merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup) as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+declare @WorkLogLookup table(""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
+insert @WorkLogLookup(""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") values(@worklogsStartDate0, @worklogsEndDate0, 0, 0), (@worklogsStartDate1, @worklogsEndDate1, 1, 1)
+merge ""WorkLog"" using (select ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"" from @WorkLogLookup) as i (""StartDate"",""EndDate"",""_index"",""EmployeeId_index"") on (1 = 0)
+ when not matched then
+ insert (""StartDate"", ""EndDate"", ""EmployeeId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @insertedEmployee ""insertedEmployee"" where (""insertedEmployee"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");", sql);
+        }
+
+        [TestMethod]
+        public void InsertMultipleWithAdjacentAndManyToManyNavigationProperties_Void_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleWorkLogsWithAdjacentAndNestedRelations(
+                new[]
+            {
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee =
+                        new Employee.InsertFieldsWithAddress()
+                        {
+                            Name = "Mike",
+                            Addresses = new Address.InsertFields[]
+                            {
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "123 fake st",
+                                    City = "Pennsylvania",
+                                    State = "PA"
+                                }
+                            }
+
+                        },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Ice Queen"
+                    }
+                },
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 3, 1),
+                    EndDate = new DateTime(2021, 1, 2),
+                    Employee =
+                        new Employee.InsertFieldsWithAddress()
+                            {
+                                Name = "Lester",
+                                Addresses = new Address.InsertFields[]
+                                {
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "234 fake st",
+                                        City = "New York",
+                                        State = "NY"
+                                    }
+                                }
+
+                            },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Burger Hut"
+                    }
+                }
+            }));
+
+            AssertSqlEqual(@"declare @insertedWorkLog table(""Id"" int, ""_index"" int)
+declare @insertedLocation table(""Id"" int, ""_index"" int)
+declare @insertedAddress table(""Id"" int, ""_index"" int)
+declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Name"", ""_index"") values(@employeesEmployee_Name0, 0), (@employeesEmployee_Name1, 1)
+merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup) as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+declare @AddressLookup table(""StreetAddress"" nvarchar(max), ""City"" nvarchar(max), ""State"" nvarchar(max), ""_index"" int)
+insert @AddressLookup(""StreetAddress"", ""City"", ""State"", ""_index"") values(@employeesEmployee_Addresses_StreetAddress0, @employeesEmployee_Addresses_City0, @employeesEmployee_Addresses_State0, 0), (@employeesEmployee_Addresses_StreetAddress1, @employeesEmployee_Addresses_City1, @employeesEmployee_Addresses_State1, 1)
+merge ""Address"" using (select ""StreetAddress"", ""City"", ""State"", ""_index"" from @AddressLookup) as i (""StreetAddress"",""City"",""State"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""StreetAddress"", ""City"", ""State"") values(""i"".""StreetAddress"", ""i"".""City"", ""i"".""State"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedAddress(""Id"", ""_index"");
+declare @LocationLookup table(""Name"" nvarchar(max), ""_index"" int)
+insert @LocationLookup(""Name"", ""_index"") values(@employeesLocation_Name0, 0), (@employeesLocation_Name1, 1)
+merge ""Location"" using (select ""Name"", ""_index"" from @LocationLookup) as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedLocation(""Id"", ""_index"");
+declare @WorkLogLookup table(""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int, ""LocationId_index"" int)
+insert @WorkLogLookup(""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""LocationId_index"") values(@employeesStartDate0, @employeesEndDate0, 0, 0, 0), (@employeesStartDate1, @employeesEndDate1, 1, 1, 1)
+merge ""WorkLog"" using (select ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""LocationId_index"" from @WorkLogLookup) as i (""StartDate"",""EndDate"",""_index"",""EmployeeId_index"",""LocationId_index"") on (1 = 0)
+ when not matched then
+ insert (""StartDate"", ""EndDate"", ""EmployeeId"", ""LocationId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @insertedEmployee ""insertedEmployee"" where (""insertedEmployee"".""_index"" = ""i"".""EmployeeId_index"")), (select ""Id"" from @insertedLocation ""insertedLocation"" where (""insertedLocation"".""_index"" = ""i"".""LocationId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
+declare @EmployeeAddressLookup table(""_index"" int, ""AddressId_index"" int, ""EmployeeId_index"" int)
+insert @EmployeeAddressLookup(""_index"", ""AddressId_index"", ""EmployeeId_index"") values(0, 0, 0), (1, 1, 1)
+merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""EmployeeId_index"" from @EmployeeAddressLookup) as i (""_index"",""AddressId_index"",""EmployeeId_index"") on (1 = 0)
+ when not matched then
+ insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @insertedAddress ""insertedAddress"" where (""insertedAddress"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @insertedEmployee ""insertedEmployee"" where (""insertedEmployee"".""_index"" = ""i"".""EmployeeId_index"")));", sql);
+        }
+
+        [TestMethod]
+        public void InsertMultipleWithAdjacentAndManyToManyNavigationProperties_ReturnResult_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleWorkLogsWithAdjacentAndNestedRelationsAndReturnResult(
+                new[]
+            {
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee =
+                        new Employee.InsertFieldsWithAddress()
+                        {
+                            Name = "Mike",
+                            Addresses = new Address.InsertFields[]
+                            {
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "123 fake st",
+                                    City = "Pennsylvania",
+                                    State = "PA"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "456 fake st",
+                                    City = "Portland",
+                                    State = "OR"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "567 fake st",
+                                    City = "San Diego",
+                                    State = "CA"
+                                }
+                            }
+
+                        },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Ice Queen"
+                    }
+                },
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 3, 1),
+                    EndDate = new DateTime(2021, 1, 2),
+                    Employee =
+                        new Employee.InsertFieldsWithAddress()
+                            {
+                                Name = "Lester",
+                                Addresses = new Address.InsertFields[]
+                                {
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "234 fake st",
+                                        City = "New York",
+                                        State = "NY"
+                                    },
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "345 fake st",
+                                        City = "Manchester",
+                                        State = "NH"
+                                    }
+                                }
+
+                            },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Burger Hut"
+                    }
+                }
+            }));
+
+            AssertSqlEqual(@"declare @insertedWorkLog table(""Id"" int, ""_index"" int)
+declare @insertedLocation table(""Id"" int, ""_index"" int)
+declare @insertedAddress table(""Id"" int, ""_index"" int)
+declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Name"", ""_index"") values(@employeesEmployee_Name0, 0), (@employeesEmployee_Name1, 1)
+merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup) as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+declare @AddressLookup table(""StreetAddress"" nvarchar(max), ""City"" nvarchar(max), ""State"" nvarchar(max), ""_index"" int)
+insert @AddressLookup(""StreetAddress"", ""City"", ""State"", ""_index"") values(@employeesEmployee_Addresses_StreetAddress0, @employeesEmployee_Addresses_City0, @employeesEmployee_Addresses_State0, 0), (@employeesEmployee_Addresses_StreetAddress1, @employeesEmployee_Addresses_City1, @employeesEmployee_Addresses_State1, 1), (@employeesEmployee_Addresses_StreetAddress2, @employeesEmployee_Addresses_City2, @employeesEmployee_Addresses_State2, 2), (@employeesEmployee_Addresses_StreetAddress3, @employeesEmployee_Addresses_City3, @employeesEmployee_Addresses_State3, 3), (@employeesEmployee_Addresses_StreetAddress4, @employeesEmployee_Addresses_City4, @employeesEmployee_Addresses_State4, 4)
+merge ""Address"" using (select ""StreetAddress"", ""City"", ""State"", ""_index"" from @AddressLookup) as i (""StreetAddress"",""City"",""State"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""StreetAddress"", ""City"", ""State"") values(""i"".""StreetAddress"", ""i"".""City"", ""i"".""State"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedAddress(""Id"", ""_index"");
+declare @LocationLookup table(""Name"" nvarchar(max), ""_index"" int)
+insert @LocationLookup(""Name"", ""_index"") values(@employeesLocation_Name0, 0), (@employeesLocation_Name1, 1)
+merge ""Location"" using (select ""Name"", ""_index"" from @LocationLookup) as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedLocation(""Id"", ""_index"");
+declare @WorkLogLookup table(""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int, ""LocationId_index"" int)
+insert @WorkLogLookup(""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""LocationId_index"") values(@employeesStartDate0, @employeesEndDate0, 0, 0, 0), (@employeesStartDate1, @employeesEndDate1, 1, 1, 1)
+merge ""WorkLog"" using (select ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""LocationId_index"" from @WorkLogLookup) as i (""StartDate"",""EndDate"",""_index"",""EmployeeId_index"",""LocationId_index"") on (1 = 0)
+ when not matched then
+ insert (""StartDate"", ""EndDate"", ""EmployeeId"", ""LocationId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @insertedEmployee ""insertedEmployee"" where (""insertedEmployee"".""_index"" = ""i"".""EmployeeId_index"")), (select ""Id"" from @insertedLocation ""insertedLocation"" where (""insertedLocation"".""_index"" = ""i"".""LocationId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
+declare @EmployeeAddressLookup table(""_index"" int, ""AddressId_index"" int, ""EmployeeId_index"" int)
+insert @EmployeeAddressLookup(""_index"", ""AddressId_index"", ""EmployeeId_index"") values(0, 0, 0), (1, 3, 1), (2, 1, 0), (3, 2, 0), (4, 4, 1)
+merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""EmployeeId_index"" from @EmployeeAddressLookup) as i (""_index"",""AddressId_index"",""EmployeeId_index"") on (1 = 0)
+ when not matched then
+ insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @insertedAddress ""insertedAddress"" where (""insertedAddress"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @insertedEmployee ""insertedEmployee"" where (""insertedEmployee"".""_index"" = ""i"".""EmployeeId_index"")));
+select ""WorkLog<WorkLog>"".""Id"" ""Id"", ""WorkLog<WorkLog>"".""StartDate"" ""StartDate"", ""WorkLog<WorkLog>"".""EndDate"" ""EndDate"", ""WorkLog<WorkLog>"".""EmployeeId"" ""EmployeeId"", ""WorkLog<WorkLog>"".""LocationId"" ""LocationId"", ""Employee<WorkLog.Employee>"".""Id"" ""Employee.Id"", ""Employee<WorkLog.Employee>"".""Name"" ""Employee.Name"", ""Address<WorkLog.Employee.Addresses>"".""Id"" ""Employee.Addresses.Id"", ""Address<WorkLog.Employee.Addresses>"".""StreetAddress"" ""Employee.Addresses.StreetAddress"", ""Address<WorkLog.Employee.Addresses>"".""City"" ""Employee.Addresses.City"", ""Address<WorkLog.Employee.Addresses>"".""State"" ""Employee.Addresses.State"", ""Address<WorkLog.Employee.Addresses>"".""Classification"" ""Employee.Addresses.Classification"", ""Location<WorkLog.Employee.Addresses.Locations>"".""Id"" ""Employee.Addresses.Locations.Id"", ""Location<WorkLog.Employee.Addresses.Locations>"".""Name"" ""Employee.Addresses.Locations.Name"", ""Location<WorkLog.Employee.Addresses.Locations>"".""AddressId"" ""Employee.Addresses.Locations.AddressId"", ""Location<WorkLog.Location>"".""Id"" ""Location.Id"", ""Location<WorkLog.Location>"".""Name"" ""Location.Name"", ""Location<WorkLog.Location>"".""AddressId"" ""Location.AddressId"", ""Address<WorkLog.Location.Address>"".""Id"" ""Location.Address.Id"", ""Address<WorkLog.Location.Address>"".""StreetAddress"" ""Location.Address.StreetAddress"", ""Address<WorkLog.Location.Address>"".""City"" ""Location.Address.City"", ""Address<WorkLog.Location.Address>"".""State"" ""Location.Address.State"", ""Address<WorkLog.Location.Address>"".""Classification"" ""Location.Address.Classification"", ""Employee<WorkLog.Location.Address.Employees>"".""Id"" ""Location.Address.Employees.Id"", ""Employee<WorkLog.Location.Address.Employees>"".""Name"" ""Location.Address.Employees.Name"" from ""WorkLog"" ""WorkLog<WorkLog>"" left outer join ""Employee"" ""Employee<WorkLog.Employee>"" on ((""WorkLog<WorkLog>"".""EmployeeId"" = ""Employee<WorkLog.Employee>"".""Id"")) left outer join ""EmployeeAddress"" ""EmployeeAddress<WorkLog.Employee>"" on ((""EmployeeAddress<WorkLog.Employee>"".""EmployeeId"" = ""Employee<WorkLog.Employee>"".""Id"")) left outer join ""Address"" ""Address<WorkLog.Employee.Addresses>"" on ((""EmployeeAddress<WorkLog.Employee>"".""AddressId"" = ""Address<WorkLog.Employee.Addresses>"".""Id"")) left outer join ""Location"" ""Location<WorkLog.Employee.Addresses.Locations>"" on ((""Location<WorkLog.Employee.Addresses.Locations>"".""AddressId"" = ""Address<WorkLog.Employee.Addresses>"".""Id"")) left outer join ""Location"" ""Location<WorkLog.Location>"" on ((""WorkLog<WorkLog>"".""LocationId"" = ""Location<WorkLog.Location>"".""Id"")) left outer join ""Address"" ""Address<WorkLog.Location.Address>"" on ((""Location<WorkLog.Location>"".""AddressId"" = ""Address<WorkLog.Location.Address>"".""Id"")) left outer join ""EmployeeAddress"" ""EmployeeAddress<WorkLog.Location.Address>"" on ((""EmployeeAddress<WorkLog.Location.Address>"".""AddressId"" = ""Address<WorkLog.Location.Address>"".""Id"")) left outer join ""Employee"" ""Employee<WorkLog.Location.Address.Employees>"" on ((""EmployeeAddress<WorkLog.Location.Address>"".""EmployeeId"" = ""Employee<WorkLog.Location.Address.Employees>"".""Id"")) inner join @insertedWorkLog ""i"" on ((""WorkLog<WorkLog>"".""Id"" = ""i"".""Id"")) order by ""i"".""_index""", sql);
+        }
 
         // [TestMethod]
         // public void InsertSingle_Void_ValuesByUnknownClass_ViaAttribute_ReturnsExpectedSql()

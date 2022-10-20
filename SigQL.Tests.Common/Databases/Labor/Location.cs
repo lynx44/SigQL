@@ -19,6 +19,11 @@
             int? AddressId { get; }
         }
 
+        public class Insert
+        {
+            public string Name { get; set; }
+        }
+
         public interface ILocationWithAddress
         {
             int Id { get; }

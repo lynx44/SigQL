@@ -39,7 +39,7 @@ namespace SigQL
                     {
                         var castMethod = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast), BindingFlags.Static | BindingFlags.Public);
                         var castMethodForType = castMethod.MakeGenericMethod(UnwrapType(finalReturnType));
-                        return castMethodForType.Invoke(null, result.AsEnumerable().ToArray());
+                        return castMethodForType.Invoke(null, new [] { result.AsEnumerable().ToArray() });
                     }
                 }
             }

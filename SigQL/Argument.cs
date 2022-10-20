@@ -74,7 +74,7 @@ namespace SigQL
     {
         private readonly DatabaseResolver databaseResolver;
         public Type Type { get; }
-        public string Name => Type.Name;
+        public string Name => OutputFactory.UnwrapType(Type).Name;
 
         public TypeArgument(Type type, DatabaseResolver databaseResolver)
         {
@@ -209,6 +209,18 @@ namespace SigQL
             matches.AddRange(arguments.SelectMany(a => Filter(a.ClassProperties, matchCondition)).ToList());
 
             return matches;
+        }
+
+        internal static bool EquivalentTo(this IArgument arg1, IArgument arg2)
+        {
+            return (arg1 == null && arg2 == null) || 
+                   (
+                       arg1 != null && arg2 != null &&
+                       arg1.GetType() == arg2.GetType() &&
+                       arg1.Type == arg2.Type &&
+                       arg1.Name == arg2.Name &&
+                       arg1.Parent.EquivalentTo(arg2.Parent)
+                   );
         }
     }
 

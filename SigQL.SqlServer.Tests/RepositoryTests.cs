@@ -2395,6 +2395,331 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void InsertMultiple_Void_ValuesWithOneToManyNavigationTables_ReturnsExpected()
+        {
+            var insertFields = new Employee.InsertFieldsWithWorkLogs[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(insertFields);
+            var actual = this.laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+
+            Assert.AreEqual(2, actual.Count);
+            AreSame(actual.Select(p => p.Name).ToList(), insertFields.Select(e => e.Name).ToList());
+            actual.ForEach(employee => Assert.AreEqual(2, employee.WorkLogs.Count));
+        }
+
+        [TestMethod]
+        public void InsertMultiple_Void_ValuesWithManyToOneNavigationTables_ReturnsExpected()
+        {
+            var insertFields = new[]
+            {
+                new WorkLog.InsertFieldsWithEmployee()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee = 
+                        new Employee.InsertFields()
+                            { Name = "Mike" }
+                },
+                new WorkLog.InsertFieldsWithEmployee()
+                {
+                    StartDate = new DateTime(2021, 3, 1), 
+                    EndDate = new DateTime(2021, 1, 2),
+                    Employee = 
+                        new Employee.InsertFields()
+                            { Name = "Lester" }
+                }
+            };
+            this.monolithicRepository.InsertMultipleWorkLogsWithEmployees(insertFields);
+            var actual = this.laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+
+            Assert.AreEqual(2, actual.Count);
+            AreSame(actual.Select(p => p.Name).ToList(), insertFields.Select(wl => wl.Employee.Name).ToList());
+            actual.ForEach(employee => Assert.AreEqual(1, employee.WorkLogs.Count));
+        }
+
+        [TestMethod]
+        public void InsertMultiple_Void_ValuesWithManyToOneAdjacentAndNestedManyToManyNavigationTables_ReturnsExpected()
+        {
+            var insertFields = new[]
+            {
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee =
+                        new Employee.InsertFieldsWithAddress()
+                        {
+                            Name = "Mike",
+                            Addresses = new Address.InsertFields[]
+                            {
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "123 fake st",
+                                    City = "Pennsylvania",
+                                    State = "PA"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "456 fake st",
+                                    City = "Portland",
+                                    State = "OR"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "567 fake st",
+                                    City = "San Diego",
+                                    State = "CA"
+                                }
+                            }
+
+                        },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Ice Queen"
+                    }
+                },
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 3, 1), 
+                    EndDate = new DateTime(2021, 1, 2),
+                    Employee = 
+                        new Employee.InsertFieldsWithAddress()
+                            { 
+                                Name = "Lester", 
+                                Addresses = new Address.InsertFields[]
+                                {
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "234 fake st", 
+                                        City = "New York",
+                                        State = "NY"
+                                    },
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "345 fake st", 
+                                        City = "Manchester",
+                                        State = "NH"
+                                    }
+                                }
+
+                            },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Burger Hut"
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleWorkLogsWithAdjacentAndNestedRelations(insertFields);
+            var actual = this.laborDbContext.WorkLog
+                    .Include(wl => wl.Employee)
+                    .ThenInclude(e => e.Addresses)
+                    .Include(wl => wl.Location)
+                    //.Include(e => e.WorkLogs.Select(wl => wl.Location))
+                    .ToList();
+
+            Assert.AreEqual(2, actual.Count);
+            AreSame(actual.Select(p => p.Employee.Name).ToList(), insertFields.Select(wl => wl.Employee.Name).ToList());
+            Assert.AreEqual(2, actual.Count);
+
+            var efWorkLog1 = actual.First();
+            Assert.AreEqual(new DateTime(2021, 1, 1), efWorkLog1.StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 2), efWorkLog1.EndDate);
+
+                var efEmployee1 = efWorkLog1.Employee;
+                Assert.AreEqual("Mike", efEmployee1.Name);
+                Assert.AreEqual(3, efEmployee1.Addresses.Count);
+                
+                    var efEmployee1Address1 = efEmployee1.Addresses.First();
+                    Assert.AreEqual("123 fake st", efEmployee1Address1.StreetAddress);
+                    Assert.AreEqual("Pennsylvania", efEmployee1Address1.City);
+                    Assert.AreEqual("PA", efEmployee1Address1.State);
+                    
+                    var efEmployee1Address2 = efEmployee1.Addresses.Skip(1).First();
+                    Assert.AreEqual("456 fake st", efEmployee1Address2.StreetAddress);
+                    Assert.AreEqual("Portland", efEmployee1Address2.City);
+                    Assert.AreEqual("OR", efEmployee1Address2.State);
+
+                    var efEmployee1Address3 = efEmployee1.Addresses.Skip(2).First();
+                    Assert.AreEqual("567 fake st", efEmployee1Address3.StreetAddress);
+                    Assert.AreEqual("San Diego", efEmployee1Address3.City);
+                    Assert.AreEqual("CA", efEmployee1Address3.State);
+
+                var efLocation1 = efWorkLog1.Location;
+                Assert.AreEqual("Ice Queen", efLocation1.Name);
+
+            var efWorkLog2 = actual.Last();
+            Assert.AreEqual(new DateTime(2021, 3, 1), efWorkLog2.StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 2), efWorkLog2.EndDate);
+
+                var efEmployee2 = efWorkLog2.Employee;
+                Assert.AreEqual("Lester", efEmployee2.Name);
+                Assert.AreEqual(2, efEmployee2.Addresses.Count);
+                
+                    var efEmployee2Address1 = efEmployee2.Addresses.First();
+                    Assert.AreEqual("234 fake st", efEmployee2Address1.StreetAddress);
+                    Assert.AreEqual("New York", efEmployee2Address1.City);
+                    Assert.AreEqual("NY", efEmployee2Address1.State);
+                    
+                    var efEmployee2Address2 = efEmployee2.Addresses.Skip(1).First();
+                    Assert.AreEqual("345 fake st", efEmployee2Address2.StreetAddress);
+                    Assert.AreEqual("Manchester", efEmployee2Address2.City);
+                    Assert.AreEqual("NH", efEmployee2Address2.State);
+
+                var efLocation2 = efWorkLog2.Location;
+                Assert.AreEqual("Burger Hut", efLocation2.Name);
+
+        }
+
+        [TestMethod]
+        public void InsertMultiple_ReturnResult_ValuesWithManyToOneAdjacentAndNestedManyToManyNavigationTables_ReturnsExpected()
+        {
+            var insertFields = new[]
+            {
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee =
+                        new Employee.InsertFieldsWithAddress()
+                        {
+                            Name = "Mike",
+                            Addresses = new Address.InsertFields[]
+                            {
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "123 fake st",
+                                    City = "Pennsylvania",
+                                    State = "PA"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "456 fake st",
+                                    City = "Portland",
+                                    State = "OR"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "567 fake st",
+                                    City = "San Diego",
+                                    State = "CA"
+                                }
+                            }
+
+                        },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Ice Queen"
+                    }
+                },
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 3, 1), 
+                    EndDate = new DateTime(2021, 1, 2),
+                    Employee = 
+                        new Employee.InsertFieldsWithAddress()
+                            { 
+                                Name = "Lester", 
+                                Addresses = new Address.InsertFields[]
+                                {
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "234 fake st", 
+                                        City = "New York",
+                                        State = "NY"
+                                    },
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "345 fake st", 
+                                        City = "Manchester",
+                                        State = "NH"
+                                    }
+                                }
+
+                            },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Burger Hut"
+                    }
+                }
+            };
+            var actual = this.monolithicRepository.InsertMultipleWorkLogsWithAdjacentAndNestedRelationsAndReturnResult(insertFields);
+
+            Assert.AreEqual(2, actual.Count());
+            AreSame(actual.Select(p => p.Employee.Name).ToList(), insertFields.Select(wl => wl.Employee.Name).ToList());
+            Assert.AreEqual(2, actual.Count());
+
+            var efWorkLog1 = actual.First();
+            Assert.AreEqual(new DateTime(2021, 1, 1), efWorkLog1.StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 2), efWorkLog1.EndDate);
+
+                var efEmployee1 = efWorkLog1.Employee;
+                Assert.AreEqual("Mike", efEmployee1.Name);
+                Assert.AreEqual(3, efEmployee1.Addresses.Count());
+                
+                    var efEmployee1Address1 = efEmployee1.Addresses.First();
+                    Assert.AreEqual("123 fake st", efEmployee1Address1.StreetAddress);
+                    Assert.AreEqual("Pennsylvania", efEmployee1Address1.City);
+                    Assert.AreEqual("PA", efEmployee1Address1.State);
+                    
+                    var efEmployee1Address2 = efEmployee1.Addresses.Skip(1).First();
+                    Assert.AreEqual("456 fake st", efEmployee1Address2.StreetAddress);
+                    Assert.AreEqual("Portland", efEmployee1Address2.City);
+                    Assert.AreEqual("OR", efEmployee1Address2.State);
+
+                    var efEmployee1Address3 = efEmployee1.Addresses.Skip(2).First();
+                    Assert.AreEqual("567 fake st", efEmployee1Address3.StreetAddress);
+                    Assert.AreEqual("San Diego", efEmployee1Address3.City);
+                    Assert.AreEqual("CA", efEmployee1Address3.State);
+
+                var efLocation1 = efWorkLog1.Location;
+                Assert.AreEqual("Ice Queen", efLocation1.Name);
+
+            var efWorkLog2 = actual.Last();
+            Assert.AreEqual(new DateTime(2021, 3, 1), efWorkLog2.StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 2), efWorkLog2.EndDate);
+
+                var efEmployee2 = efWorkLog2.Employee;
+                Assert.AreEqual("Lester", efEmployee2.Name);
+                Assert.AreEqual(2, efEmployee2.Addresses.Count());
+                
+                    var efEmployee2Address1 = efEmployee2.Addresses.First();
+                    Assert.AreEqual("234 fake st", efEmployee2Address1.StreetAddress);
+                    Assert.AreEqual("New York", efEmployee2Address1.City);
+                    Assert.AreEqual("NY", efEmployee2Address1.State);
+                    
+                    var efEmployee2Address2 = efEmployee2.Addresses.Skip(1).First();
+                    Assert.AreEqual("345 fake st", efEmployee2Address2.StreetAddress);
+                    Assert.AreEqual("Manchester", efEmployee2Address2.City);
+                    Assert.AreEqual("NH", efEmployee2Address2.State);
+
+                var efLocation2 = efWorkLog2.Location;
+                Assert.AreEqual("Burger Hut", efLocation2.Name);
+
+        }
+
+        // test insert when empty collections are passed
+
+        [TestMethod]
         public void InsertMultiple_OutputIds_ReturnsExpected()
         {
             var insertFields = new List<Employee.InsertFields>() 

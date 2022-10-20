@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using SigQL.Extensions;
 using SigQL.Schema;
 using SigQL.Types;
 
@@ -103,6 +104,46 @@ namespace SigQL
             }
 
             return value;
+        }
+
+        internal static IEnumerable<object> GetFlattenedValuesForCollectionParameterPath(object value, Type valueType, IEnumerable<PropertyInfo> propertyPaths)
+        {
+            return !propertyPaths.Any() ? value.AsEnumerable() : value.AsEnumerable().SelectMany(v =>
+            {
+                var propertyInfo = propertyPaths.First();
+                return GetFlattenedValuesForCollectionParameterPath(
+                    propertyInfo.GetMethod.Invoke(v, null), propertyInfo.PropertyType,
+                    propertyPaths.Skip(1).ToList());
+            });
+            //var values = new List<object>();
+            //// this is a non-collection type, just return the value
+            //if (!(value?.GetType().IsCollectionType()).GetValueOrDefault(false))
+            //{
+            //    values.Add(value);
+
+            //    return values;
+            //}
+            //else if (propertyPaths.Count() == 0)
+            //{
+            //    // this is likely a primitive collection type, return the values
+            //    return values;
+            //}
+
+            //if (propertyPaths != null && Enumerable.Any<PropertyInfo>(propertyPaths))
+            //{
+            //    foreach (var propertyInfo in propertyPaths)
+            //    {
+            //        value = propertyInfo.GetMethod.Invoke(value, null);
+            //    }
+            //}
+
+            //var parameterProvider = value as IDatabaseParameterValueProvider;
+            //if (parameterProvider != null)
+            //{
+            //    value = parameterProvider.SqlValue;
+            //}
+
+            //return value;
         }
     }
 }

@@ -46,6 +46,12 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string Name { get; set; }
         }
 
+        public class InsertFieldsWithAddress
+        {
+            public string Name { get; set; }
+            public IEnumerable<Address.InsertFields> Addresses  { get; set; }
+        }
+
         public class InsertFieldsWithWorkLogs
         {
             public string Name { get; set; }
