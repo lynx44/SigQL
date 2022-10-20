@@ -34,7 +34,6 @@ namespace SigQL
         private MethodSqlStatement BuildInsertStatement(InsertSpec insertSpec, List<ParameterPath> parameterPaths)
         {
             var targetTableType = insertSpec.UnwrappedReturnType;
-
             
             var statement = new List<AstNode>();
             var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
@@ -48,6 +47,8 @@ namespace SigQL
                            this.databaseResolver.DetectTable(c.ParameterPath.Parameter.ParameterType),
                            insertSpec.Table);
             }).ToList();
+            
+            var mergeIndexColumnName = "_index";
 
             for (var index = 0; index < insertSpec.InsertTableRelationsCollection.Count; index++)
             {
@@ -94,12 +95,10 @@ namespace SigQL
                 }
                 else
                 {
-                    var mergeIndexColumnName = "_index";
                     var mergeTableAlias = "i";
 
                     var insertColumnParameter = insertTableRelations.ColumnParameters.FirstOrDefault();
-
-
+                    
                     //var lookupParameterTableName = $"{insertSpec.RelationalPrefix}{insertSpec.Table.Name}Lookup";
                     var lookupParameterTableName = GetLookupTableName(insertTableRelations.TableRelations);
                     var declareLookupParameterStatement = new DeclareStatement()
@@ -368,7 +367,7 @@ namespace SigQL
                     tokens.Add(tokenPath);
                     statement.Add(merge);
 
-                    if (insertSpec.ReturnType != typeof(void) || index != insertSpec.InsertTableRelationsCollection.Count - 1)
+                    if (insertTableRelations.TableRelations.TargetTable.PrimaryKey != null && (insertSpec.ReturnType != typeof(void) || insertSpec.InsertTableRelationsCollection.Count > 1))
                     {
                         var outputParameterTableName = GetInsertedTableName(insertTableRelations.TableRelations);
                         var declareOutputParameterStatement = new DeclareStatement()
@@ -376,7 +375,7 @@ namespace SigQL
                             Parameter = new NamedParameterIdentifier() {Name = outputParameterTableName},
                             DataType = new DataType() {Type = new Literal() {Value = "table"}}
                                 .SetArgs(
-                                    insertSpec.Table.PrimaryKey.Columns.Select(c =>
+                                    insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
                                         new ColumnDeclaration().SetArgs(
                                             new RelationalColumn() {Label = c.Name},
                                             new DataType() {Type = new Literal() {Value = c.DataTypeDeclaration}}
@@ -394,13 +393,13 @@ namespace SigQL
                         {
                             Into = new IntoClause()
                                 {Object = new NamedParameterIdentifier() {Name = outputParameterTableName}}.SetArgs(
-                                insertSpec.Table.PrimaryKey.Columns.Select(c =>
+                                insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
                                         new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = c.Name}))
                                     .AppendOne(
                                         new ColumnIdentifier().SetArgs(new RelationalColumn()
                                             {Label = mergeIndexColumnName})))
                         }.SetArgs(
-                            insertSpec.Table.PrimaryKey.Columns.Select(c =>
+                            insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
                                     new ColumnIdentifier().SetArgs(new RelationalTable() {Label = insertedTableName},
                                         new RelationalColumn() {Label = c.Name}))
                                 .AppendOne(
@@ -409,55 +408,6 @@ namespace SigQL
                                         new RelationalColumn() {Label = mergeIndexColumnName}
                                     ))
                         );
-
-                        if (insertSpec.ReturnType != typeof(void))
-                        {
-                            var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
-                            var resolvedSelectClause = selectClauseBuilder.Build(targetTableType);
-                            var fromClauseRelations = resolvedSelectClause.FromClauseRelations;
-                            var selectClause = resolvedSelectClause.Ast;
-
-                            var fromClauseNode = BuildFromClause(fromClauseRelations);
-
-                            var primaryTable = fromClauseRelations.TargetTable;
-                            var outputParameterTableSelectAlias = "i";
-                            fromClauseNode.SetArgs(fromClauseNode.Args.AppendOne(new InnerJoin()
-                            {
-                                RightNode =
-                                    new TableIdentifier().SetArgs(
-                                        new Alias() { Label = outputParameterTableSelectAlias }.SetArgs(
-                                            new NamedParameterIdentifier() { Name = outputParameterTableName }))
-                            }.SetArgs(
-                                primaryTable.PrimaryKey.Columns.Select(pks =>
-                                    new AndOperator().SetArgs(
-                                        new EqualsOperator().SetArgs(
-                                            new ColumnIdentifier().SetArgs(
-                                                new RelationalTable() { Label = fromClauseRelations.Alias },
-                                                new RelationalColumn() { Label = pks.Name }),
-                                            new ColumnIdentifier().SetArgs(
-                                                new RelationalTable() { Label = outputParameterTableSelectAlias },
-                                                new RelationalColumn() { Label = pks.Name })
-                                        )))
-                            )));
-                            var fromClause = new FromClause().SetArgs(fromClauseNode);
-
-                            var selectStatement = new Select()
-                            {
-                                SelectClause = selectClause,
-                                FromClause = fromClause,
-                                OrderByClause = new OrderByClause().SetArgs(
-                                    primaryTable.PrimaryKey.Columns.Select(pks =>
-                                        new OrderByIdentifier().SetArgs(
-                                            new ColumnIdentifier().SetArgs(
-                                                new RelationalTable() { Label = outputParameterTableSelectAlias },
-                                                new RelationalColumn() { Label = mergeIndexColumnName })
-                                        )
-                                    )
-                                )
-                            };
-
-                            statement.Add(selectStatement);
-                        }
                         
                     }
 
@@ -493,6 +443,65 @@ namespace SigQL
                     //statement.AddRange(methodSqlStatements.SelectMany(mst => mst.CommandAst));
                     //tokens.AddRange(methodSqlStatements.SelectMany(mst => mst.Tokens));
                 }
+                
+            }
+
+
+            if (insertSpec.ReturnType != typeof(void))
+            {
+                
+                var tableRelations = this.databaseResolver.BuildTableRelations(insertSpec.Table, new TypeArgument(insertSpec.ReturnType, this.databaseResolver), TableRelationsColumnSource.ReturnType, tablePrimaryKeyDefinitions);
+                var matchingInsertTableRelations = insertSpec.InsertTableRelationsCollection
+                    .Where(tr =>
+                        TableEqualityComparer.Default.Equals(tr.TableRelations.TargetTable, tableRelations.TargetTable))
+                    .OrderBy(tr => tr.TableRelations.CalculateDepth())
+                    .First();
+                var outputParameterTableName = GetInsertedTableName(matchingInsertTableRelations.TableRelations);
+                var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
+                var resolvedSelectClause = selectClauseBuilder.Build(tableRelations, tablePrimaryKeyDefinitions);
+                var fromClauseRelations = resolvedSelectClause.FromClauseRelations;
+                var selectClause = resolvedSelectClause.Ast;
+
+                var fromClauseNode = BuildFromClause(fromClauseRelations);
+
+                var primaryTable = fromClauseRelations.TargetTable;
+                var outputParameterTableSelectAlias = "i";
+                fromClauseNode.SetArgs(fromClauseNode.Args.AppendOne(new InnerJoin()
+                {
+                    RightNode =
+                        new TableIdentifier().SetArgs(
+                            new Alias() { Label = outputParameterTableSelectAlias }.SetArgs(
+                                new NamedParameterIdentifier() { Name = outputParameterTableName }))
+                }.SetArgs(
+                    primaryTable.PrimaryKey.Columns.Select(pks =>
+                        new AndOperator().SetArgs(
+                            new EqualsOperator().SetArgs(
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalTable() { Label = fromClauseRelations.Alias },
+                                    new RelationalColumn() { Label = pks.Name }),
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalTable() { Label = outputParameterTableSelectAlias },
+                                    new RelationalColumn() { Label = pks.Name })
+                            )))
+                )));
+                var fromClause = new FromClause().SetArgs(fromClauseNode);
+
+                var selectStatement = new Select()
+                {
+                    SelectClause = selectClause,
+                    FromClause = fromClause,
+                    OrderByClause = new OrderByClause().SetArgs(
+                        primaryTable.PrimaryKey.Columns.Select(pks =>
+                            new OrderByIdentifier().SetArgs(
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalTable() { Label = outputParameterTableSelectAlias },
+                                    new RelationalColumn() { Label = mergeIndexColumnName })
+                            )
+                        )
+                    )
+                };
+
+                statement.Add(selectStatement);
             }
 
             var sqlStatement = new MethodSqlStatement()
@@ -857,9 +866,8 @@ namespace SigQL
             public Type ReturnType { get; set; }
             public Type UnwrappedReturnType { get; set; }
             public MethodInfo RootMethodInfo { get; set; }
-
+            
             public List<InsertTableRelations> InsertTableRelationsCollection { get; set; }
-            public InsertTableRelations Next { get; set; }
         }
         
 

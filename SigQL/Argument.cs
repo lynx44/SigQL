@@ -74,7 +74,7 @@ namespace SigQL
     {
         private readonly DatabaseResolver databaseResolver;
         public Type Type { get; }
-        public string Name => Type.Name;
+        public string Name => OutputFactory.UnwrapType(Type).Name;
 
         public TypeArgument(Type type, DatabaseResolver databaseResolver)
         {

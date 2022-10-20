@@ -183,6 +183,19 @@ namespace SigQL.Sql
                 navigationTable.Traverse(action);
             }
         }
+
+        public int CalculateDepth()
+        {
+            var tableRelations = this;
+            var depth = 0;
+            while (tableRelations.Parent != null)
+            {
+                depth++;
+                tableRelations = tableRelations.Parent;
+            }
+
+            return depth;
+        }
     }
 
     internal class TableRelationColumnDefinition : TableRelationColumnIdentifierDefinition
