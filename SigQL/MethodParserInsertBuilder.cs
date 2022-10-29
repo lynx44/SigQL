@@ -100,7 +100,6 @@ namespace SigQL
 
                     var insertColumnParameter = insertTableRelations.ColumnParameters.FirstOrDefault();
                     
-                    //var lookupParameterTableName = $"{insertSpec.RelationalPrefix}{insertSpec.Table.Name}Lookup";
                     var lookupParameterTableName = GetLookupTableName(insertTableRelations.TableRelations);
                     var declareLookupParameterStatement = BuildDeclareLookupParameterStatement(lookupParameterTableName, insertTableRelations);
                     statement.Add(declareLookupParameterStatement);
@@ -353,22 +352,7 @@ namespace SigQL
                     if (insertTableRelations.TableRelations.TargetTable.PrimaryKey != null && (insertSpec.ReturnType != typeof(void) || insertSpec.InsertTableRelationsCollection.Count > 1))
                     {
                         var outputParameterTableName = GetInsertedTableName(insertTableRelations.TableRelations);
-                        var declareOutputParameterStatement = new DeclareStatement()
-                        {
-                            Parameter = new NamedParameterIdentifier() {Name = outputParameterTableName},
-                            DataType = new DataType() {Type = new Literal() {Value = "table"}}
-                                .SetArgs(
-                                    insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
-                                        new ColumnDeclaration().SetArgs(
-                                            new RelationalColumn() {Label = c.Name},
-                                            new DataType() {Type = new Literal() {Value = c.DataTypeDeclaration}}
-                                        )
-                                    ).Concat(new ColumnDeclaration().SetArgs(
-                                        new RelationalColumn() {Label = MergeIndexColumnName},
-                                        new DataType() {Type = new Literal() {Value = "int"}}
-                                    ).AsEnumerable())
-                                )
-                        };
+                        var declareOutputParameterStatement = BuildDeclareInsertedTableParameterStatement(outputParameterTableName, insertTableRelations);
                         statement.Insert(0, declareOutputParameterStatement);
 
                         var insertedTableName = "inserted";
@@ -502,14 +486,51 @@ namespace SigQL
             return sqlStatement;
         }
 
+        private static DeclareStatement BuildDeclareInsertedTableParameterStatement(string outputParameterTableName,
+            InsertTableRelations insertTableRelations)
+        {
+            var declareOutputParameterStatement = new DeclareStatement()
+            {
+                Parameter = new NamedParameterIdentifier() {Name = outputParameterTableName},
+                DataType = new DataType() {Type = new Literal() {Value = "table"}}
+                    .SetArgs(
+                        insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
+                            new ColumnDeclaration().SetArgs(
+                                new RelationalColumn() {Label = c.Name},
+                                new DataType() {Type = new Literal() {Value = c.DataTypeDeclaration}}
+                            )
+                        ).Concat(new ColumnDeclaration().SetArgs(
+                            new RelationalColumn() {Label = MergeIndexColumnName},
+                            new DataType() {Type = new Literal() {Value = "int"}}
+                        ).AsEnumerable())
+                    )
+            };
+            return declareOutputParameterStatement;
+        }
+
         private static DeclareStatement BuildDeclareLookupParameterStatement(string lookupParameterTableName,
             InsertTableRelations insertTableRelations)
         {
+            List<AstNode> primaryKeyColumns = new List<AstNode>();
+            if ((insertTableRelations.TableRelations.TargetTable.PrimaryKey?.Columns.Any()).GetValueOrDefault(false))
+            {
+                var unselectedPrimaryKeys = insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Where(c =>
+                    !insertTableRelations.ColumnParameters.Any(
+                        ic => ColumnEqualityComparer.Default.Equals(ic.Column, c)));
+                primaryKeyColumns = unselectedPrimaryKeys.Select(c =>
+                    new ColumnDeclaration().SetArgs(
+                        new RelationalColumn() {Label = c.Name},
+                        new DataType() {Type = new Literal() {Value = c.DataTypeDeclaration}}
+                    )
+                ).ToList<AstNode>();
+            }
+
             var declareLookupParameterStatement = new DeclareStatement()
             {
                 Parameter = new NamedParameterIdentifier() {Name = lookupParameterTableName},
                 DataType = new DataType() {Type = new Literal() {Value = "table"}}
                     .SetArgs(
+                        primaryKeyColumns.Concat(
                         insertTableRelations.ColumnParameters.Select(c =>
                                 new ColumnDeclaration().SetArgs(
                                     new RelationalColumn() {Label = c.Column.Name},
@@ -518,7 +539,7 @@ namespace SigQL
                             ).Concat(new ColumnDeclaration().SetArgs(
                                 new RelationalColumn() {Label = MergeIndexColumnName},
                                 new DataType() {Type = new Literal() {Value = "int"}}
-                            ).AsEnumerable())
+                            ).AsEnumerable()))
                             .Concat(insertTableRelations.ForeignTableColumns.SelectMany(fk =>
                                 fk.ForeignKey.GetForeignColumns().Select(fc =>
                                     new ColumnDeclaration().SetArgs(
