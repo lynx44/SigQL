@@ -1183,6 +1183,77 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void UpdateQuery()
+        {
+            var ast = new Update()
+            {
+                SetClause = new[]
+                {
+                    new SetEqualOperator()
+                        .SetArgs(
+                            new ColumnIdentifier().SetArgs(
+                                new RelationalColumn()
+                                {
+                                    Label = "name"
+                                }),
+                            new ColumnIdentifier().SetArgs(
+                                new RelationalTable()
+                                {
+                                    Label = "student"
+                                },
+                                new RelationalColumn()
+                                {
+                                    Label = "firstname"
+                                })
+                        )
+                },
+                FromClause = new FromClause().SetArgs(
+                        new FromClauseNode().SetArgs(
+                                new Alias()
+                                {
+                                    Label = "p"
+                                }.SetArgs(
+                                    new TableIdentifier().SetArgs(
+                                            new RelationalTable() { Label = "person" }
+                                        )),
+                                new InnerJoin()
+                                {
+                                    RightNode = new TableIdentifier()
+                                        .SetArgs(new RelationalTable()
+                                        {
+                                            Label = "student"
+                                        })
+                                }.SetArgs(new EqualsOperator().SetArgs(
+                                    new ColumnIdentifier().SetArgs(
+                                        new RelationalTable()
+                                        {
+                                            Label = "student"
+                                        },
+                                        new RelationalColumn()
+                                        {
+                                            Label = "personid"
+                                        }),
+                                    new ColumnIdentifier().SetArgs(
+                                        new RelationalTable()
+                                        {
+                                            Label = "p"
+                                        },
+                                        new RelationalColumn()
+                                        {
+                                            Label = "id"
+                                        })))
+                         )
+                 )
+            }.SetArgs(new Alias()
+            {
+                Label = "p"
+            });
+
+            var statement = Build(ast);
+            Assert.AreEqual("update \"p\" set \"name\" = \"student\".\"firstname\" from \"person\" \"p\" inner join \"student\" on (\"student\".\"personid\" = \"p\".\"id\")", statement);
+        }
+
+        [TestMethod]
         public void BasicInsert()
         {
             var insertStatement = new Insert()

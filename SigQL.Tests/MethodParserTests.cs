@@ -1378,26 +1378,34 @@ insert @EmployeeLookup(""Name"", ""_index"") values(@employeesEmployee_Name0, 0)
 merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup) as i (""Name"",""_index"") on (1 = 0)
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = i.Id from @EmployeeLookup ""EmployeeLookup""
+inner join @insertedEmployee i on ""EmployeeLookup""._index = i._index
 declare @AddressLookup table(""StreetAddress"" nvarchar(max), ""City"" nvarchar(max), ""State"" nvarchar(max), ""_index"" int)
 insert @AddressLookup(""StreetAddress"", ""City"", ""State"", ""_index"") values(@employeesEmployee_Addresses_StreetAddress0, @employeesEmployee_Addresses_City0, @employeesEmployee_Addresses_State0, 0), (@employeesEmployee_Addresses_StreetAddress1, @employeesEmployee_Addresses_City1, @employeesEmployee_Addresses_State1, 1)
 merge ""Address"" using (select ""StreetAddress"", ""City"", ""State"", ""_index"" from @AddressLookup) as i (""StreetAddress"",""City"",""State"",""_index"") on (1 = 0)
  when not matched then
  insert (""StreetAddress"", ""City"", ""State"") values(""i"".""StreetAddress"", ""i"".""City"", ""i"".""State"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedAddress(""Id"", ""_index"");
+update ""AddressLookup"" set ""Id"" = i.Id from @AddressLookup ""AddressLookup""
+inner join @insertedEmployee i on ""AddressLookup""._index = i._index
 declare @LocationLookup table(""Name"" nvarchar(max), ""_index"" int)
 insert @LocationLookup(""Name"", ""_index"") values(@employeesLocation_Name0, 0), (@employeesLocation_Name1, 1)
 merge ""Location"" using (select ""Name"", ""_index"" from @LocationLookup) as i (""Name"",""_index"") on (1 = 0)
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedLocation(""Id"", ""_index"");
+update ""LocationLookup"" set ""Id"" = i.Id from @LocationLookup ""LocationLookup""
+inner join @insertedEmployee i on ""LocationLookup""._index = i._index
 declare @WorkLogLookup table(""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int, ""LocationId_index"" int)
 insert @WorkLogLookup(""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""LocationId_index"") values(@employeesStartDate0, @employeesEndDate0, 0, 0, 0), (@employeesStartDate1, @employeesEndDate1, 1, 1, 1)
 merge ""WorkLog"" using (select ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""LocationId_index"" from @WorkLogLookup) as i (""StartDate"",""EndDate"",""_index"",""EmployeeId_index"",""LocationId_index"") on (1 = 0)
  when not matched then
- insert (""StartDate"", ""EndDate"", ""EmployeeId"", ""LocationId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @insertedEmployee ""insertedEmployee"" where (""insertedEmployee"".""_index"" = ""i"".""EmployeeId_index"")), (select ""Id"" from @insertedLocation ""insertedLocation"" where (""insertedLocation"".""_index"" = ""i"".""LocationId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
+ insert (""StartDate"", ""EndDate"", ""EmployeeId"", ""LocationId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index"")), (select ""Id"" from @LocationLookup ""LocationLookup"" where (""LocationLookup"".""_index"" = ""i"".""LocationId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
+update ""WorkLogLookup"" set ""Id"" = i.Id from @WorkLogLookup ""WorkLogLookup""
+inner join @insertedEmployee i on ""WorkLogLookup""._index = i._index
 declare @EmployeeAddressLookup table(""_index"" int, ""AddressId_index"" int, ""EmployeeId_index"" int)
 insert @EmployeeAddressLookup(""_index"", ""AddressId_index"", ""EmployeeId_index"") values(0, 0, 0), (1, 1, 1)
 merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""EmployeeId_index"" from @EmployeeAddressLookup) as i (""_index"",""AddressId_index"",""EmployeeId_index"") on (1 = 0)
  when not matched then
- insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @insertedAddress ""insertedAddress"" where (""insertedAddress"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @insertedEmployee ""insertedEmployee"" where (""insertedEmployee"".""_index"" = ""i"".""EmployeeId_index"")));", sql);
+ insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index"")));", sql);
         }
 
         [TestMethod]
