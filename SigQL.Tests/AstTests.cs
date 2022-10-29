@@ -1067,7 +1067,7 @@ namespace SigQL.Tests
             };
 
             var statement = Build(selectStatement);
-            Assert.AreEqual("update \"person\" set \"name\" = @newName", statement);
+            Assert.AreEqual("update \"person\" set \"name\" = @newName;", statement);
         }
 
         [TestMethod]
@@ -1118,7 +1118,7 @@ namespace SigQL.Tests
             };
 
             var statement = Build(selectStatement);
-            Assert.AreEqual("update \"person\" set \"name\" = @newName where (\"name\" = @nameToFind)", statement);
+            Assert.AreEqual("update \"person\" set \"name\" = @newName where (\"name\" = @nameToFind);", statement);
         }
 
         [TestMethod]
@@ -1179,7 +1179,7 @@ namespace SigQL.Tests
             };
 
             var statement = Build(selectStatement);
-            Assert.AreEqual("update \"p\" set \"name\" = @newName from \"person\" \"p\" where (\"name\" = @nameToFind)", statement);
+            Assert.AreEqual("update \"p\" set \"name\" = @newName from \"person\" \"p\" where (\"name\" = @nameToFind);", statement);
         }
 
         [TestMethod]
@@ -1250,7 +1250,7 @@ namespace SigQL.Tests
             });
 
             var statement = Build(ast);
-            Assert.AreEqual("update \"p\" set \"name\" = \"student\".\"firstname\" from \"person\" \"p\" inner join \"student\" on (\"student\".\"personid\" = \"p\".\"id\")", statement);
+            Assert.AreEqual("update \"p\" set \"name\" = \"student\".\"firstname\" from \"person\" \"p\" inner join \"student\" on (\"student\".\"personid\" = \"p\".\"id\");", statement);
         }
 
         [TestMethod]

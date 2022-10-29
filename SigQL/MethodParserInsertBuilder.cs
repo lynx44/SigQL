@@ -102,28 +102,7 @@ namespace SigQL
                     
                     //var lookupParameterTableName = $"{insertSpec.RelationalPrefix}{insertSpec.Table.Name}Lookup";
                     var lookupParameterTableName = GetLookupTableName(insertTableRelations.TableRelations);
-                    var declareLookupParameterStatement = new DeclareStatement()
-                    {
-                        Parameter = new NamedParameterIdentifier() {Name = lookupParameterTableName},
-                        DataType = new DataType() {Type = new Literal() {Value = "table"}}
-                            .SetArgs(
-                                insertTableRelations.ColumnParameters.Select(c =>
-                                    new ColumnDeclaration().SetArgs(
-                                        new RelationalColumn() {Label = c.Column.Name},
-                                        new DataType() {Type = new Literal() {Value = c.Column.DataTypeDeclaration}}
-                                    )
-                                ).Concat(new ColumnDeclaration().SetArgs(
-                                    new RelationalColumn() {Label = MergeIndexColumnName},
-                                    new DataType() {Type = new Literal() {Value = "int"}}
-                                ).AsEnumerable())
-                                .Concat(insertTableRelations.ForeignTableColumns.SelectMany(fk => 
-                                        fk.ForeignKey.GetForeignColumns().Select(fc =>
-                                            new ColumnDeclaration().SetArgs(
-                                                new RelationalColumn() { Label = GetForeignColumnIndexName(fc.Name) },
-                                                new DataType() { Type = new Literal() { Value = "int" } }))
-                                )).ToList()
-                            )
-                    };
+                    var declareLookupParameterStatement = BuildDeclareLookupParameterStatement(lookupParameterTableName, insertTableRelations);
                     statement.Add(declareLookupParameterStatement);
 
                     var mergeValuesParametersList = new ValuesListClause();
@@ -521,6 +500,34 @@ namespace SigQL
             };
 
             return sqlStatement;
+        }
+
+        private static DeclareStatement BuildDeclareLookupParameterStatement(string lookupParameterTableName,
+            InsertTableRelations insertTableRelations)
+        {
+            var declareLookupParameterStatement = new DeclareStatement()
+            {
+                Parameter = new NamedParameterIdentifier() {Name = lookupParameterTableName},
+                DataType = new DataType() {Type = new Literal() {Value = "table"}}
+                    .SetArgs(
+                        insertTableRelations.ColumnParameters.Select(c =>
+                                new ColumnDeclaration().SetArgs(
+                                    new RelationalColumn() {Label = c.Column.Name},
+                                    new DataType() {Type = new Literal() {Value = c.Column.DataTypeDeclaration}}
+                                )
+                            ).Concat(new ColumnDeclaration().SetArgs(
+                                new RelationalColumn() {Label = MergeIndexColumnName},
+                                new DataType() {Type = new Literal() {Value = "int"}}
+                            ).AsEnumerable())
+                            .Concat(insertTableRelations.ForeignTableColumns.SelectMany(fk =>
+                                fk.ForeignKey.GetForeignColumns().Select(fc =>
+                                    new ColumnDeclaration().SetArgs(
+                                        new RelationalColumn() {Label = GetForeignColumnIndexName(fc.Name)},
+                                        new DataType() {Type = new Literal() {Value = "int"}}))
+                            )).ToList()
+                    )
+            };
+            return declareLookupParameterStatement;
         }
 
         private AstNode BuildUpdateLookupStatement(TableRelations tableRelations)

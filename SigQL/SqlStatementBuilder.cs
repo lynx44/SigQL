@@ -127,7 +127,8 @@ namespace SigQL
                             sql.Add($"update {string.Join(" ", Walk(a.Args))} set {string.Join(", ", a.SetClause.Select(a => Walk(a)))}".Trim());
                             sql.Add(Walk(new AstNode[] { a.FromClause }));
                             sql.Add(Walk(new AstNode[] { a.WhereClause }));
-                            break;
+                            sql.Add(";\n");
+                                break;
                         case Delete a:
                             sql.Add($"delete {string.Join(" ", a.Args?.Select(a => Walk(a)) ?? new string[0])}".Trim());
                             sql.Add(Walk(new AstNode[] { a.FromClause }));
