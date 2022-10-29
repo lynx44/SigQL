@@ -222,6 +222,10 @@ namespace SigQL.Tests.Common.Databases.Labor
         [Update(TableName = nameof(Employee))]
         void UpdateEmployeeById([Set] string name, int id);
 
+        // UpdateByKey
+        [UpdateByKey]
+        void UpdateByKeyMultipleEmployeesWithWorkLogs(IEnumerable<Employee.UpdateByKeyFieldsWithWorkLogs> employees);
+
         // delete
         [Delete(TableName = nameof(Employee))]
         void DeleteEmployeeWithAttributeTableNameWithValuesByParams(string name);
