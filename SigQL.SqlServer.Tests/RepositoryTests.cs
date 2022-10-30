@@ -2853,6 +2853,226 @@ namespace SigQL.SqlServer.Tests
             CustomAssert.AreEquivalent<dynamic>(Enumerable.Range(0, 2).Select(i => new { StartDate = new DateTime(2022, 2, 2), EndDate = new DateTime(2022, 2, 3) }), actual);
         }
 
+        [TestMethod]
+        public void UpdateByKey_Multiple()
+        {
+            var insertFields = new Employee.InsertFieldsWithWorkLogs[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(insertFields);
+
+            this.monolithicRepository.UpdateByKeyMultipleEmployeesWithWorkLogs(
+                new Employee.UpdateByKeyFieldsWithWorkLogs[]
+                {
+                    new Employee.UpdateByKeyFieldsWithWorkLogs()
+                    {
+                        Id = 1,
+                        Name = "Bob",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpdateByKeyFields()
+                                {Id = 1, StartDate = new DateTime(2022, 9, 1), EndDate = new DateTime(2022, 9, 2)},
+                            new WorkLog.UpdateByKeyFields()
+                                {Id = 2, StartDate = new DateTime(2022, 10, 1), EndDate = new DateTime(2022, 10, 2)}
+                        }
+                    },
+                    new Employee.UpdateByKeyFieldsWithWorkLogs()
+                    {
+                        Id = 2,
+                        Name = "Joe",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpdateByKeyFields()
+                                {Id = 3, StartDate = new DateTime(2022, 11, 1), EndDate = new DateTime(2022, 11, 2)},
+                            new WorkLog.UpdateByKeyFields()
+                                {Id = 4, StartDate = new DateTime(2022, 12, 1), EndDate = new DateTime(2022, 12, 2)}
+                        }
+                    }
+                });
+
+            var actual = laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+            var actualEmployee1 = actual.First(e => e.Id == 1);
+            Assert.AreEqual("Bob", actualEmployee1.Name);
+            Assert.AreEqual(new DateTime(2022, 9, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).StartDate);
+            Assert.AreEqual(new DateTime(2022, 9, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).EndDate);
+            Assert.AreEqual(new DateTime(2022, 10, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 2).StartDate);
+            Assert.AreEqual(new DateTime(2022, 10, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 2).EndDate);
+            var actualEmployee2 = actual.First(e => e.Id == 2);
+            Assert.AreEqual("Joe", actualEmployee2.Name);
+            Assert.AreEqual(new DateTime(2022, 11, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 3).StartDate);
+            Assert.AreEqual(new DateTime(2022, 11, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 3).EndDate);
+            Assert.AreEqual(new DateTime(2022, 12, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 4).StartDate);
+            Assert.AreEqual(new DateTime(2022, 12, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 4).EndDate);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_MovesNavigationProperty()
+        {
+            var insertFields = new Employee.InsertFieldsWithWorkLogs[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(insertFields);
+
+            this.monolithicRepository.UpdateByKeyMultipleEmployeesWithWorkLogs(
+                new Employee.UpdateByKeyFieldsWithWorkLogs[]
+                {
+                    new Employee.UpdateByKeyFieldsWithWorkLogs()
+                    {
+                        Id = 1,
+                        Name = "Bob",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpdateByKeyFields()
+                                {Id = 1, StartDate = new DateTime(2022, 9, 1), EndDate = new DateTime(2022, 9, 2)}
+                        }
+                    },
+                    new Employee.UpdateByKeyFieldsWithWorkLogs()
+                    {
+                        Id = 2,
+                        Name = "Joe",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpdateByKeyFields()
+                                {Id = 3, StartDate = new DateTime(2022, 11, 1), EndDate = new DateTime(2022, 11, 2)},
+                            new WorkLog.UpdateByKeyFields()
+                                {Id = 4, StartDate = new DateTime(2022, 12, 1), EndDate = new DateTime(2022, 12, 2)},
+                            new WorkLog.UpdateByKeyFields()
+                                {Id = 2, StartDate = new DateTime(2022, 10, 1), EndDate = new DateTime(2022, 10, 2)}
+                        }
+                    }
+                });
+
+            var actual = laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+            var actualEmployee1 = actual.First(e => e.Id == 1);
+            Assert.AreEqual("Bob", actualEmployee1.Name);
+            Assert.AreEqual(new DateTime(2022, 9, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).StartDate);
+            Assert.AreEqual(new DateTime(2022, 9, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).EndDate);
+            var actualEmployee2 = actual.First(e => e.Id == 2);
+            Assert.AreEqual("Joe", actualEmployee2.Name);
+            Assert.AreEqual(new DateTime(2022, 10, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 2).StartDate);
+            Assert.AreEqual(new DateTime(2022, 10, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 2).EndDate);
+            Assert.AreEqual(new DateTime(2022, 11, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 3).StartDate);
+            Assert.AreEqual(new DateTime(2022, 11, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 3).EndDate);
+            Assert.AreEqual(new DateTime(2022, 12, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 4).StartDate);
+            Assert.AreEqual(new DateTime(2022, 12, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 4).EndDate);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_DoesNotDeleteNavigationProperty()
+        {
+            var insertFields = new Employee.InsertFieldsWithWorkLogs[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(insertFields);
+
+            this.monolithicRepository.UpdateByKeyMultipleEmployeesWithWorkLogs(
+                new Employee.UpdateByKeyFieldsWithWorkLogs[]
+                {
+                    new Employee.UpdateByKeyFieldsWithWorkLogs()
+                    {
+                        Id = 1,
+                        Name = "Bob",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpdateByKeyFields()
+                                {Id = 1, StartDate = new DateTime(2022, 9, 1), EndDate = new DateTime(2022, 9, 2)}
+                        }
+                    },
+                    new Employee.UpdateByKeyFieldsWithWorkLogs()
+                    {
+                        Id = 2,
+                        Name = "Joe",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpdateByKeyFields()
+                                {Id = 3, StartDate = new DateTime(2022, 11, 1), EndDate = new DateTime(2022, 11, 2)},
+                            new WorkLog.UpdateByKeyFields()
+                                {Id = 4, StartDate = new DateTime(2022, 12, 1), EndDate = new DateTime(2022, 12, 2)}
+                        }
+                    }
+                });
+
+            var actual = laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+            var actualEmployee1 = actual.First(e => e.Id == 1);
+            Assert.AreEqual("Bob", actualEmployee1.Name);
+            Assert.AreEqual(new DateTime(2022, 9, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).StartDate);
+            Assert.AreEqual(new DateTime(2022, 9, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).EndDate);
+            Assert.AreEqual(new DateTime(2021, 2, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 2).StartDate);
+            Assert.AreEqual(new DateTime(2021, 2, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 2).EndDate);
+            var actualEmployee2 = actual.First(e => e.Id == 2);
+            Assert.AreEqual("Joe", actualEmployee2.Name);
+            Assert.AreEqual(new DateTime(2022, 11, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 3).StartDate);
+            Assert.AreEqual(new DateTime(2022, 11, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 3).EndDate);
+            Assert.AreEqual(new DateTime(2022, 12, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 4).StartDate);
+            Assert.AreEqual(new DateTime(2022, 12, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 4).EndDate);
+        }
+
         #endregion
 
         #region Abstract Class
