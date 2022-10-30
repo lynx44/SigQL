@@ -33,8 +33,13 @@ namespace SigQL
             var statementType = DetectStatementType(methodInfo);
             if (statementType == StatementType.Insert)
             {
-                var insertSpec = GetInsertSpec(methodInfo);
-                return BuildInsertStatement(insertSpec, Enumerable.Select<InsertColumnParameter, ParameterPath>(insertSpec.InsertTableRelationsCollection.First().ColumnParameters, cp => cp.ParameterPath).ToList());
+                var insertSpec = GetUpsertSpec(methodInfo);
+                return BuildInsertStatement(insertSpec, Enumerable.Select<UpsertColumnParameter, ParameterPath>(insertSpec.UpsertTableRelationsCollection.First().ColumnParameters, cp => cp.ParameterPath).ToList());
+            }
+            if (statementType == StatementType.UpdateByKey)
+            {
+                var insertSpec = GetUpsertSpec(methodInfo);
+                return BuildUpdateByKeyStatement(insertSpec, Enumerable.Select<UpsertColumnParameter, ParameterPath>(insertSpec.UpsertTableRelationsCollection.First().ColumnParameters, cp => cp.ParameterPath).ToList());
             }
             if (statementType == StatementType.Delete)
             {
@@ -457,8 +462,26 @@ namespace SigQL
             {
                 return StatementType.Update;
             }
+            if (IsUpdateByKeyMethod(methodInfo))
+            {
+                return StatementType.UpdateByKey;
+            }
 
             return StatementType.Select;
+        }
+        private bool IsDeleteMethod(MethodInfo methodInfo)
+        {
+            return (methodInfo.GetCustomAttributes(typeof(DeleteAttribute), false)?.Any()).GetValueOrDefault(false);
+        }
+
+        private bool IsUpdateMethod(MethodInfo methodInfo)
+        {
+            return (methodInfo.GetCustomAttributes(typeof(UpdateAttribute), false)?.Any()).GetValueOrDefault(false);
+        }
+
+        private bool IsUpdateByKeyMethod(MethodInfo methodInfo)
+        {
+            return (methodInfo.GetCustomAttributes(typeof(UpdateByKeyAttribute), false)?.Any()).GetValueOrDefault(false);
         }
 
         private WhereClause BuildWhereClauseFromTargetTablePerspective(AstNode primaryTableReference, TableRelations whereClauseTableRelations, List<ParameterPath> parameterPaths, List<TokenPath> tokens)
@@ -1133,7 +1156,8 @@ namespace SigQL
             Select,
             Insert,
             Update,
-            Delete
+            Delete,
+            UpdateByKey
         }
     }
 

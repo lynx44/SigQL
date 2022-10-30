@@ -58,6 +58,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<WorkLog.DataFields> WorkLogs { get; set; }
         }
 
+        public class UpdateByKeyFieldsWithWorkLogs
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            public IEnumerable<WorkLog.UpdateByKeyFields> WorkLogs { get; set; }
+        }
+
         public interface IEmployeeWithAddresses
         {
             int Id { get; set; }

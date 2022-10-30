@@ -17,6 +17,8 @@ namespace SigQL
 {
     public partial class MethodParser
     {
+        private const string MergeIndexColumnName = "_index";
+
         public class TableIndexReference
         {
             public int? PrimaryTableIndex { get; }
@@ -31,7 +33,7 @@ namespace SigQL
             }
         }
 
-        private MethodSqlStatement BuildInsertStatement(InsertSpec insertSpec, List<ParameterPath> parameterPaths)
+        private MethodSqlStatement BuildInsertStatement(UpsertSpec insertSpec, List<ParameterPath> parameterPaths)
         {
             var targetTableType = insertSpec.UnwrappedReturnType;
             
@@ -40,7 +42,7 @@ namespace SigQL
 
             var tokens = new List<TokenPath>();
 
-            var multipleInsertParameters = insertSpec.InsertTableRelationsCollection[0].ColumnParameters.Where(c =>
+            var multipleInsertParameters = insertSpec.UpsertTableRelationsCollection[0].ColumnParameters.Where(c =>
             {
                 return this.databaseResolver.IsTableOrTableProjection(c.ParameterPath.Parameter.ParameterType) &&
                        TableEqualityComparer.Default.Equals(
@@ -48,15 +50,14 @@ namespace SigQL
                            insertSpec.Table);
             }).ToList();
             
-            var mergeIndexColumnName = "_index";
 
-            for (var index = 0; index < insertSpec.InsertTableRelationsCollection.Count; index++)
+            for (var index = 0; index < insertSpec.UpsertTableRelationsCollection.Count; index++)
             {
                 var valuesListClause = new ValuesListClause();
-                var insertTableRelations = insertSpec.InsertTableRelationsCollection[index];
-                var insertColumnList = insertTableRelations.ColumnParameters.Select(cp =>
+                var upsertTableRelations = insertSpec.UpsertTableRelationsCollection[index];
+                var upsertColumnList = upsertTableRelations.ColumnParameters.Select(cp =>
                     new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = cp.Column.Name}))
-                    .Concat(insertTableRelations.ForeignTableColumns.SelectMany(fk =>
+                    .Concat(upsertTableRelations.ForeignTableColumns.SelectMany(fk =>
                         fk.ForeignKey.GetForeignColumns().Select(fc =>
                             new ColumnIdentifier().SetArgs(
                                 new RelationalColumn() { Label = fc.Name }))
@@ -64,10 +65,10 @@ namespace SigQL
                     .ToList();
 
                 
-                if (insertTableRelations.ColumnParameters.Any() &&
+                if (upsertTableRelations.ColumnParameters.Any() &&
                     multipleInsertParameters.Any(p =>
                         p.ParameterPath.Parameter !=
-                        insertTableRelations.ColumnParameters.First().ParameterPath.Parameter))
+                        upsertTableRelations.ColumnParameters.First().ParameterPath.Parameter))
                 {
                     throw new InvalidOperationException(
                         $"Only one parameter can represent multiple inserts for target table {insertSpec.Table.Name}");
@@ -78,7 +79,7 @@ namespace SigQL
                 {
                     valuesListClause.SetArgs(
                         new ValuesList().SetArgs(
-                            insertTableRelations.ColumnParameters.Select(cp =>
+                            upsertTableRelations.ColumnParameters.Select(cp =>
                                 new NamedParameterIdentifier()
                                 {
                                     Name = cp.ParameterPath.SqlParameterName
@@ -89,7 +90,7 @@ namespace SigQL
                     {
                         Object = new TableIdentifier().SetArgs(new RelationalTable() {Label = insertSpec.Table.Name}),
                         ColumnList =
-                            insertColumnList,
+                            upsertColumnList,
                         ValuesList = valuesListClause
                     });
                 }
@@ -97,78 +98,38 @@ namespace SigQL
                 {
                     var mergeTableAlias = "i";
 
-                    var insertColumnParameter = insertTableRelations.ColumnParameters.FirstOrDefault();
+                    var insertColumnParameter = upsertTableRelations.ColumnParameters.FirstOrDefault();
                     
-                    //var lookupParameterTableName = $"{insertSpec.RelationalPrefix}{insertSpec.Table.Name}Lookup";
-                    var lookupParameterTableName = GetLookupTableName(insertTableRelations.TableRelations);
-                    var declareLookupParameterStatement = new DeclareStatement()
-                    {
-                        Parameter = new NamedParameterIdentifier() {Name = lookupParameterTableName},
-                        DataType = new DataType() {Type = new Literal() {Value = "table"}}
-                            .SetArgs(
-                                insertTableRelations.ColumnParameters.Select(c =>
-                                    new ColumnDeclaration().SetArgs(
-                                        new RelationalColumn() {Label = c.Column.Name},
-                                        new DataType() {Type = new Literal() {Value = c.Column.DataTypeDeclaration}}
-                                    )
-                                ).Concat(new ColumnDeclaration().SetArgs(
-                                    new RelationalColumn() {Label = mergeIndexColumnName},
-                                    new DataType() {Type = new Literal() {Value = "int"}}
-                                ).AsEnumerable())
-                                .Concat(insertTableRelations.ForeignTableColumns.SelectMany(fk => 
-                                        fk.ForeignKey.GetForeignColumns().Select(fc =>
-                                            new ColumnDeclaration().SetArgs(
-                                                new RelationalColumn() { Label = GetForeignColumnIndexName(fc.Name) },
-                                                new DataType() { Type = new Literal() { Value = "int" } }))
-                                )).ToList()
-                            )
-                    };
+                    var lookupParameterTableName = GetLookupTableName(upsertTableRelations.TableRelations);
+                    var declareLookupParameterStatement = BuildDeclareLookupParameterStatement(lookupParameterTableName, upsertTableRelations);
                     statement.Add(declareLookupParameterStatement);
+                    
+                    var tableColumns = BuildTableColumnsAst(upsertTableRelations);
 
-                    var mergeValuesParametersList = new ValuesListClause();
+                    var foreignColumns = BuildForeignColumnsAst(upsertTableRelations);
 
-                    var tableColumns = insertTableRelations.ColumnParameters.Select(c =>
-                        new ColumnIdentifier().SetArgs(
-                            new RelationalColumn() { Label = c.Column.Name }
-                        )).AppendOne(new ColumnIdentifier().SetArgs(
-                        new RelationalColumn() { Label = mergeIndexColumnName }
-                    ));
-
-                    var foreignColumns = insertTableRelations.ForeignTableColumns.SelectMany(fk =>
-                        fk.ForeignKey.GetForeignColumns().Select(fc =>
-                            new ColumnIdentifier()
-                                .SetArgs(new RelationalColumn()
-                                {
-                                    Label = GetForeignColumnIndexName(fc.Name)
-                                })
-                        )).ToList();
-                    var lookupParameterTableInsert = new Insert()
-                    {
-                        Object = new TableIdentifier().SetArgs(new NamedParameterIdentifier()
-                            {Name = lookupParameterTableName}),
-                        ColumnList = tableColumns.Concat(foreignColumns)
-                        .ToList(),
-                        ValuesList = mergeValuesParametersList
-                    };
-
+                    var lookupParameterTableInsertResult = BuildLookupParameterTableInsert(parameterPaths, lookupParameterTableName, tableColumns, foreignColumns, upsertTableRelations, insertColumnParameter, insertSpec.Table.Name, insertSpec.RootMethodInfo.Name);
+                    var lookupParameterTableInsert = lookupParameterTableInsertResult.Item1;
+                    var tokenPath = lookupParameterTableInsertResult.Item2;
                     statement.Add(lookupParameterTableInsert);
+                    tokens.Add(tokenPath);
 
                     var merge = new Merge()
                     {
                         Table = new TableIdentifier().SetArgs(new RelationalTable()
-                            {Label = insertTableRelations.TableRelations.TableName}),
+                            {Label = upsertTableRelations.TableRelations.TableName}),
                         Using = new MergeUsing()
                         {
                             Values =
                                 new Select()
                                 {
                                     SelectClause = new SelectClause().SetArgs(
-                                        insertTableRelations.ColumnParameters.Select(c =>
+                                        upsertTableRelations.ColumnParameters.Select(c =>
                                             new ColumnIdentifier().SetArgs(
                                                 new RelationalColumn() {Label = c.Column.Name}
                                             )
                                         ).AppendOne(new ColumnIdentifier().SetArgs(
-                                            new RelationalColumn() {Label = mergeIndexColumnName}
+                                            new RelationalColumn() {Label = MergeIndexColumnName}
                                         ))
                                         .Concat(foreignColumns)),
                                     FromClause =
@@ -179,13 +140,13 @@ namespace SigQL
                                 },
                             As = new TableAliasDefinition() {Alias = mergeTableAlias}
                                 .SetArgs(
-                                    insertTableRelations.ColumnParameters.Select(cp =>
+                                    upsertTableRelations.ColumnParameters.Select(cp =>
                                         (AstNode) new ColumnDeclaration().SetArgs(
                                             new RelationalColumn() {Label = cp.Column.Name}
                                         )
                                     ).AppendOne(
                                         new ColumnDeclaration().SetArgs(
-                                            new RelationalColumn() {Label = mergeIndexColumnName})
+                                            new RelationalColumn() {Label = MergeIndexColumnName})
                                     ).Concat(foreignColumns)
                                 )
                         },
@@ -197,195 +158,37 @@ namespace SigQL
                         {
                             Insert = new MergeInsert()
                             {
-                                ColumnList = insertColumnList,
+                                ColumnList = upsertColumnList,
                                 ValuesList = valuesListClause
                             }
                         }
                     };
 
-                    var foreignSelectValueStatements = insertTableRelations.ForeignTableColumns.SelectMany(fk =>
-                        fk.ForeignKey.KeyPairs.Select(kp =>
-                        {
-                            var selectStatement = new Select();
-                            selectStatement.SelectClause =
-                                new SelectClause().SetArgs(
-                                    new ColumnIdentifier().SetArgs(
-                                        new RelationalColumn() {Label = kp.PrimaryTableColumn.Name}));
-                            selectStatement.FromClause =
-                                new FromClause().SetArgs(
-                                    new Alias() {Label = GetInsertedTableName(fk.PrimaryTableRelations)}
-                                        .SetArgs(new NamedParameterIdentifier()
-                                            {Name = GetInsertedTableName(fk.PrimaryTableRelations)}));
-                            selectStatement.WhereClause =
-                                new WhereClause().SetArgs(
-                                    new EqualsOperator().SetArgs(
-
-                                        new ColumnIdentifier().SetArgs(
-                                            new RelationalTable()
-                                                {Label = GetInsertedTableName(fk.PrimaryTableRelations)},
-                                            new RelationalColumn() {Label = mergeIndexColumnName}),
-                                        new ColumnIdentifier().SetArgs(
-                                            new RelationalTable() {Label = mergeTableAlias},
-                                            new RelationalColumn() {Label = GetForeignColumnIndexName(kp.ForeignTableColumn.Name) })
-                                    )
-                                );
-                            return new LogicalGrouping().SetArgs(selectStatement);
-                        })).ToList();
+                    var foreignSelectValueStatements = 
+                        BuildForeignValueLookupStatements(upsertTableRelations, mergeTableAlias);
 
                     valuesListClause.SetArgs(
                         new ValuesList().SetArgs(
-                            insertTableRelations.ColumnParameters.Select(cp =>
+                            upsertTableRelations.ColumnParameters.Select(cp =>
                                 (AstNode) new ColumnIdentifier().SetArgs(
                                     new RelationalTable() {Label = mergeTableAlias},
                                     new RelationalColumn() {Label = cp.Column.Name}
                                 )
-                            ).Concat(foreignSelectValueStatements)
+                            ).Concat(foreignSelectValueStatements.Select(c => c.Item2).ToList())
                         )
                     );
 
-                    var tokenPath = new TokenPath(FindRootArgument(insertTableRelations.TableRelations.Argument).FindParameter())
-                    {
-                        SqlParameterName = insertColumnParameter?.ParameterPath.SqlParameterName,
-                        UpdateNodeFunc = (parameterValue, tokenPath) =>
-                        {
-                            var orderedParameterLookup = new OrderedParameterValueLookup();
-                            OrderParameterValues(orderedParameterLookup, parameterValue,
-                                FindRootArgument(insertTableRelations.TableRelations.Argument).FindParameter(), null);
-
-                            IEnumerable<TableIndexReference> parentIndexMappings;
-                            var orderedParametersForInsert = orderedParameterLookup.FindOrderedParameters(FindRootArgument(insertTableRelations.TableRelations.Argument));
-                            // one-to-many or many-to-one
-                            if (FindRootArgument(insertTableRelations.TableRelations.Argument).Type != typeof(void))
-                            {
-                                parentIndexMappings = GetTableIndexReferences(orderedParametersForInsert, insertTableRelations, orderedParameterLookup);
-                            } 
-                            // many-to-many
-                            else
-                            {
-                                var parentRelations = insertTableRelations.TableRelations.Parent;
-                                var navigationTableRelations =
-                                    insertTableRelations.TableRelations.NavigationTables.Single();
-                                // get all the parameter values for the parent and the navigation tables, so we can find the indicies of all
-                                // and send them as the parameters of this table
-                                var parentOrderedParametersForInsert = orderedParameterLookup.FindOrderedParameters(FindRootArgument(parentRelations.Argument));
-                                var navigationOrderedParametersForInsert = orderedParameterLookup.FindOrderedParameters(FindRootArgument(navigationTableRelations.Argument));
-
-                                var parentForeignColumns = 
-                                    insertTableRelations.ForeignTableColumns.SelectMany(ftc =>
-                                        ftc.ForeignKey.KeyPairs.Where(kp => TableEqualityComparer.Default.Equals(kp.PrimaryTableColumn.Table, parentRelations.TargetTable))
-                                            .Select(kp => kp.ForeignTableColumn))
-                                            .ToList();
-                                var navigationForeignColumns = 
-                                    insertTableRelations.ForeignTableColumns.SelectMany(ftc =>
-                                            ftc.ForeignKey.KeyPairs.Where(kp => TableEqualityComparer.Default.Equals(kp.PrimaryTableColumn.Table, navigationTableRelations.TargetTable))
-                                                .Select(kp => kp.ForeignTableColumn))
-                                        .ToList();
-
-                                // walk through both sides of the relations and collect the indecies in relation to each other
-                                var parentToNavigationIndecies = parentOrderedParametersForInsert.Select((op, i) =>
-                                {
-                                    var primaryTableKeyIndex = orderedParameterLookup.FindArgumentIndex(op, FindRootArgument(parentRelations.Argument), FindRootArgument(navigationTableRelations.Argument), ForeignTablePropertyDirection.Navigation);
-                                    return new TableIndexReference(primaryTableKeyIndex, parentForeignColumns, op.Index);
-                                }).ToList();
-                                var navigationToParentIndecies = navigationOrderedParametersForInsert.Select((op, i) =>
-                                {
-                                    var primaryTableKeyIndex = orderedParameterLookup.FindArgumentIndex(op, FindRootArgument(navigationTableRelations.Argument), FindRootArgument(parentRelations.Argument), ForeignTablePropertyDirection.Parent);
-                                    return new TableIndexReference(primaryTableKeyIndex, navigationForeignColumns, op.Index);
-                                }).ToList();
-
-                                var parentToNavigationValues = parentToNavigationIndecies.Join(navigationToParentIndecies, p => p.PrimaryTableIndex,
-                                    n => n.InsertedIndex, (p, n) => new { Parent = p, Navigation = n}).ToList();
-
-                                var navigationToParentValues = navigationToParentIndecies.Join(parentToNavigationIndecies, p => p.PrimaryTableIndex,
-                                    n => n.InsertedIndex, (n, p) => new { Parent = p, Navigation = n }).ToList();
-
-                                // filter down to distinct values, since either side can hold an uneven number of values
-                                var distinctValues = parentToNavigationValues.Concat(navigationToParentValues).Distinct().ToList();
-
-                                // decouple the distinct column pairs into individual rows, and order 
-                                // them for the many-to-many lookup table variable
-                                parentIndexMappings = distinctValues.Select((v, i) =>
-                                {
-                                    return new[]
-                                    {
-                                        new TableIndexReference(v.Parent.InsertedIndex, v.Parent.ForeignColumns, i),
-                                        new TableIndexReference(v.Navigation.InsertedIndex, v.Navigation.ForeignColumns, i)
-                                    };
-                                }).SelectMany(v => v).ToList();
-
-                                // fake the data for this table by padding it with the same number of indexed rows from above.
-                                // since there is no row data, only the Foreign Columns will be populated
-                                orderedParametersForInsert = parentIndexMappings.Select(p => p.InsertedIndex).Distinct().Select(p => new OrderedParameterValue()
-                                {
-                                    Index = p
-                                }).ToList();
-                            }
-                            
-
-
-                            //var enumerable = tokenPath.Argument.Type.IsCollectionType()
-                            //    ? parameterValue as IEnumerable
-                            //    : parameterValue.AsEnumerable();
-                            var sqlParameters = new Dictionary<string, object>();
-                            //var allParameters = enumerable?.Cast<object>();
-                            if (orderedParametersForInsert.Any() || parentIndexMappings.Any())
-                            {
-                                mergeValuesParametersList.SetArgs(orderedParametersForInsert.Select((param, i) =>
-                                {
-                                    return new ValuesList().SetArgs(
-                                        insertTableRelations.ColumnParameters.Select(cp =>
-                                        {
-                                            if (i == 0)
-                                                parameterPaths.RemoveAll(p =>
-                                                    p.SqlParameterName == cp.ParameterPath.SqlParameterName);
-                                            var sqlParameterName = $"{cp.ParameterPath.SqlParameterName}{param.Index}";
-                                            var parameterValue = param.Value;
-                                            sqlParameters[sqlParameterName] = MethodSqlStatement.GetValueForParameterPath(parameterValue, cp.ParameterPath.Properties.Last().AsEnumerable());
-                                            return new NamedParameterIdentifier()
-                                            {
-                                                Name = sqlParameterName
-                                            };
-                                        }).Cast<AstNode>().AppendOne(new Literal() {Value = param.Index.ToString()})
-                                            .Concat(
-                                                OrderIndexReferences(insertTableRelations, parentIndexMappings)
-                                                    .Where(p => p.InsertedIndex == param.Index)
-                                                    
-                                                    .Select(p => 
-                                                        new Literal() { Value = p.PrimaryTableIndex.ToString() }).ToList()));
-                                }));
-                            }
-                            else
-                            {
-                                throw new ArgumentException(
-                                    $"Unable to insert items for {insertSpec.Table.Name} (via method {insertSpec.RootMethodInfo.Name}) from null or empty list.");
-                            }
-
-                            return sqlParameters;
-                        }
-                    };
-
-                    tokens.Add(tokenPath);
+                    
                     statement.Add(merge);
 
-                    if (insertTableRelations.TableRelations.TargetTable.PrimaryKey != null && (insertSpec.ReturnType != typeof(void) || insertSpec.InsertTableRelationsCollection.Count > 1))
+                    if (upsertTableRelations.TableRelations.TargetTable.PrimaryKey != null && (insertSpec.ReturnType != typeof(void) || insertSpec.UpsertTableRelationsCollection.Count > 1))
                     {
-                        var outputParameterTableName = GetInsertedTableName(insertTableRelations.TableRelations);
-                        var declareOutputParameterStatement = new DeclareStatement()
-                        {
-                            Parameter = new NamedParameterIdentifier() {Name = outputParameterTableName},
-                            DataType = new DataType() {Type = new Literal() {Value = "table"}}
-                                .SetArgs(
-                                    insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
-                                        new ColumnDeclaration().SetArgs(
-                                            new RelationalColumn() {Label = c.Name},
-                                            new DataType() {Type = new Literal() {Value = c.DataTypeDeclaration}}
-                                        )
-                                    ).Concat(new ColumnDeclaration().SetArgs(
-                                        new RelationalColumn() {Label = mergeIndexColumnName},
-                                        new DataType() {Type = new Literal() {Value = "int"}}
-                                    ).AsEnumerable())
-                                )
-                        };
+                        var updateLookupTablePKsStatement = BuildUpdateLookupStatement(upsertTableRelations.TableRelations);
+                        if (updateLookupTablePKsStatement != null)
+                            statement.Add(updateLookupTablePKsStatement);
+
+                        var outputParameterTableName = GetInsertedTableName(upsertTableRelations.TableRelations);
+                        var declareOutputParameterStatement = BuildDeclareInsertedTableParameterStatement(outputParameterTableName, upsertTableRelations);
                         statement.Insert(0, declareOutputParameterStatement);
 
                         var insertedTableName = "inserted";
@@ -393,19 +196,19 @@ namespace SigQL
                         {
                             Into = new IntoClause()
                                 {Object = new NamedParameterIdentifier() {Name = outputParameterTableName}}.SetArgs(
-                                insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
+                                upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
                                         new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = c.Name}))
                                     .AppendOne(
                                         new ColumnIdentifier().SetArgs(new RelationalColumn()
-                                            {Label = mergeIndexColumnName})))
+                                            {Label = MergeIndexColumnName})))
                         }.SetArgs(
-                            insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
+                            upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
                                     new ColumnIdentifier().SetArgs(new RelationalTable() {Label = insertedTableName},
                                         new RelationalColumn() {Label = c.Name}))
                                 .AppendOne(
                                     new ColumnIdentifier().SetArgs(
                                         new RelationalTable() {Label = mergeTableAlias},
-                                        new RelationalColumn() {Label = mergeIndexColumnName}
+                                        new RelationalColumn() {Label = MergeIndexColumnName}
                                     ))
                         );
                         
@@ -451,7 +254,7 @@ namespace SigQL
             {
                 
                 var tableRelations = this.databaseResolver.BuildTableRelations(insertSpec.Table, new TypeArgument(insertSpec.ReturnType, this.databaseResolver), TableRelationsColumnSource.ReturnType, tablePrimaryKeyDefinitions);
-                var matchingInsertTableRelations = insertSpec.InsertTableRelationsCollection
+                var matchingInsertTableRelations = insertSpec.UpsertTableRelationsCollection
                     .Where(tr =>
                         TableEqualityComparer.Default.Equals(tr.TableRelations.TargetTable, tableRelations.TargetTable))
                     .OrderBy(tr => tr.TableRelations.CalculateDepth())
@@ -495,7 +298,7 @@ namespace SigQL
                             new OrderByIdentifier().SetArgs(
                                 new ColumnIdentifier().SetArgs(
                                     new RelationalTable() { Label = outputParameterTableSelectAlias },
-                                    new RelationalColumn() { Label = mergeIndexColumnName })
+                                    new RelationalColumn() { Label = MergeIndexColumnName })
                             )
                         )
                     )
@@ -519,7 +322,367 @@ namespace SigQL
             return sqlStatement;
         }
 
-        private static IEnumerable<TableIndexReference> OrderIndexReferences(InsertTableRelations insertTableRelations, IEnumerable<TableIndexReference> parentIndexMappings)
+        private static List<Tuple<IColumnDefinition, AstNode>> BuildForeignValueLookupStatements(UpsertTableRelations upsertTableRelations, string sourceTableAlias)
+        {
+            var list = upsertTableRelations.ForeignTableColumns.SelectMany(fk =>
+                fk.ForeignKey.KeyPairs.Select(kp =>
+                {
+                    var selectStatement = new Select();
+                    selectStatement.SelectClause =
+                        new SelectClause().SetArgs(
+                            new ColumnIdentifier().SetArgs(
+                                new RelationalColumn() {Label = kp.PrimaryTableColumn.Name}));
+                    selectStatement.FromClause =
+                        new FromClause().SetArgs(
+                            new Alias() {Label = GetLookupTableName(fk.PrimaryTableRelations)}
+                                .SetArgs(new NamedParameterIdentifier()
+                                    {Name = GetLookupTableName(fk.PrimaryTableRelations)}));
+                    selectStatement.WhereClause =
+                        new WhereClause().SetArgs(
+                            new EqualsOperator().SetArgs(
+
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalTable()
+                                        {Label = GetLookupTableName(fk.PrimaryTableRelations)},
+                                    new RelationalColumn() {Label = MergeIndexColumnName}),
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalTable() {Label = sourceTableAlias},
+                                    new RelationalColumn() {Label = GetForeignColumnIndexName(kp.ForeignTableColumn.Name) })
+                            )
+                        );
+                    return new Tuple<IColumnDefinition, AstNode>(kp.ForeignTableColumn, new LogicalGrouping().SetArgs(selectStatement));
+                })).ToList();
+            return list;
+        }
+
+        private static IEnumerable<ColumnIdentifier> BuildTableColumnsAst(UpsertTableRelations upsertTableRelations)
+        {
+            return upsertTableRelations.ColumnParameters.Select(c =>
+                new ColumnIdentifier().SetArgs(
+                    new RelationalColumn() { Label = c.Column.Name }
+                )).AppendOne(new ColumnIdentifier().SetArgs(
+                new RelationalColumn() { Label = MergeIndexColumnName }
+            ));
+        }
+
+        private static List<ColumnIdentifier> BuildForeignColumnsAst(UpsertTableRelations upsertTableRelations)
+        {
+            return upsertTableRelations.ForeignTableColumns.SelectMany(fk =>
+                fk.ForeignKey.GetForeignColumns().Select(fc =>
+                    new ColumnIdentifier()
+                        .SetArgs(new RelationalColumn()
+                        {
+                            Label = GetForeignColumnIndexName(fc.Name)
+                        })
+                )).ToList();
+        }
+
+        private Tuple<AstNode, TokenPath> BuildLookupParameterTableInsert(List<ParameterPath> parameterPaths, string lookupParameterTableName,
+            IEnumerable<ColumnIdentifier> tableColumns, List<ColumnIdentifier> foreignColumns,
+            UpsertTableRelations insertTableRelations, UpsertColumnParameter insertColumnParameter, string targetTableName, string rootMethodName)
+        {
+            var mergeValuesParametersList = new ValuesListClause();
+            var lookupParameterTableInsert = new Insert()
+            {
+                Object = new TableIdentifier().SetArgs(new NamedParameterIdentifier()
+                    {Name = lookupParameterTableName}),
+                ColumnList = tableColumns.Concat(foreignColumns)
+                    .ToList(),
+                ValuesList = mergeValuesParametersList
+            };
+
+            var tokenPath = new TokenPath(FindRootArgument(insertTableRelations.TableRelations.Argument).FindParameter())
+            {
+                SqlParameterName = insertColumnParameter?.ParameterPath.SqlParameterName,
+                UpdateNodeFunc = (parameterValue, tokenPath) =>
+                {
+                    var orderedParameterLookup = new OrderedParameterValueLookup();
+                    OrderParameterValues(orderedParameterLookup, parameterValue,
+                        FindRootArgument(insertTableRelations.TableRelations.Argument).FindParameter(), null);
+
+                    IEnumerable<TableIndexReference> parentIndexMappings;
+                    var orderedParametersForInsert =
+                        orderedParameterLookup.FindOrderedParameters(
+                            FindRootArgument(insertTableRelations.TableRelations.Argument));
+                    // one-to-many or many-to-one
+                    if (FindRootArgument(insertTableRelations.TableRelations.Argument).Type != typeof(void))
+                    {
+                        parentIndexMappings = GetTableIndexReferences(orderedParametersForInsert, insertTableRelations,
+                            orderedParameterLookup);
+                    }
+                    // many-to-many
+                    else
+                    {
+                        parentIndexMappings = BuildManyToManyParentIndexMappings(insertTableRelations, orderedParameterLookup);
+
+                        // fake the data for this table by padding it with the same number of indexed rows from above.
+                        // since there is no row data, only the Foreign Columns will be populated
+                        orderedParametersForInsert = parentIndexMappings.Select(p => p.InsertedIndex).Distinct().Select(p =>
+                            new OrderedParameterValue()
+                            {
+                                Index = p
+                            }).ToList();
+                    }
+
+
+                    //var enumerable = tokenPath.Argument.Type.IsCollectionType()
+                    //    ? parameterValue as IEnumerable
+                    //    : parameterValue.AsEnumerable();
+                    var sqlParameters = new Dictionary<string, object>();
+                    //var allParameters = enumerable?.Cast<object>();
+                    if (orderedParametersForInsert.Any() || parentIndexMappings.Any())
+                    {
+                        mergeValuesParametersList.SetArgs(orderedParametersForInsert.Select((param, i) =>
+                        {
+                            return new ValuesList().SetArgs(
+                                insertTableRelations.ColumnParameters.Select(cp =>
+                                    {
+                                        if (i == 0)
+                                            parameterPaths.RemoveAll(p =>
+                                                p.SqlParameterName == cp.ParameterPath.SqlParameterName);
+                                        var sqlParameterName = $"{cp.ParameterPath.SqlParameterName}{param.Index}";
+                                        var parameterValue = param.Value;
+                                        sqlParameters[sqlParameterName] =
+                                            MethodSqlStatement.GetValueForParameterPath(parameterValue,
+                                                cp.ParameterPath.Properties.Last().AsEnumerable());
+                                        return new NamedParameterIdentifier()
+                                        {
+                                            Name = sqlParameterName
+                                        };
+                                    }).Cast<AstNode>().AppendOne(new Literal() {Value = param.Index.ToString()})
+                                    .Concat(
+                                        OrderIndexReferences(insertTableRelations, parentIndexMappings)
+                                            .Where(p => p.InsertedIndex == param.Index)
+                                            .Select(p =>
+                                                new Literal() {Value = p.PrimaryTableIndex.ToString()}).ToList()));
+                        }));
+                    }
+                    else
+                    {
+                        throw new ArgumentException(
+                            $"Unable to insert items for {targetTableName} (via method {rootMethodName}) from null or empty list.");
+                    }
+
+                    return sqlParameters;
+                }
+            };
+            return new Tuple<AstNode, TokenPath>(lookupParameterTableInsert, tokenPath);
+        }
+
+        private static IEnumerable<TableIndexReference> BuildManyToManyParentIndexMappings(UpsertTableRelations insertTableRelations,
+            OrderedParameterValueLookup orderedParameterLookup)
+        {
+            IEnumerable<TableIndexReference> parentIndexMappings;
+            var parentRelations = insertTableRelations.TableRelations.Parent;
+            var navigationTableRelations =
+                insertTableRelations.TableRelations.NavigationTables.Single();
+            // get all the parameter values for the parent and the navigation tables, so we can find the indicies of all
+            // and send them as the parameters of this table
+            var parentOrderedParametersForInsert =
+                orderedParameterLookup.FindOrderedParameters(FindRootArgument(parentRelations.Argument));
+            var navigationOrderedParametersForInsert =
+                orderedParameterLookup.FindOrderedParameters(FindRootArgument(navigationTableRelations.Argument));
+
+            var parentForeignColumns =
+                insertTableRelations.ForeignTableColumns.SelectMany(ftc =>
+                        ftc.ForeignKey.KeyPairs.Where(kp =>
+                                TableEqualityComparer.Default.Equals(kp.PrimaryTableColumn.Table,
+                                    parentRelations.TargetTable))
+                            .Select(kp => kp.ForeignTableColumn))
+                    .ToList();
+            var navigationForeignColumns =
+                insertTableRelations.ForeignTableColumns.SelectMany(ftc =>
+                        ftc.ForeignKey.KeyPairs.Where(kp =>
+                                TableEqualityComparer.Default.Equals(kp.PrimaryTableColumn.Table,
+                                    navigationTableRelations.TargetTable))
+                            .Select(kp => kp.ForeignTableColumn))
+                    .ToList();
+
+            // walk through both sides of the relations and collect the indecies in relation to each other
+            var parentToNavigationIndecies = parentOrderedParametersForInsert.Select((op, i) =>
+            {
+                var primaryTableKeyIndex = orderedParameterLookup.FindArgumentIndex(op,
+                    FindRootArgument(parentRelations.Argument), FindRootArgument(navigationTableRelations.Argument),
+                    ForeignTablePropertyDirection.Navigation);
+                return new TableIndexReference(primaryTableKeyIndex, parentForeignColumns, op.Index);
+            }).ToList();
+            var navigationToParentIndecies = navigationOrderedParametersForInsert.Select((op, i) =>
+            {
+                var primaryTableKeyIndex = orderedParameterLookup.FindArgumentIndex(op,
+                    FindRootArgument(navigationTableRelations.Argument), FindRootArgument(parentRelations.Argument),
+                    ForeignTablePropertyDirection.Parent);
+                return new TableIndexReference(primaryTableKeyIndex, navigationForeignColumns, op.Index);
+            }).ToList();
+
+            var parentToNavigationValues = parentToNavigationIndecies.Join(navigationToParentIndecies,
+                p => p.PrimaryTableIndex,
+                n => n.InsertedIndex, (p, n) => new {Parent = p, Navigation = n}).ToList();
+
+            var navigationToParentValues = navigationToParentIndecies.Join(parentToNavigationIndecies,
+                p => p.PrimaryTableIndex,
+                n => n.InsertedIndex, (n, p) => new {Parent = p, Navigation = n}).ToList();
+
+            // filter down to distinct values, since either side can hold an uneven number of values
+            var distinctValues = parentToNavigationValues.Concat(navigationToParentValues).Distinct().ToList();
+
+            // decouple the distinct column pairs into individual rows, and order 
+            // them for the many-to-many lookup table variable
+            parentIndexMappings = distinctValues.Select((v, i) =>
+            {
+                return new[]
+                {
+                    new TableIndexReference(v.Parent.InsertedIndex, v.Parent.ForeignColumns, i),
+                    new TableIndexReference(v.Navigation.InsertedIndex, v.Navigation.ForeignColumns, i)
+                };
+            }).SelectMany(v => v).ToList();
+            return parentIndexMappings;
+        }
+
+        private static DeclareStatement BuildDeclareInsertedTableParameterStatement(string outputParameterTableName,
+            UpsertTableRelations insertTableRelations)
+        {
+            var declareOutputParameterStatement = new DeclareStatement()
+            {
+                Parameter = new NamedParameterIdentifier() {Name = outputParameterTableName},
+                DataType = new DataType() {Type = new Literal() {Value = "table"}}
+                    .SetArgs(
+                        insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
+                            new ColumnDeclaration().SetArgs(
+                                new RelationalColumn() {Label = c.Name},
+                                new DataType() {Type = new Literal() {Value = c.DataTypeDeclaration}}
+                            )
+                        ).Concat(new ColumnDeclaration().SetArgs(
+                            new RelationalColumn() {Label = MergeIndexColumnName},
+                            new DataType() {Type = new Literal() {Value = "int"}}
+                        ).AsEnumerable())
+                    )
+            };
+            return declareOutputParameterStatement;
+        }
+
+        private static DeclareStatement BuildDeclareLookupParameterStatement(string lookupParameterTableName,
+            UpsertTableRelations insertTableRelations)
+        {
+            List<AstNode> primaryKeyColumns = new List<AstNode>();
+            if ((insertTableRelations.TableRelations.TargetTable.PrimaryKey?.Columns.Any()).GetValueOrDefault(false))
+            {
+                var unselectedPrimaryKeys = insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Where(c =>
+                    !insertTableRelations.ColumnParameters.Any(
+                        ic => ColumnEqualityComparer.Default.Equals(ic.Column, c)));
+                primaryKeyColumns = unselectedPrimaryKeys.Select(c =>
+                    new ColumnDeclaration().SetArgs(
+                        new RelationalColumn() {Label = c.Name},
+                        new DataType() {Type = new Literal() {Value = c.DataTypeDeclaration}}
+                    )
+                ).ToList<AstNode>();
+            }
+
+            var declareLookupParameterStatement = new DeclareStatement()
+            {
+                Parameter = new NamedParameterIdentifier() {Name = lookupParameterTableName},
+                DataType = new DataType() {Type = new Literal() {Value = "table"}}
+                    .SetArgs(
+                        primaryKeyColumns.Concat(
+                        insertTableRelations.ColumnParameters.Select(c =>
+                                new ColumnDeclaration().SetArgs(
+                                    new RelationalColumn() {Label = c.Column.Name},
+                                    new DataType() {Type = new Literal() {Value = c.Column.DataTypeDeclaration}}
+                                )
+                            ).Concat(new ColumnDeclaration().SetArgs(
+                                new RelationalColumn() {Label = MergeIndexColumnName},
+                                new DataType() {Type = new Literal() {Value = "int"}}
+                            ).AsEnumerable()))
+                            .Concat(insertTableRelations.ForeignTableColumns.SelectMany(fk =>
+                                fk.ForeignKey.GetForeignColumns().Select(fc =>
+                                    new ColumnDeclaration().SetArgs(
+                                        new RelationalColumn() {Label = GetForeignColumnIndexName(fc.Name)},
+                                        new DataType() {Type = new Literal() {Value = "int"}}))
+                            )).ToList()
+                    )
+            };
+            return declareLookupParameterStatement;
+        }
+
+        private AstNode BuildUpdateLookupStatement(TableRelations tableRelations)
+        {
+            if ((tableRelations.TargetTable.PrimaryKey?.Columns.Any()).GetValueOrDefault(false))
+            {
+                var lookupTableName = GetLookupTableName(tableRelations);
+                var insertedTableName = GetInsertedTableName(tableRelations);
+                var ast = new Update()
+                {
+                    SetClause =
+                        tableRelations.TargetTable.PrimaryKey.Columns.Select(pk =>
+                            new SetEqualOperator()
+                                .SetArgs(
+                                    new ColumnIdentifier().SetArgs(
+                                        new RelationalColumn()
+                                        {
+                                            Label = pk.Name
+                                        }),
+                                    new ColumnIdentifier().SetArgs(
+                                        new RelationalTable()
+                                        {
+                                            Label = insertedTableName
+                                        },
+                                        new RelationalColumn()
+                                        {
+                                            Label = pk.Name
+                                        })
+                                    )).ToList(),
+                    FromClause = new FromClause().SetArgs(
+                            new FromClauseNode().SetArgs(
+                                    new Alias()
+                                    {
+                                        Label = lookupTableName
+                                    }.SetArgs(
+                                        new NamedParameterIdentifier()
+                                        {
+                                            Name = lookupTableName
+                                        }),
+                                    new InnerJoin()
+                                    {
+                                        RightNode = new Alias()
+                                        {
+                                            Label = insertedTableName
+                                        }.SetArgs(
+                                            new NamedParameterIdentifier()
+                                            {
+                                                Name = insertedTableName
+                                            })
+                                    }.SetArgs(new EqualsOperator().SetArgs(
+                                        new ColumnIdentifier().SetArgs(
+                                            new RelationalTable()
+                                            {
+                                                Label = lookupTableName
+                                            },
+                                            new RelationalColumn()
+                                            {
+                                                Label = MergeIndexColumnName
+                                            }),
+                                        new ColumnIdentifier().SetArgs(
+                                            new RelationalTable()
+                                            {
+                                                Label = insertedTableName
+                                            },
+                                            new RelationalColumn()
+                                            {
+                                                Label = MergeIndexColumnName
+                                            })))
+                             )
+                     )
+                }.SetArgs(new Alias()
+                {
+                    Label = lookupTableName
+                });
+
+                return ast;
+            }
+            
+            return null;
+        }
+
+        private static IEnumerable<TableIndexReference> OrderIndexReferences(UpsertTableRelations insertTableRelations, IEnumerable<TableIndexReference> parentIndexMappings)
         {
             var columnCollectionComparer = new FuncEqualityComparer<IEnumerable<IColumnDefinition>>((l1, l2) => Enumerable.SequenceEqual(l1, l2, ColumnEqualityComparer.Default));
             var result = insertTableRelations.ForeignTableColumns
@@ -537,7 +700,7 @@ namespace SigQL
             return result;
         }
 
-        private static IEnumerable<TableIndexReference> GetTableIndexReferences(IEnumerable<OrderedParameterValue> orderedParametersForInsert, InsertTableRelations insertTableRelations, OrderedParameterValueLookup orderedParameterLookup)
+        private static IEnumerable<TableIndexReference> GetTableIndexReferences(IEnumerable<OrderedParameterValue> orderedParametersForInsert, UpsertTableRelations insertTableRelations, OrderedParameterValueLookup orderedParameterLookup)
         {
             return orderedParametersForInsert.SelectMany((op, i) =>
             {
@@ -665,10 +828,12 @@ namespace SigQL
             return (methodInfo.GetCustomAttributes(typeof(InsertAttribute), false)?.Any()).GetValueOrDefault(false);
         }
 
-        private InsertSpec GetInsertSpec(MethodInfo methodInfo)
+        private UpsertSpec GetUpsertSpec(MethodInfo methodInfo)
         {
-            var insertAttribute = methodInfo.GetCustomAttributes(typeof(InsertAttribute), false).Cast<InsertAttribute>().FirstOrDefault();
-            if (insertAttribute != null)
+            var upsertAttribute = 
+                methodInfo.GetCustomAttributes(typeof(InsertAttribute), false).Cast<IUpsertAttribute>().FirstOrDefault() 
+                ?? methodInfo.GetCustomAttributes(typeof(UpdateByKeyAttribute), false).Cast<IUpsertAttribute>().FirstOrDefault();
+            if (upsertAttribute != null)
             {
                 var methodParameters = methodInfo.GetParameters();
                 var tableTypeParameters = methodParameters.Where(p => this.databaseResolver.IsTableOrTableProjection(OutputFactory.UnwrapType(p.ParameterType)));
@@ -680,10 +845,10 @@ namespace SigQL
                     }
                 }
 
-                var insertSpec = new InsertSpec();
-                if (!string.IsNullOrEmpty(insertAttribute.TableName))
+                var insertSpec = new UpsertSpec();
+                if (!string.IsNullOrEmpty(upsertAttribute.TableName))
                 {
-                    insertSpec.Table = this.databaseConfiguration.Tables.FindByName(insertAttribute.TableName);
+                    insertSpec.Table = this.databaseConfiguration.Tables.FindByName(upsertAttribute.TableName);
                 }
                 else
                 {
@@ -711,7 +876,7 @@ namespace SigQL
 
 
                 var dependencyOrderedTableRelations = GetInsertTableRelationsOrderedByDependencies(parameterTableRelations).ToList();
-                insertSpec.InsertTableRelationsCollection = dependencyOrderedTableRelations.Select(tr => ToInsertTableRelations(tr, dependencyOrderedTableRelations)).ToList();
+                insertSpec.UpsertTableRelationsCollection = dependencyOrderedTableRelations.Select(tr => ToInsertTableRelations(tr, dependencyOrderedTableRelations)).ToList();
                 
                 insertSpec.ReturnType = methodInfo.ReturnType;
                 insertSpec.UnwrappedReturnType = OutputFactory.UnwrapType(methodInfo.ReturnType);
@@ -723,15 +888,15 @@ namespace SigQL
             return null;
         }
 
-        private InsertTableRelations ToInsertTableRelations(TableRelations parameterTableRelations, List<TableRelations> dependencyList)
+        private UpsertTableRelations ToInsertTableRelations(TableRelations parameterTableRelations, List<TableRelations> dependencyList)
         {
-            var insertRelations = new InsertTableRelations();
+            var insertRelations = new UpsertTableRelations();
             insertRelations.ColumnParameters = parameterTableRelations.ProjectedColumns.SelectMany(pc =>
                 pc.Arguments.All.Select(arg =>
                     {
                         var parameterPath = arg.ToParameterPath();
                         parameterPath.SqlParameterName = parameterPath.GenerateSuggestedSqlIdentifierName();
-                        return new InsertColumnParameter()
+                        return new UpsertColumnParameter()
                         {
                             Column = pc,
                             ParameterPath = parameterPath
@@ -822,9 +987,9 @@ namespace SigQL
             return null;
         }
 
-        private class InsertTableRelations
+        private class UpsertTableRelations
         {
-            public IList<InsertColumnParameter> ColumnParameters { get; set; }
+            public IList<UpsertColumnParameter> ColumnParameters { get; set; }
             public TableRelations TableRelations { get; set; }
             
             public IEnumerable<ForeignTableColumn> ForeignTableColumns { get; set; }
@@ -855,11 +1020,11 @@ namespace SigQL
             Navigation
         }
 
-        private class InsertSpec
+        private class UpsertSpec
         {
-            public InsertSpec()
+            public UpsertSpec()
             {
-                this.InsertTableRelationsCollection = new List<InsertTableRelations>();
+                this.UpsertTableRelationsCollection = new List<UpsertTableRelations>();
             }
 
             public ITableDefinition Table { get; set; }
@@ -867,11 +1032,11 @@ namespace SigQL
             public Type UnwrappedReturnType { get; set; }
             public MethodInfo RootMethodInfo { get; set; }
             
-            public List<InsertTableRelations> InsertTableRelationsCollection { get; set; }
+            public List<UpsertTableRelations> UpsertTableRelationsCollection { get; set; }
         }
         
 
-        private class InsertColumnParameter
+        private class UpsertColumnParameter
         {
             public IColumnDefinition Column { get; set; }
             public ParameterPath ParameterPath { get; set; }
