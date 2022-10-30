@@ -1542,40 +1542,32 @@ select ""WorkLog<WorkLog>"".""Id"" ""Id"", ""WorkLog<WorkLog>"".""StartDate"" ""
                     {
                          new Employee.UpdateByKeyFieldsWithWorkLogs()
                          {
+                             Id = 1,
                              Name = "bah",
                              WorkLogs = new []
                              {
-                                 new WorkLog.UpdateByKeyFields() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) },
-                                 new WorkLog.UpdateByKeyFields() { StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) }
+                                 new WorkLog.UpdateByKeyFields() { Id = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) },
+                                 new WorkLog.UpdateByKeyFields() { Id = 2, StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) }
                              }
                          },
                          new Employee.UpdateByKeyFieldsWithWorkLogs()
                          {
+                             Id = 2,
                              Name = "2bah",
                              WorkLogs = new []
                              {
-                                 new WorkLog.UpdateByKeyFields() { StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2) },
-                                 new WorkLog.UpdateByKeyFields() { StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2) }
+                                 new WorkLog.UpdateByKeyFields() { Id = 3, StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2) },
+                                 new WorkLog.UpdateByKeyFields() { Id = 4, StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2) }
                              }
                          }
                     }));
 
-            AssertSqlEqual(@"declare @EmployeeLookup table(""Name"" nvarchar(max), ""_index"" int)
-insert @EmployeeLookup(""Name"", ""_index"") values(@employeesName0, 0), (@employeesName1, 1)
-
-update ""Employee"" set ""Name""=""EmployeeLookup"".""Name"" 
-from ""Employee""
-inner join @EmployeeLookup ""EmployeeLookup"" on ""EmployeeLookup"".""Id""=""Employee"".""Id""
-where ""EmployeeLookup"".""Id"" = ""Employee"".""Id""
-
-declare @WorkLogLookup table(""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
-insert @WorkLogLookup(""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") values(@employeesWorkLogs_StartDate0, @employeesWorkLogs_EndDate0, 0, 0), (@employeesWorkLogs_StartDate1, @employeesWorkLogs_EndDate1, 1, 0), (@employeesWorkLogs_StartDate2, @employeesWorkLogs_EndDate2, 2, 1), (@employeesWorkLogs_StartDate3, @employeesWorkLogs_EndDate3, 3, 1)
-
-update ""WorkLog"" set ""StartDate""=""WorkLogLookup"".""StartDate"", ""EndDate""=""WorkLogLookup"".""EndDate"", ""EmployeeId""=(select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = l.""EmployeeId_index""))
-from ""WorkLog""
-inner join @WorkLogLookup ""WorkLogLookup"" on ""WorkLogLookup"".""Id""=""WorkLog"".""Id""
-where ""WorkLogLookup"".""Id"" = ""WorkLog"".""Id"" and ""WorkLog"".""Id""
-", sql);
+            AssertSqlEqual(@"declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0), (@employeesId1, @employeesName1, 1)
+update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"");
+declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
+insert @WorkLogLookup(""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") values(@employeesWorkLogs_Id0, @employeesWorkLogs_StartDate0, @employeesWorkLogs_EndDate0, 0, 0), (@employeesWorkLogs_Id1, @employeesWorkLogs_StartDate1, @employeesWorkLogs_EndDate1, 1, 0), (@employeesWorkLogs_Id2, @employeesWorkLogs_StartDate2, @employeesWorkLogs_EndDate2, 2, 1), (@employeesWorkLogs_Id3, @employeesWorkLogs_StartDate3, @employeesWorkLogs_EndDate3, 3, 1)
+update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDate"" = ""WorkLogLookup"".""EndDate"", ""EmployeeId"" = (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""WorkLogLookup"".""EmployeeId_index"")) from ""WorkLog"" inner join @WorkLogLookup ""WorkLogLookup"" on (""WorkLogLookup"".""Id"" = ""WorkLog"".""Id"");", sql);
         }
 
         #endregion UpdateByKey

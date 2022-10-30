@@ -46,16 +46,6 @@ namespace SigQL
             return sqlStatement;
         }
 
-        private bool IsDeleteMethod(MethodInfo methodInfo)
-        {
-            return (methodInfo.GetCustomAttributes(typeof(DeleteAttribute), false)?.Any()).GetValueOrDefault(false);
-        }
-
-        private bool IsUpdateMethod(MethodInfo methodInfo)
-        {
-            return (methodInfo.GetCustomAttributes(typeof(UpdateAttribute), false)?.Any()).GetValueOrDefault(false);
-        }
-
         private DeleteSpec GetDeleteSpec(MethodInfo methodInfo)
         {
             var deleteAttribute = methodInfo.GetCustomAttributes(typeof(DeleteAttribute), false).Cast<DeleteAttribute>().FirstOrDefault();
