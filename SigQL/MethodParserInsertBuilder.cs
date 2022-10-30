@@ -180,12 +180,13 @@ namespace SigQL
 
                     
                     statement.Add(merge);
-                    var updateLookupTablePKsStatement = BuildUpdateLookupStatement(upsertTableRelations.TableRelations);
-                    if(updateLookupTablePKsStatement != null)
-                        statement.Add(updateLookupTablePKsStatement);
 
                     if (upsertTableRelations.TableRelations.TargetTable.PrimaryKey != null && (insertSpec.ReturnType != typeof(void) || insertSpec.UpsertTableRelationsCollection.Count > 1))
                     {
+                        var updateLookupTablePKsStatement = BuildUpdateLookupStatement(upsertTableRelations.TableRelations);
+                        if (updateLookupTablePKsStatement != null)
+                            statement.Add(updateLookupTablePKsStatement);
+
                         var outputParameterTableName = GetInsertedTableName(upsertTableRelations.TableRelations);
                         var declareOutputParameterStatement = BuildDeclareInsertedTableParameterStatement(outputParameterTableName, upsertTableRelations);
                         statement.Insert(0, declareOutputParameterStatement);
