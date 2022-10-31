@@ -1595,6 +1595,7 @@ update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee""
 update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDate"" = ""WorkLogLookup"".""EndDate"", ""EmployeeId"" = (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""WorkLogLookup"".""EmployeeId_index"")) from ""WorkLog"" inner join @WorkLogLookup ""WorkLogLookup"" on (""WorkLogLookup"".""Id"" = ""WorkLog"".""Id"") where not exists (select 1 from ""WorkLog"" inner join @insertedWorkLog ""insertedWorkLog"" on ""WorkLog"".""Id"" = ""insertedWorkLog"".""Id"" where ""WorkLogLookup"".""Id"" = ""insertedWorkLog"".""Id"");", sql);
         }
 
+        // upsert - many to many
 
         #endregion
 

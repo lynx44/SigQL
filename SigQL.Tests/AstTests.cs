@@ -309,6 +309,28 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void BasicWhereNotExists()
+        {
+            var select1 = new Select();
+            select1.SelectClause = new SelectClause().SetArgs(new Literal() { Value = "1" });
+            var selectStatement = new Select()
+            {
+                SelectClause = new SelectClause()
+                {
+                    Args = new[] {new ColumnIdentifier() {Args = new[] {new RelationalColumn() {Label = "name"}}},}
+                },
+                FromClause = new FromClause()
+                {
+                    Args = new [] {new TableIdentifier() { Args = new[] { new RelationalTable() { Label = "person" } }}}
+                },
+                WhereClause = new WhereClause().SetArgs(new NotExists().SetArgs(select1))
+            };
+
+            var statement = Build(selectStatement);
+            Assert.AreEqual("select \"name\" from \"person\" where not exists (select 1)", statement);
+        }
+
+        [TestMethod]
         public void BasicWhereWithLike()
         {
             var selectStatement = new Select()

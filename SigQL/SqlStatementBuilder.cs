@@ -34,6 +34,9 @@ namespace SigQL
                         case Exists a: 
                             sql.Add($"exists ({Walk(a.Args.SingleOrDefault())})".Trim());
                             break;
+                        case NotExists a: 
+                            sql.Add($"not exists ({Walk(a.Args.SingleOrDefault())})".Trim());
+                            break;
                         case Alias a: 
                             sql.Add($"{(a.Args != null ? $"{Walk(a.Args.SingleOrDefault())}" : string.Empty)} \"{a.Label}\"".Trim());
                             break;

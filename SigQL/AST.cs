@@ -301,6 +301,10 @@ namespace SigQL
     {
     }
 
+    public class NotExists : AstNode
+    {
+    }
+
     public class Operator : AstNode
     {
         public string Label { get; set; }

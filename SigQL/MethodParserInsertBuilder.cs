@@ -36,11 +36,31 @@ namespace SigQL
         private MethodSqlStatement BuildInsertStatement(UpsertSpec insertSpec, List<ParameterPath> parameterPaths)
         {
             var targetTableType = insertSpec.UnwrappedReturnType;
-            
-            var statement = new List<AstNode>();
-            var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
+            var builderAstCollection = BuildInsertAstCollection(insertSpec, parameterPaths);
 
-            var tokens = new List<TokenPath>();
+            var sqlStatement = new MethodSqlStatement()
+            {
+                CommandAst = builderAstCollection.Statements,
+                SqlBuilder = this.builder,
+                ReturnType = insertSpec.ReturnType,
+                UnwrappedReturnType = targetTableType,
+                Parameters = parameterPaths,
+                Tokens = builderAstCollection.Tokens,
+                TargetTablePrimaryKey = insertSpec.Table.PrimaryKey,
+                TablePrimaryKeyDefinitions = builderAstCollection.TablePrimaryKeyDefinitions
+            };
+
+            return sqlStatement;
+        }
+
+        private InsertBuilderAstCollection BuildInsertAstCollection(UpsertSpec insertSpec,
+            List<ParameterPath> parameterPaths)
+        {
+            var builderAstCollection = new InsertBuilderAstCollection();
+            var statement = builderAstCollection.Statements;
+            var tablePrimaryKeyDefinitions = builderAstCollection.TablePrimaryKeyDefinitions;
+
+            var tokens = builderAstCollection.Tokens;
 
             var multipleInsertParameters = insertSpec.UpsertTableRelationsCollection[0].ColumnParameters.Where(c =>
             {
@@ -49,14 +69,14 @@ namespace SigQL
                            this.databaseResolver.DetectTable(c.ParameterPath.Parameter.ParameterType),
                            insertSpec.Table);
             }).ToList();
-            
+
 
             for (var index = 0; index < insertSpec.UpsertTableRelationsCollection.Count; index++)
             {
                 var valuesListClause = new ValuesListClause();
                 var upsertTableRelations = insertSpec.UpsertTableRelationsCollection[index];
                 var upsertColumnList = upsertTableRelations.ColumnParameters.Select(cp =>
-                    new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = cp.Column.Name}))
+                    new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = cp.Column.Name }))
                     .Concat(upsertTableRelations.ForeignTableColumns.SelectMany(fk =>
                         fk.ForeignKey.GetForeignColumns().Select(fc =>
                             new ColumnIdentifier().SetArgs(
@@ -64,7 +84,7 @@ namespace SigQL
                     ))
                     .ToList();
 
-                
+
                 if (upsertTableRelations.ColumnParameters.Any() &&
                     multipleInsertParameters.Any(p =>
                         p.ParameterPath.Parameter !=
@@ -88,7 +108,7 @@ namespace SigQL
                     );
                     statement.Add(new Insert()
                     {
-                        Object = new TableIdentifier().SetArgs(new RelationalTable() {Label = insertSpec.Table.Name}),
+                        Object = new TableIdentifier().SetArgs(new RelationalTable() { Label = insertSpec.Table.Name }),
                         ColumnList =
                             upsertColumnList,
                         ValuesList = valuesListClause
@@ -99,11 +119,11 @@ namespace SigQL
                     var mergeTableAlias = "i";
 
                     var insertColumnParameter = upsertTableRelations.ColumnParameters.FirstOrDefault();
-                    
+
                     var lookupParameterTableName = GetLookupTableName(upsertTableRelations.TableRelations);
                     var declareLookupParameterStatement = BuildDeclareLookupParameterStatement(lookupParameterTableName, upsertTableRelations);
                     statement.Add(declareLookupParameterStatement);
-                    
+
                     var tableColumns = BuildTableColumnsAst(upsertTableRelations);
 
                     var foreignColumns = BuildForeignColumnsAst(upsertTableRelations);
@@ -114,45 +134,47 @@ namespace SigQL
                     statement.Add(lookupParameterTableInsert);
                     tokens.Add(tokenPath);
 
+                    var mergeSelectStatement = new Select()
+                    {
+                        SelectClause = new SelectClause().SetArgs(
+                            upsertTableRelations.ColumnParameters.Select(c =>
+                                    new ColumnIdentifier().SetArgs(
+                                        new RelationalColumn() { Label = c.Column.Name }
+                                    )
+                                ).AppendOne(new ColumnIdentifier().SetArgs(
+                                    new RelationalColumn() { Label = MergeIndexColumnName }
+                                ))
+                                .Concat(foreignColumns)),
+                        FromClause =
+                            new FromClause().SetArgs(
+                                new FromClauseNode().SetArgs(
+                                    new TableIdentifier().SetArgs(
+                                        new NamedParameterIdentifier() { Name = lookupParameterTableName })))
+                    };
+                    builderAstCollection.RegisterMergeSelectReference(upsertTableRelations.TableRelations.TargetTable, mergeSelectStatement);
                     var merge = new Merge()
                     {
                         Table = new TableIdentifier().SetArgs(new RelationalTable()
-                            {Label = upsertTableRelations.TableRelations.TableName}),
+                        { Label = upsertTableRelations.TableRelations.TableName }),
                         Using = new MergeUsing()
                         {
                             Values =
-                                new Select()
-                                {
-                                    SelectClause = new SelectClause().SetArgs(
-                                        upsertTableRelations.ColumnParameters.Select(c =>
-                                            new ColumnIdentifier().SetArgs(
-                                                new RelationalColumn() {Label = c.Column.Name}
-                                            )
-                                        ).AppendOne(new ColumnIdentifier().SetArgs(
-                                            new RelationalColumn() {Label = MergeIndexColumnName}
-                                        ))
-                                        .Concat(foreignColumns)),
-                                    FromClause =
-                                        new FromClause().SetArgs(
-                                            new FromClauseNode().SetArgs(
-                                                new TableIdentifier().SetArgs(
-                                                    new NamedParameterIdentifier() {Name = lookupParameterTableName})))
-                                },
-                            As = new TableAliasDefinition() {Alias = mergeTableAlias}
+                                mergeSelectStatement,
+                            As = new TableAliasDefinition() { Alias = mergeTableAlias }
                                 .SetArgs(
                                     upsertTableRelations.ColumnParameters.Select(cp =>
-                                        (AstNode) new ColumnDeclaration().SetArgs(
-                                            new RelationalColumn() {Label = cp.Column.Name}
+                                        (AstNode)new ColumnDeclaration().SetArgs(
+                                            new RelationalColumn() { Label = cp.Column.Name }
                                         )
                                     ).AppendOne(
                                         new ColumnDeclaration().SetArgs(
-                                            new RelationalColumn() {Label = MergeIndexColumnName})
+                                            new RelationalColumn() { Label = MergeIndexColumnName })
                                     ).Concat(foreignColumns)
                                 )
                         },
                         On = new EqualsOperator().SetArgs(
-                            new Literal() {Value = "1"},
-                            new Literal() {Value = "0"}
+                            new Literal() { Value = "1" },
+                            new Literal() { Value = "0" }
                         ),
                         WhenNotMatched = new WhenNotMatched()
                         {
@@ -164,21 +186,21 @@ namespace SigQL
                         }
                     };
 
-                    var foreignSelectValueStatements = 
+                    var foreignSelectValueStatements =
                         BuildForeignValueLookupStatements(upsertTableRelations, mergeTableAlias);
 
                     valuesListClause.SetArgs(
                         new ValuesList().SetArgs(
                             upsertTableRelations.ColumnParameters.Select(cp =>
-                                (AstNode) new ColumnIdentifier().SetArgs(
-                                    new RelationalTable() {Label = mergeTableAlias},
-                                    new RelationalColumn() {Label = cp.Column.Name}
+                                (AstNode)new ColumnIdentifier().SetArgs(
+                                    new RelationalTable() { Label = mergeTableAlias },
+                                    new RelationalColumn() { Label = cp.Column.Name }
                                 )
                             ).Concat(foreignSelectValueStatements.Select(c => c.Item2).ToList())
                         )
                     );
 
-                    
+
                     statement.Add(merge);
 
                     if (upsertTableRelations.TableRelations.TargetTable.PrimaryKey != null && (insertSpec.ReturnType != typeof(void) || insertSpec.UpsertTableRelationsCollection.Count > 1))
@@ -195,23 +217,23 @@ namespace SigQL
                         merge.WhenNotMatched.Insert.Output = new OutputClause()
                         {
                             Into = new IntoClause()
-                                {Object = new NamedParameterIdentifier() {Name = outputParameterTableName}}.SetArgs(
+                            { Object = new NamedParameterIdentifier() { Name = outputParameterTableName } }.SetArgs(
                                 upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
-                                        new ColumnIdentifier().SetArgs(new RelationalColumn() {Label = c.Name}))
+                                        new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Name }))
                                     .AppendOne(
                                         new ColumnIdentifier().SetArgs(new RelationalColumn()
-                                            {Label = MergeIndexColumnName})))
+                                        { Label = MergeIndexColumnName })))
                         }.SetArgs(
                             upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
-                                    new ColumnIdentifier().SetArgs(new RelationalTable() {Label = insertedTableName},
-                                        new RelationalColumn() {Label = c.Name}))
+                                    new ColumnIdentifier().SetArgs(new RelationalTable() { Label = insertedTableName },
+                                        new RelationalColumn() { Label = c.Name }))
                                 .AppendOne(
                                     new ColumnIdentifier().SetArgs(
-                                        new RelationalTable() {Label = mergeTableAlias},
-                                        new RelationalColumn() {Label = MergeIndexColumnName}
+                                        new RelationalTable() { Label = mergeTableAlias },
+                                        new RelationalColumn() { Label = MergeIndexColumnName }
                                     ))
                         );
-                        
+
                     }
 
                     //var manyTables = insertTableRelations.TableRelations.NavigationTables.Where(nt =>
@@ -246,13 +268,13 @@ namespace SigQL
                     //statement.AddRange(methodSqlStatements.SelectMany(mst => mst.CommandAst));
                     //tokens.AddRange(methodSqlStatements.SelectMany(mst => mst.Tokens));
                 }
-                
+
             }
 
 
             if (insertSpec.ReturnType != typeof(void))
             {
-                
+
                 var tableRelations = this.databaseResolver.BuildTableRelations(insertSpec.Table, new TypeArgument(insertSpec.ReturnType, this.databaseResolver), TableRelationsColumnSource.ReturnType, tablePrimaryKeyDefinitions);
                 var matchingInsertTableRelations = insertSpec.UpsertTableRelationsCollection
                     .Where(tr =>
@@ -307,19 +329,7 @@ namespace SigQL
                 statement.Add(selectStatement);
             }
 
-            var sqlStatement = new MethodSqlStatement()
-            {
-                CommandAst = statement,
-                SqlBuilder = this.builder,
-                ReturnType = insertSpec.ReturnType,
-                UnwrappedReturnType = targetTableType,
-                Parameters = parameterPaths,
-                Tokens = tokens,
-                TargetTablePrimaryKey = insertSpec.Table.PrimaryKey,
-                TablePrimaryKeyDefinitions = tablePrimaryKeyDefinitions
-            };
-
-            return sqlStatement;
+            return builderAstCollection;
         }
 
         private static List<Tuple<IColumnDefinition, AstNode>> BuildForeignValueLookupStatements(UpsertTableRelations upsertTableRelations, string sourceTableAlias)
@@ -832,7 +842,8 @@ namespace SigQL
         {
             var upsertAttribute = 
                 methodInfo.GetCustomAttributes(typeof(InsertAttribute), false).Cast<IUpsertAttribute>().FirstOrDefault() 
-                ?? methodInfo.GetCustomAttributes(typeof(UpdateByKeyAttribute), false).Cast<IUpsertAttribute>().FirstOrDefault();
+                ?? methodInfo.GetCustomAttributes(typeof(UpdateByKeyAttribute), false).Cast<IUpsertAttribute>().FirstOrDefault()
+                ?? methodInfo.GetCustomAttributes(typeof(UpsertAttribute), false).Cast<IUpsertAttribute>().FirstOrDefault();
             if (upsertAttribute != null)
             {
                 var methodParameters = methodInfo.GetParameters();
@@ -1059,6 +1070,45 @@ namespace SigQL
             {
                 return obj.GetHashCode();
             }
+        }
+
+        private class InsertBuilderAstCollection
+        {
+            internal List<AstNode> Statements { get; }
+            internal ConcurrentDictionary<string, ITableKeyDefinition> TablePrimaryKeyDefinitions { get; }
+            internal List<TokenPath> Tokens { get; }
+
+            private IDictionary<ITableDefinition, Select> mergeSelectReferences;
+            //private IDictionary<ITableDefinition, AstNode> updateTableReferences;
+
+            public InsertBuilderAstCollection()
+            {
+                this.Statements = new List<AstNode>();
+                this.TablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
+                this.Tokens = new List<TokenPath>();
+                this.mergeSelectReferences = new Dictionary<ITableDefinition, Select>(TableEqualityComparer.Default);
+                //this.updateTableReferences = new Dictionary<ITableDefinition, AstNode>(TableEqualityComparer.Default);
+            }
+
+            internal void RegisterMergeSelectReference(ITableDefinition tableDefinition, Select ast)
+            {
+                mergeSelectReferences[tableDefinition] = ast;
+            }
+
+            internal Select GetMergeSelectReference(ITableDefinition tableDefinition)
+            {
+                return mergeSelectReferences[tableDefinition];
+            }
+            
+            //internal void RegisterUpdateTableReference(ITableDefinition tableDefinition, AstNode ast)
+            //{
+            //    updateTableReferences[tableDefinition] = ast;
+            //}
+
+            //internal AstNode GetUpdateTableReference(ITableDefinition tableDefinition)
+            //{
+            //    return updateTableReferences[tableDefinition];
+            //}
         }
     }
 }
