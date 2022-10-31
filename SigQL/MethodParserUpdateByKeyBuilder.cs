@@ -53,7 +53,7 @@ namespace SigQL
             return sqlStatement;
         }
 
-        private AstNode BuildUpdateFromLookupStatement(UpsertTableRelations upsertTableRelations, string lookupTableName)
+        private Update BuildUpdateFromLookupStatement(UpsertTableRelations upsertTableRelations, string lookupTableName)
         {
             var targetTable = upsertTableRelations.TableRelations.TargetTable;
             var primaryKeyColumns = targetTable.PrimaryKey.Columns;

@@ -2854,6 +2854,38 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Upsert_Multiple()
+        {
+            this.monolithicRepository.UpsertMultipleEmployeesWithWorkLogs(
+                new Employee.UpsertFieldsWithWorkLogs[]
+                {
+                    new Employee.UpsertFieldsWithWorkLogs()
+                    {
+                        Id = 1,
+                        Name = "bah",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpsertFields()
+                                {Id = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                        }
+                    },
+                    new Employee.UpsertFieldsWithWorkLogs()
+                    {
+                        Name = "2bah",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpsertFields()
+                                {Id = 2, StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                        }
+                    }
+                });
+        }
+
+        [TestMethod]
         public void UpdateByKey_Multiple()
         {
             var insertFields = new Employee.InsertFieldsWithWorkLogs[]

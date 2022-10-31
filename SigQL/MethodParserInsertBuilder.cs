@@ -149,7 +149,13 @@ namespace SigQL
                             new FromClause().SetArgs(
                                 new FromClauseNode().SetArgs(
                                     new TableIdentifier().SetArgs(
-                                        new NamedParameterIdentifier() { Name = lookupParameterTableName })))
+                                        new Alias()
+                                        {
+                                            Label = lookupParameterTableName
+                                        }.SetArgs(
+                                            new NamedParameterIdentifier() { Name = lookupParameterTableName }
+                                        )
+                                        )))
                     };
                     builderAstCollection.RegisterMergeSelectReference(upsertTableRelations.TableRelations.TargetTable, mergeSelectStatement);
                     var merge = new Merge()
