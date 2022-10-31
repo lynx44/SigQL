@@ -209,6 +209,9 @@ namespace SigQL.Tests.Common.Databases.Labor
         // [Insert(TableName = nameof(Employee))]
         // void InsertEmployeeWithAttributeWithValuesByUnknownClass(EmployeeInsertFields values);
 
+        [Upsert]
+        void UpsertMultipleEmployeesWithWorkLogs(IEnumerable<Employee.UpsertFieldsWithWorkLogs> employees);
+
         //update
         [Update(TableName = nameof(Employee))]
         void UpdateAllEmployees([Set] string name);
