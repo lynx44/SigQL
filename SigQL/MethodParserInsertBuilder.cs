@@ -75,7 +75,7 @@ namespace SigQL
             {
                 var valuesListClause = new ValuesListClause();
                 var upsertTableRelations = insertSpec.UpsertTableRelationsCollection[index];
-                var upsertColumnList = upsertTableRelations.ColumnParameters.Select(cp =>
+                var upsertColumnList = upsertTableRelations.ColumnParameters.Where(cp => !cp.Column.IsIdentity).Select(cp =>
                     new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = cp.Column.Name }))
                     .Concat(upsertTableRelations.ForeignTableColumns.SelectMany(fk =>
                         fk.ForeignKey.GetForeignColumns().Select(fc =>
@@ -197,7 +197,7 @@ namespace SigQL
 
                     valuesListClause.SetArgs(
                         new ValuesList().SetArgs(
-                            upsertTableRelations.ColumnParameters.Select(cp =>
+                            upsertTableRelations.ColumnParameters.Where(cp => !cp.Column.IsIdentity).Select(cp =>
                                 (AstNode)new ColumnIdentifier().SetArgs(
                                     new RelationalTable() { Label = mergeTableAlias },
                                     new RelationalColumn() { Label = cp.Column.Name }

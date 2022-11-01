@@ -2856,33 +2856,82 @@ namespace SigQL.SqlServer.Tests
         [TestMethod]
         public void Upsert_Multiple()
         {
+            var insertFields = new Employee.InsertFieldsWithWorkLogs[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(insertFields);
+
             this.monolithicRepository.UpsertMultipleEmployeesWithWorkLogs(
                 new Employee.UpsertFieldsWithWorkLogs[]
                 {
                     new Employee.UpsertFieldsWithWorkLogs()
                     {
                         Id = 1,
-                        Name = "bah",
+                        Name = "Kyle",
                         WorkLogs = new[]
                         {
                             new WorkLog.UpsertFields()
-                                {Id = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                                {Id = 1, StartDate = new DateTime(2022, 1, 1), EndDate = new DateTime(2022, 1, 2)},
                             new WorkLog.UpsertFields()
-                                {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                                {StartDate = new DateTime(2022, 2, 1), EndDate = new DateTime(2022, 2, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2022, 3, 1), EndDate = new DateTime(2022, 3, 2)}
                         }
                     },
                     new Employee.UpsertFieldsWithWorkLogs()
                     {
-                        Name = "2bah",
+                        Name = "Geno",
                         WorkLogs = new[]
                         {
                             new WorkLog.UpsertFields()
-                                {Id = 2, StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                                {Id = 2, StartDate = new DateTime(2022, 4, 1), EndDate = new DateTime(2022, 4, 2)},
                             new WorkLog.UpsertFields()
-                                {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                                {StartDate = new DateTime(2022, 5, 1), EndDate = new DateTime(2022, 5, 2)}
                         }
                     }
                 });
+
+            var actual = laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+
+            Assert.IsFalse(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            var actualEmployee1 = actual.Single(e => e.Id == 1);
+            Assert.AreEqual("Kyle", actualEmployee1.Name);
+            Assert.AreEqual(3, actualEmployee1.WorkLogs.Count);
+            Assert.AreEqual(new DateTime(2022, 1, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).StartDate);
+            Assert.AreEqual(new DateTime(2022, 1, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).EndDate);
+            Assert.AreEqual(new DateTime(2022, 2, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 5).StartDate);
+            Assert.AreEqual(new DateTime(2022, 2, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 5).EndDate);
+            Assert.AreEqual(new DateTime(2022, 3, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 6).StartDate);
+            Assert.AreEqual(new DateTime(2022, 3, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 6).EndDate);
+            var actualEmployee2 = actual.Single(e => e.Id == 3);
+            Assert.AreEqual(2, actualEmployee2.WorkLogs.Count);
+            Assert.AreEqual(new DateTime(2022, 4, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 2).StartDate);
+            Assert.AreEqual(new DateTime(2022, 4, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 2).EndDate);
+            Assert.AreEqual(new DateTime(2022, 5, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 7).StartDate);
+            Assert.AreEqual(new DateTime(2022, 5, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 7).EndDate);
         }
 
         [TestMethod]

@@ -83,7 +83,8 @@ namespace SigQL
                         tableColumn.DataTypeDeclaration,
                         tableColumn.Table,
                         d.Column.Argument, 
-                        source);
+                        source,
+                        tableColumn.IsIdentity);
 
                 }).ToList<TableRelationColumnIdentifierDefinition>();
             var functionParameterColumns = argument.ClassProperties.Where(a => ColumnAttributes.IsFunctionParameter(a));
@@ -105,7 +106,7 @@ namespace SigQL
                         !columns.Any(cl => ColumnEqualityComparer.Default.Equals(c, cl))).ToList();
 
                     var additionalProjectedKeyColumns = missingProjectedKeyColumns.Select(c =>
-                        new TableRelationColumnIdentifierDefinition(c.Name, tableDefinition, null, source)).ToList();
+                        new TableRelationColumnIdentifierDefinition(c.Name, tableDefinition, null, source, c.IsIdentity)).ToList();
                     columns.AddRange(additionalProjectedKeyColumns);
 
                     primaryKey = existingProjectedKeyColumns.Concat(additionalProjectedKeyColumns).ToList();
@@ -120,7 +121,7 @@ namespace SigQL
                         columnName += "_SigQL";
                     }
 
-                    var rowNumberColumn = new TableRelationColumnRowNumberFunctionDefinition(columnName, tableDefinition, source);
+                    var rowNumberColumn = new TableRelationColumnRowNumberFunctionDefinition(columnName, tableDefinition, source, false);
                     rowNumberColumn.Arguments.AddArgument(argument, source);
                     //columns.Insert(0, rowNumberColumn);
                     primaryKey = new[] {rowNumberColumn};
@@ -295,7 +296,7 @@ namespace SigQL
                     
                     tableRelations.ProjectedColumns = new List<TableRelationColumnDefinition>()
                     {
-                        new TableRelationColumnDefinition(column.Name, column.DataTypeDeclaration, column.Table, argument, source)
+                        new TableRelationColumnDefinition(column.Name, column.DataTypeDeclaration, column.Table, argument, source, column.IsIdentity)
                         {
                             TableRelations = tableRelations
                         }

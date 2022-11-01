@@ -1295,8 +1295,8 @@ namespace SigQL
         public ColumnAliasForeignKeyPair(IForeignKeyPair foreignKeyPair)
         {
             this.foreignKeyPair = foreignKeyPair;
-            this.ForeignTableColumnWithAlias = new ColumnAliasColumnDefinition(this.ForeignTableColumn.Name, this.ForeignTableColumn.DataTypeDeclaration, this.ForeignTableColumn.Table, null);
-            this.PrimaryTableColumnWithAlias = new ColumnAliasColumnDefinition(this.PrimaryTableColumn.Name, this.PrimaryTableColumn.DataTypeDeclaration, this.PrimaryTableColumn.Table, null);
+            this.ForeignTableColumnWithAlias = new ColumnAliasColumnDefinition(this.ForeignTableColumn.Name, this.ForeignTableColumn.DataTypeDeclaration, this.ForeignTableColumn.Table, null, this.ForeignTableColumn.IsIdentity);
+            this.PrimaryTableColumnWithAlias = new ColumnAliasColumnDefinition(this.PrimaryTableColumn.Name, this.PrimaryTableColumn.DataTypeDeclaration, this.PrimaryTableColumn.Table, null, this.ForeignTableColumn.IsIdentity);
         }
 
         public ColumnAliasColumnDefinition ForeignTableColumnWithAlias { get; }
@@ -1308,12 +1308,13 @@ namespace SigQL
         private readonly IColumnDefinition columnDefinition;
         public string Name { get; }
         public string DataTypeDeclaration { get; }
+        public bool IsIdentity { get; }
 
         public ITableDefinition Table { get; }
 
         public string TableAlias { get; }
 
-        public ColumnAliasColumnDefinition(string name, string dataTypeDeclaration, ITableDefinition table, ITableHierarchyAlias tableAlias)
+        public ColumnAliasColumnDefinition(string name, string dataTypeDeclaration, ITableDefinition table, ITableHierarchyAlias tableAlias, bool isIdentity)
         {
             Name = name;
             DataTypeDeclaration = dataTypeDeclaration;
