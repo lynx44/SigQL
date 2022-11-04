@@ -2935,6 +2935,69 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Upsert_Multiple_OutputIds()
+        {
+            var insertFields = new Employee.InsertFieldsWithWorkLogs[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(insertFields);
+
+            var result = this.monolithicRepository.UpsertMultipleEmployeesWithWorkLogs_OutputIds(
+                new Employee.UpsertFieldsWithWorkLogs[]
+                {
+                    new Employee.UpsertFieldsWithWorkLogs()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpsertFields()
+                                {Id = 1, StartDate = new DateTime(2022, 1, 1), EndDate = new DateTime(2022, 1, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2022, 2, 1), EndDate = new DateTime(2022, 2, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2022, 3, 1), EndDate = new DateTime(2022, 3, 2)}
+                        }
+                    },
+                    new Employee.UpsertFieldsWithWorkLogs()
+                    {
+                        Name = "Geno",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpsertFields()
+                                {Id = 2, StartDate = new DateTime(2022, 4, 1), EndDate = new DateTime(2022, 4, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2022, 5, 1), EndDate = new DateTime(2022, 5, 2)}
+                        }
+                    }
+                });
+            
+            AreEquivalent(new [] { 1, 3 }, result.Select(c => c.Id));
+        }
+
+        [TestMethod]
         public void UpdateByKey_Multiple()
         {
             var insertFields = new Employee.InsertFieldsWithWorkLogs[]

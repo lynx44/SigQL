@@ -19,9 +19,13 @@ namespace SigQL
                 var upsertTableRelations = upsertSpec.UpsertTableRelationsCollection[index];
                 var targetTable = upsertTableRelations.TableRelations.TargetTable;
                 ModifyMergeSelectStatement(builderAstCollection, targetTable, upsertTableRelations);
+                
+                var updateLookupIdsAst = builderAstCollection.GetReference<AstNode>(targetTable,
+                    InsertBuilderAstCollection.AstReferenceSource.UpdateLookupIds);
+                var updateLookupIdsAstIndex = builderAstCollection.Statements.IndexOf(updateLookupIdsAst);
                 var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations, GetLookupTableName(upsertTableRelations.TableRelations));
                 AppendWhereClauseToUpdateStatement(updateFromLookupStatement, targetTable, upsertTableRelations);
-                builderAstCollection.Statements.Add(updateFromLookupStatement);
+                builderAstCollection.Statements.Insert(updateLookupIdsAstIndex + 1, updateFromLookupStatement);
             }
 
             var sqlStatement = new MethodSqlStatement()
@@ -141,7 +145,7 @@ namespace SigQL
         private static void ModifyMergeSelectStatement(InsertBuilderAstCollection builderAstCollection,
             ITableDefinition targetTable, UpsertTableRelations upsertTableRelations)
         {
-            var mergeSelectStatement = builderAstCollection.GetMergeSelectReference(targetTable);
+            var mergeSelectStatement = builderAstCollection.GetReference<Select>(targetTable, InsertBuilderAstCollection.AstReferenceSource.MergeSelectClause);
             //where("Id" is null /* and "CompositeId2" is null */)
             //or not exists(
             //  select 1 from "Employee"

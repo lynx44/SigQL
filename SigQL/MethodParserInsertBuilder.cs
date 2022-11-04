@@ -157,7 +157,7 @@ namespace SigQL
                                         )
                                         )))
                     };
-                    builderAstCollection.RegisterMergeSelectReference(upsertTableRelations.TableRelations.TargetTable, mergeSelectStatement);
+                    builderAstCollection.RegisterReference(upsertTableRelations.TableRelations.TargetTable, InsertBuilderAstCollection.AstReferenceSource.MergeSelectClause, mergeSelectStatement);
                     var merge = new Merge()
                     {
                         Table = new TableIdentifier().SetArgs(new RelationalTable()
@@ -213,7 +213,10 @@ namespace SigQL
                     {
                         var updateLookupTablePKsStatement = BuildUpdateLookupStatement(upsertTableRelations.TableRelations);
                         if (updateLookupTablePKsStatement != null)
+                        {
                             statement.Add(updateLookupTablePKsStatement);
+                            builderAstCollection.RegisterReference(upsertTableRelations.TableRelations.TargetTable, InsertBuilderAstCollection.AstReferenceSource.UpdateLookupIds, updateLookupTablePKsStatement);
+                        }   
 
                         var outputParameterTableName = GetInsertedTableName(upsertTableRelations.TableRelations);
                         var declareOutputParameterStatement = BuildDeclareInsertedTableParameterStatement(outputParameterTableName, upsertTableRelations);
@@ -241,38 +244,6 @@ namespace SigQL
                         );
 
                     }
-
-                    //var manyTables = insertTableRelations.TableRelations.NavigationTables.Where(nt =>
-                    //    TableEqualityComparer.Default.Equals(nt.ForeignKeyToParent.PrimaryKeyTable, insertSpec.Table)).ToList();
-
-                    //var manyTableInsertSpecs = manyTables.Select(t => new InsertSpec()
-                    //{
-                    //    Table = t.TargetTable,
-                    //    InsertTableRelationsCollection = new List<InsertTableRelations>()
-                    //    {
-                    //        new InsertTableRelations() {
-                    //            TableRelations = t,
-                    //            ColumnParameters = t.ForeignKeyToParent.KeyPairs.Select(c => new InsertColumnParameter()
-                    //            {
-                    //                Column = c.ForeignTableColumn,
-                    //                ParameterPath = new ParameterPath(t.Argument)
-                    //                {
-                    //                    SqlParameterName = $"{t.TargetTable.Name}"
-                    //                }
-                    //            }).ToList(),
-                    //        }
-                    //    },
-                    //    ReturnType = typeof(void),
-                    //    UnwrappedReturnType = typeof(void),
-                    //    RootMethodInfo = insertSpec.RootMethodInfo
-                    //}).ToList();
-
-                    //// parameterPaths.AddRange(manyTableInsertSpecs.SelectMany(m => m.ColumnParameters.Select(c => c.ParameterPath)).ToList());
-                    //var methodSqlStatements = manyTableInsertSpecs.Select(tis =>
-                    //    BuildInsertStatement(tis, parameterPaths)).ToList();
-
-                    //statement.AddRange(methodSqlStatements.SelectMany(mst => mst.CommandAst));
-                    //tokens.AddRange(methodSqlStatements.SelectMany(mst => mst.Tokens));
                 }
 
             }
@@ -287,7 +258,7 @@ namespace SigQL
                         TableEqualityComparer.Default.Equals(tr.TableRelations.TargetTable, tableRelations.TargetTable))
                     .OrderBy(tr => tr.TableRelations.CalculateDepth())
                     .First();
-                var outputParameterTableName = GetInsertedTableName(matchingInsertTableRelations.TableRelations);
+                var outputParameterTableName = GetLookupTableName(matchingInsertTableRelations.TableRelations);
                 var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
                 var resolvedSelectClause = selectClauseBuilder.Build(tableRelations, tablePrimaryKeyDefinitions);
                 var fromClauseRelations = resolvedSelectClause.FromClauseRelations;
@@ -296,7 +267,7 @@ namespace SigQL
                 var fromClauseNode = BuildFromClause(fromClauseRelations);
 
                 var primaryTable = fromClauseRelations.TargetTable;
-                var outputParameterTableSelectAlias = "i";
+                var outputParameterTableSelectAlias = outputParameterTableName;
                 fromClauseNode.SetArgs(fromClauseNode.Args.AppendOne(new InnerJoin()
                 {
                     RightNode =
@@ -1084,37 +1055,37 @@ namespace SigQL
             internal ConcurrentDictionary<string, ITableKeyDefinition> TablePrimaryKeyDefinitions { get; }
             internal List<TokenPath> Tokens { get; }
 
-            private IDictionary<ITableDefinition, Select> mergeSelectReferences;
-            //private IDictionary<ITableDefinition, AstNode> updateTableReferences;
+            private IDictionary<ITableDefinition, IDictionary<AstReferenceSource, AstNode>> astReferences;
 
             public InsertBuilderAstCollection()
             {
                 this.Statements = new List<AstNode>();
                 this.TablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
                 this.Tokens = new List<TokenPath>();
-                this.mergeSelectReferences = new Dictionary<ITableDefinition, Select>(TableEqualityComparer.Default);
-                //this.updateTableReferences = new Dictionary<ITableDefinition, AstNode>(TableEqualityComparer.Default);
+                this.astReferences = new Dictionary<ITableDefinition, IDictionary<AstReferenceSource, AstNode>>(TableEqualityComparer.Default);
             }
 
-            internal void RegisterMergeSelectReference(ITableDefinition tableDefinition, Select ast)
+            internal void RegisterReference(ITableDefinition tableDefinition, AstReferenceSource source, AstNode ast)
             {
-                mergeSelectReferences[tableDefinition] = ast;
+                if (!astReferences.ContainsKey(tableDefinition))
+                {
+                    astReferences[tableDefinition] = new ConcurrentDictionary<AstReferenceSource, AstNode>();
+                }
+                
+                astReferences[tableDefinition][source] = ast;
             }
 
-            internal Select GetMergeSelectReference(ITableDefinition tableDefinition)
+            internal T GetReference<T>(ITableDefinition tableDefinition, AstReferenceSource source)
+                where T: AstNode
             {
-                return mergeSelectReferences[tableDefinition];
+                return (T) astReferences[tableDefinition][source];
             }
-            
-            //internal void RegisterUpdateTableReference(ITableDefinition tableDefinition, AstNode ast)
-            //{
-            //    updateTableReferences[tableDefinition] = ast;
-            //}
 
-            //internal AstNode GetUpdateTableReference(ITableDefinition tableDefinition)
-            //{
-            //    return updateTableReferences[tableDefinition];
-            //}
+            internal enum AstReferenceSource
+            {
+                MergeSelectClause,
+                UpdateLookupIds
+            }
         }
     }
 }
