@@ -3141,13 +3141,6 @@ namespace SigQL.SqlServer.Tests
                                     },
                                     new Address.UpsertFields()
                                     {
-                                        Id = 5,
-                                        StreetAddress = "345 fake st",
-                                        City = "Manchester",
-                                        State = "NH"
-                                    },
-                                    new Address.UpsertFields()
-                                    {
                                         StreetAddress = "345 fake st",
                                         City = "Manchester",
                                         State = "NH"
