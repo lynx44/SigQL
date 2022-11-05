@@ -206,7 +206,7 @@ namespace SigQL
                         )
                     );
 
-
+                    builderAstCollection.RegisterReference(upsertTableRelations.TableRelations.TargetTable, InsertBuilderAstCollection.AstReferenceSource.Merge, merge);
                     statement.Add(merge);
 
                     if (upsertTableRelations.TableRelations.TargetTable.PrimaryKey != null && (insertSpec.ReturnType != typeof(void) || insertSpec.UpsertTableRelationsCollection.Count > 1))
@@ -247,11 +247,9 @@ namespace SigQL
                 }
 
             }
-
-
+            
             if (insertSpec.ReturnType != typeof(void))
             {
-
                 var tableRelations = this.databaseResolver.BuildTableRelations(insertSpec.Table, new TypeArgument(insertSpec.ReturnType, this.databaseResolver), TableRelationsColumnSource.ReturnType, tablePrimaryKeyDefinitions);
                 var matchingInsertTableRelations = insertSpec.UpsertTableRelationsCollection
                     .Where(tr =>
@@ -1084,7 +1082,8 @@ namespace SigQL
             internal enum AstReferenceSource
             {
                 MergeSelectClause,
-                UpdateLookupIds
+                UpdateLookupIds,
+                Merge
             }
         }
     }

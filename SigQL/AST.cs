@@ -65,6 +65,14 @@ namespace SigQL
         public OffsetClause Offset { get; set; }
     }
 
+    public class PartitionByClause : Clause
+    {
+        public PartitionByClause()
+        {
+            this.Keyword = "partition by";
+        }
+    }
+
     public class GroupByClause : Clause
     {
         public GroupByClause()

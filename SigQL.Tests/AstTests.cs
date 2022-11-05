@@ -710,6 +710,44 @@ namespace SigQL.Tests
             var statement = Build(selectStatement);
             Assert.AreEqual("select ROW_NUMBER() over(order by \"table\".\"column\")", statement);
         }
+        
+        [TestMethod]
+        public void OverWithPartition()
+        {
+            var selectStatement = new Select()
+            {
+                SelectClause = new SelectClause().SetArgs(new OverClause()
+                {
+                    Function = new Function()
+                    {
+                        Name = "ROW_NUMBER"
+                    }
+                }.SetArgs(
+                    new PartitionByClause().SetArgs(
+                        new ColumnIdentifier().SetArgs(
+                            new RelationalTable()
+                            {
+                                Label = "p1"
+                            },
+                            new RelationalColumn()
+                            {
+                                Label = "col"
+                            })),
+                    new OrderByClause().SetArgs(
+                        new ColumnIdentifier().SetArgs(
+                            new RelationalTable()
+                            {
+                                Label = "table"
+                            },
+                            new RelationalColumn()
+                            {
+                                Label = "column"
+                            }))))
+            };
+
+            var statement = Build(selectStatement);
+            Assert.AreEqual("select ROW_NUMBER() over(partition by \"p1\".\"col\" order by \"table\".\"column\")", statement);
+        }
 
         [TestMethod]
         public void BasicGroupBy()

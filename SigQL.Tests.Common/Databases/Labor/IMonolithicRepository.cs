@@ -213,6 +213,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         void UpsertMultipleEmployeesWithWorkLogs(IEnumerable<Employee.UpsertFieldsWithWorkLogs> employees);
         [Upsert]
         IEnumerable<Employee.IEmployeeId> UpsertMultipleEmployeesWithWorkLogs_OutputIds(IEnumerable<Employee.UpsertFieldsWithWorkLogs> employees);
+        [Upsert]
+        void UpsertMultipleWorkLogsWithAdjacentAndNestedRelations(IEnumerable<WorkLog.UpsertFieldsWithEmployeeAndLocation> employees);
 
         //update
         [Update(TableName = nameof(Employee))]
