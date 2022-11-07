@@ -3096,28 +3096,20 @@ namespace SigQL.SqlServer.Tests
                                     StreetAddress = "456 fake st",
                                     City = "Portland",
                                     State = "OR"
-                                },
-                                new Address.UpsertFields()
-                                {
-                                    Id = 3,
-                                    StreetAddress = "567 fake st",
-                                    City = "San Diego",
-                                    State = "CA"
                                 }
                             }
 
                         },
                     Location = new Location.Upsert()
                     {
-                        Id = 1,
-                        Name = "Ice Queen"
+                        Name = "Eleven Til Seven"
                     }
                 },
                 new WorkLog.UpsertFieldsWithEmployeeAndLocation()
                 {
                     Id = 2,
-                    StartDate = new DateTime(2021, 3, 1),
-                    EndDate = new DateTime(2021, 1, 2),
+                    StartDate = new DateTime(2022, 3, 1),
+                    EndDate = new DateTime(2022, 1, 2),
                     Employee =
                         new Employee.UpsertFieldsWithAddress()
                             {
@@ -3125,6 +3117,13 @@ namespace SigQL.SqlServer.Tests
                                 Name = "Lester",
                                 Addresses = new []
                                 {
+                                    new Address.UpsertFields()
+                                    {
+                                        Id = 3,
+                                        StreetAddress = "567 fake st",
+                                        City = "San Diego",
+                                        State = "CA"
+                                    },
                                     new Address.UpsertFields()
                                     {
                                         Id = 4,
@@ -3141,9 +3140,9 @@ namespace SigQL.SqlServer.Tests
                                     },
                                     new Address.UpsertFields()
                                     {
-                                        StreetAddress = "345 fake st",
-                                        City = "Manchester",
-                                        State = "NH"
+                                        StreetAddress = "789 sesame st",
+                                        City = "New Jersey",
+                                        State = "NJ"
                                     }
                                 }
 
@@ -3151,62 +3150,72 @@ namespace SigQL.SqlServer.Tests
                     Location = new Location.Upsert()
                     {
                         Id = 2,
-                        Name = "Burger Hut"
+                        Name = "Taco Hut"
                     }
                 }
             };
             this.monolithicRepository.UpsertMultipleWorkLogsWithAdjacentAndNestedRelations(upsertFields);
+            var actual = laborDbContext.WorkLog
+                .Include(wl => wl.Employee)
+                .ThenInclude(e => e.Addresses)
+                .Include(wl => wl.Location).ToList();
 
-            //Assert.AreEqual(2, actual.Count());
-            //AreSame(actual.Select(p => p.Employee.Name).ToList(), upsertFields.Select(wl => wl.Employee.Name).ToList());
-            //Assert.AreEqual(2, actual.Count());
+            Assert.AreEqual(2, actual.Count());
+            AreSame(actual.Select(p => p.Employee.Name).ToList(), upsertFields.Select(wl => wl.Employee.Name).ToList());
+            Assert.AreEqual(2, actual.Count());
 
-            //var efWorkLog1 = actual.First();
-            //Assert.AreEqual(new DateTime(2021, 1, 1), efWorkLog1.StartDate);
-            //Assert.AreEqual(new DateTime(2021, 1, 2), efWorkLog1.EndDate);
+            var efWorkLog1 = actual.First();
+            Assert.AreEqual(new DateTime(2021, 1, 1), efWorkLog1.StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 2), efWorkLog1.EndDate);
 
-            //var efEmployee1 = efWorkLog1.Employee;
-            //Assert.AreEqual("Mike", efEmployee1.Name);
-            //Assert.AreEqual(3, efEmployee1.Addresses.Count());
+            var efEmployee1 = efWorkLog1.Employee;
+            Assert.AreEqual("Mike", efEmployee1.Name);
+            Assert.AreEqual(3, efEmployee1.Addresses.Count());
 
-            //var efEmployee1Address1 = efEmployee1.Addresses.First();
-            //Assert.AreEqual("123 fake st", efEmployee1Address1.StreetAddress);
-            //Assert.AreEqual("Pennsylvania", efEmployee1Address1.City);
-            //Assert.AreEqual("PA", efEmployee1Address1.State);
+            var efEmployee1Address1 = efEmployee1.Addresses.First();
+            Assert.AreEqual("123 fake st", efEmployee1Address1.StreetAddress);
+            Assert.AreEqual("Pennsylvania", efEmployee1Address1.City);
+            Assert.AreEqual("PA", efEmployee1Address1.State);
 
-            //var efEmployee1Address2 = efEmployee1.Addresses.Skip(1).First();
-            //Assert.AreEqual("456 fake st", efEmployee1Address2.StreetAddress);
-            //Assert.AreEqual("Portland", efEmployee1Address2.City);
-            //Assert.AreEqual("OR", efEmployee1Address2.State);
+            var efEmployee1Address2 = efEmployee1.Addresses.Skip(1).First();
+            Assert.AreEqual("456 fake st", efEmployee1Address2.StreetAddress);
+            Assert.AreEqual("Portland", efEmployee1Address2.City);
+            Assert.AreEqual("OR", efEmployee1Address2.State);
 
-            //var efEmployee1Address3 = efEmployee1.Addresses.Skip(2).First();
-            //Assert.AreEqual("567 fake st", efEmployee1Address3.StreetAddress);
-            //Assert.AreEqual("San Diego", efEmployee1Address3.City);
-            //Assert.AreEqual("CA", efEmployee1Address3.State);
+            var efLocation1 = efWorkLog1.Location;
+            Assert.AreEqual(3, efLocation1.Id);
+            Assert.AreEqual("Eleven Til Seven", efLocation1.Name);
 
-            //var efLocation1 = efWorkLog1.Location;
-            //Assert.AreEqual("Ice Queen", efLocation1.Name);
+            var efWorkLog2 = actual.Last();
+            Assert.AreEqual(new DateTime(2022, 3, 1), efWorkLog2.StartDate);
+            Assert.AreEqual(new DateTime(2022, 1, 2), efWorkLog2.EndDate);
 
-            //var efWorkLog2 = actual.Last();
-            //Assert.AreEqual(new DateTime(2021, 3, 1), efWorkLog2.StartDate);
-            //Assert.AreEqual(new DateTime(2021, 1, 2), efWorkLog2.EndDate);
+            var efEmployee2 = efWorkLog2.Employee;
+            Assert.AreEqual("Lester", efEmployee2.Name);
+            Assert.AreEqual(4, efEmployee2.Addresses.Count());
 
-            //var efEmployee2 = efWorkLog2.Employee;
-            //Assert.AreEqual("Lester", efEmployee2.Name);
-            //Assert.AreEqual(2, efEmployee2.Addresses.Count());
+            var efEmployee2Address1 = efEmployee2.Addresses.Single(a => a.Id == 3);
+            Assert.AreEqual("567 fake st", efEmployee2Address1.StreetAddress);
+            Assert.AreEqual("San Diego", efEmployee2Address1.City);
+            Assert.AreEqual("CA", efEmployee2Address1.State);
 
-            //var efEmployee2Address1 = efEmployee2.Addresses.First();
-            //Assert.AreEqual("234 fake st", efEmployee2Address1.StreetAddress);
-            //Assert.AreEqual("New York", efEmployee2Address1.City);
-            //Assert.AreEqual("NY", efEmployee2Address1.State);
+            var efEmployee2Address2 = efEmployee2.Addresses.Single(a => a.Id == 4);
+            Assert.AreEqual("234 fake st", efEmployee2Address2.StreetAddress);
+            Assert.AreEqual("New York", efEmployee2Address2.City);
+            Assert.AreEqual("NY", efEmployee2Address2.State);
 
-            //var efEmployee2Address2 = efEmployee2.Addresses.Skip(1).First();
-            //Assert.AreEqual("345 fake st", efEmployee2Address2.StreetAddress);
-            //Assert.AreEqual("Manchester", efEmployee2Address2.City);
-            //Assert.AreEqual("NH", efEmployee2Address2.State);
+            var efEmployee2Address3 = efEmployee2.Addresses.Single(a => a.Id == 5);
+            Assert.AreEqual("345 fake st", efEmployee2Address3.StreetAddress);
+            Assert.AreEqual("Manchester", efEmployee2Address3.City);
+            Assert.AreEqual("NH", efEmployee2Address3.State);
 
-            //var efLocation2 = efWorkLog2.Location;
-            //Assert.AreEqual("Burger Hut", efLocation2.Name);
+            var efEmployee2Address4 = efEmployee2.Addresses.Single(a => a.Id == 6);
+            Assert.AreEqual("789 sesame st", efEmployee2Address4.StreetAddress);
+            Assert.AreEqual("New Jersey", efEmployee2Address4.City);
+            Assert.AreEqual("NJ", efEmployee2Address4.State);
+
+            var efLocation2 = efWorkLog2.Location;
+            Assert.AreEqual("Taco Hut", efLocation2.Name);
 
         }
 

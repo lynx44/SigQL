@@ -22,17 +22,20 @@ namespace SigQL
                 
                 var updateLookupIdsAst = builderAstCollection.GetReference<AstNode>(targetTable,
                     InsertBuilderAstCollection.AstReferenceSource.UpdateLookupIds);
-                var updateLookupIdsAstIndex = builderAstCollection.Statements.IndexOf(updateLookupIdsAst);
-                if (upsertTableRelations.TableRelations.Argument is TableArgument || upsertTableRelations.TableRelations.Argument.Type != typeof(void))
+                if(updateLookupIdsAst != null)
                 {
-                    var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations, GetLookupTableName(upsertTableRelations.TableRelations));
-                    AppendWhereClauseToUpdateStatement(updateFromLookupStatement, targetTable, upsertTableRelations);
-                    builderAstCollection.Statements.Insert(updateLookupIdsAstIndex + 1, updateFromLookupStatement);
-                }
-                else
-                // many to many - no need to do an update
-                {
-                    builderAstCollection.Statements.RemoveAt(updateLookupIdsAstIndex);
+                    var updateLookupIdsAstIndex = builderAstCollection.Statements.IndexOf(updateLookupIdsAst);
+                    if (upsertTableRelations.TableRelations.Argument is TableArgument || upsertTableRelations.TableRelations.Argument.Type != typeof(void))
+                    {
+                        var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations, GetLookupTableName(upsertTableRelations.TableRelations));
+                        AppendWhereClauseToUpdateStatement(updateFromLookupStatement, targetTable, upsertTableRelations);
+                        builderAstCollection.Statements.Insert(updateLookupIdsAstIndex + 1, updateFromLookupStatement);
+                    }
+                    else
+                        // many to many - no need to do an update
+                    {
+                        builderAstCollection.Statements.RemoveAt(updateLookupIdsAstIndex);
+                    }
                 }
                 
             }

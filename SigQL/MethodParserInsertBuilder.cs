@@ -1076,7 +1076,12 @@ namespace SigQL
             internal T GetReference<T>(ITableDefinition tableDefinition, AstReferenceSource source)
                 where T: AstNode
             {
-                return (T) astReferences[tableDefinition][source];
+                if (astReferences[tableDefinition].ContainsKey(source))
+                {
+                    return (T)astReferences[tableDefinition][source];
+                }
+
+                return null;
             }
 
             internal enum AstReferenceSource
