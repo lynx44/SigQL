@@ -3220,6 +3220,18 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void UpdateByKey_Single_InsertsRow()
+        {
+            this.monolithicRepository.InsertEmployeeWithAttributeTableNameWithValuesByParams("bill");
+
+            this.monolithicRepository.UpdateByKeyEmployeeViaMethodParams(1, "bob");
+
+            var actual = laborDbContext.Employee.Single();
+
+            Assert.AreEqual("bob", actual.Name);
+        }
+
+        [TestMethod]
         public void UpdateByKey_Multiple()
         {
             var insertFields = new Employee.InsertFieldsWithWorkLogs[]

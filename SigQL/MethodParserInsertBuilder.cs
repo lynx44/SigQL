@@ -62,15 +62,7 @@ namespace SigQL
 
             var tokens = builderAstCollection.Tokens;
 
-            var multipleInsertParameters = insertSpec.UpsertTableRelationsCollection[0].ColumnParameters.Where(c =>
-            {
-                return this.databaseResolver.IsTableOrTableProjection(c.ParameterPath.Parameter.ParameterType) &&
-                       TableEqualityComparer.Default.Equals(
-                           this.databaseResolver.DetectTable(c.ParameterPath.Parameter.ParameterType),
-                           insertSpec.Table);
-            }).ToList();
-
-
+            
             for (var index = 0; index < insertSpec.UpsertTableRelationsCollection.Count; index++)
             {
                 var valuesListClause = new ValuesListClause();
@@ -83,19 +75,8 @@ namespace SigQL
                                 new RelationalColumn() { Label = fc.Name }))
                     ))
                     .ToList();
-
-
-                if (upsertTableRelations.ColumnParameters.Any() &&
-                    multipleInsertParameters.Any(p =>
-                        p.ParameterPath.Parameter !=
-                        upsertTableRelations.ColumnParameters.First().ParameterPath.Parameter))
-                {
-                    throw new InvalidOperationException(
-                        $"Only one parameter can represent multiple inserts for target table {insertSpec.Table.Name}");
-                }
-
-                if (!multipleInsertParameters.Any(p => p.ParameterPath.Parameter.ParameterType.IsCollectionType()) &&
-                    insertSpec.RootMethodInfo.ReturnType == typeof(void))
+                
+                if (insertSpec.IsSingular)
                 {
                     valuesListClause.SetArgs(
                         new ValuesList().SetArgs(
@@ -429,7 +410,7 @@ namespace SigQL
                                         var parameterValue = param.Value;
                                         sqlParameters[sqlParameterName] =
                                             MethodSqlStatement.GetValueForParameterPath(parameterValue,
-                                                cp.ParameterPath.Properties.Last().AsEnumerable());
+                                                cp.ParameterPath.Properties.LastOrDefault()?.AsEnumerable() ?? new List<PropertyInfo>());
                                         return new NamedParameterIdentifier()
                                         {
                                             Name = sqlParameterName
@@ -868,6 +849,27 @@ namespace SigQL
                 insertSpec.UnwrappedReturnType = OutputFactory.UnwrapType(methodInfo.ReturnType);
                 insertSpec.RootMethodInfo = methodInfo;
 
+                var multipleInsertParameters = insertSpec.UpsertTableRelationsCollection[0].ColumnParameters.Where(c =>
+                {
+                    return this.databaseResolver.IsTableOrTableProjection(c.ParameterPath.Parameter.ParameterType) &&
+                           TableEqualityComparer.Default.Equals(
+                               this.databaseResolver.DetectTable(c.ParameterPath.Parameter.ParameterType),
+                               insertSpec.Table);
+                }).ToList();
+
+
+                if (insertSpec.UpsertTableRelationsCollection[0].ColumnParameters.Any() &&
+                    multipleInsertParameters.Any(p =>
+                        p.ParameterPath.Parameter !=
+                        insertSpec.UpsertTableRelationsCollection[0].ColumnParameters.First().ParameterPath.Parameter))
+                {
+                    throw new InvalidOperationException(
+                        $"Only one parameter can represent multiple inserts for target table {insertSpec.Table.Name}");
+                }
+
+                insertSpec.IsSingular =
+                    !multipleInsertParameters.Any(p => p.ParameterPath.Parameter.ParameterType.IsCollectionType());
+
                 return insertSpec;
             }
             
@@ -1017,6 +1019,7 @@ namespace SigQL
             public Type ReturnType { get; set; }
             public Type UnwrappedReturnType { get; set; }
             public MethodInfo RootMethodInfo { get; set; }
+            public bool IsSingular { get; set; }
             
             public List<UpsertTableRelations> UpsertTableRelationsCollection { get; set; }
         }

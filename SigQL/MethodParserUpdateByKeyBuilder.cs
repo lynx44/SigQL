@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using SigQL.Extensions;
 using SigQL.Schema;
 
 namespace SigQL
@@ -17,26 +18,80 @@ namespace SigQL
             var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
 
             var tokens = new List<TokenPath>();
-            for (var index = 0; index < insertSpec.UpsertTableRelationsCollection.Count; index++)
+            if (insertSpec.IsSingular)
             {
-                var upsertTableRelations = insertSpec.UpsertTableRelationsCollection[index];
-                var insertColumnParameter = upsertTableRelations.ColumnParameters.FirstOrDefault();
-                
-                var tableColumns = BuildTableColumnsAst(upsertTableRelations);
-                var foreignColumns = BuildForeignColumnsAst(upsertTableRelations);
-
-                var lookupTableName = GetLookupTableName(upsertTableRelations.TableRelations);
-                var declareLookupParameterStatement = BuildDeclareLookupParameterStatement(lookupTableName,
-                    upsertTableRelations);
-                statement.Add(declareLookupParameterStatement);
-                
-                var lookupParameterTableInsertResult = BuildLookupParameterTableInsert(parameterPaths, lookupTableName, tableColumns, foreignColumns, upsertTableRelations, insertColumnParameter, insertSpec.Table.Name, insertSpec.RootMethodInfo.Name);
-                statement.Add(lookupParameterTableInsertResult.Item1);
-                tokens.Add(lookupParameterTableInsertResult.Item2);
-
-                var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations, lookupTableName);
-                statement.Add(updateFromLookupStatement);
+                var update = new Update();
+                var tableRelations = insertSpec.UpsertTableRelationsCollection[0];
+                update.SetClause = tableRelations.ColumnParameters
+                    .Where(cp =>
+                        !tableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Any(c => ColumnEqualityComparer.Default.Equals(c, cp.Column)))
+                    .Select(cp =>
+                    new SetEqualOperator().SetArgs(
+                        new ColumnIdentifier().SetArgs(
+                            new RelationalColumn()
+                            {
+                                Label = cp.Column.Name
+                            }
+                        ),
+                        new NamedParameterIdentifier()
+                        {
+                            Name = cp.ParameterPath.SqlParameterName
+                        }
+                    )
+                ).ToList();
+                update.WhereClause = new WhereClause();
+                update.WhereClause.SetArgs(
+                        new AndOperator().SetArgs(
+                            tableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
+                                new EqualsOperator().SetArgs(
+                                    new ColumnIdentifier().SetArgs(
+                                        new RelationalColumn()
+                                        {
+                                            Label = c.Name
+                                        }
+                                    ),
+                                    new NamedParameterIdentifier()
+                                    {
+                                        Name = tableRelations.ColumnParameters.Single(cp => ColumnEqualityComparer.Default.Equals(cp.Column, c)).ParameterPath.SqlParameterName
+                                    }
+                                )
+                            )
+                        )
+                );
+                update.SetArgs(
+                    new TableIdentifier().SetArgs(
+                        new RelationalTable()
+                        {
+                            Label = tableRelations.TableRelations.TableName
+                        }
+                    )
+                );
+                statement.Add(update);
             }
+            else
+            {
+                for (var index = 0; index < insertSpec.UpsertTableRelationsCollection.Count; index++)
+                {
+                    var upsertTableRelations = insertSpec.UpsertTableRelationsCollection[index];
+                    var insertColumnParameter = upsertTableRelations.ColumnParameters.FirstOrDefault();
+
+                    var tableColumns = BuildTableColumnsAst(upsertTableRelations);
+                    var foreignColumns = BuildForeignColumnsAst(upsertTableRelations);
+
+                    var lookupTableName = GetLookupTableName(upsertTableRelations.TableRelations);
+                    var declareLookupParameterStatement = BuildDeclareLookupParameterStatement(lookupTableName,
+                        upsertTableRelations);
+                    statement.Add(declareLookupParameterStatement);
+
+                    var lookupParameterTableInsertResult = BuildLookupParameterTableInsert(parameterPaths, lookupTableName, tableColumns, foreignColumns, upsertTableRelations, insertColumnParameter, insertSpec.Table.Name, insertSpec.RootMethodInfo.Name);
+                    statement.Add(lookupParameterTableInsertResult.Item1);
+                    tokens.Add(lookupParameterTableInsertResult.Item2);
+
+                    var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations, lookupTableName);
+                    statement.Add(updateFromLookupStatement);
+                }
+            }
+            
             
             var sqlStatement = new MethodSqlStatement()
             {

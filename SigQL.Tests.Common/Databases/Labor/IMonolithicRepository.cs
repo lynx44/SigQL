@@ -209,8 +209,12 @@ namespace SigQL.Tests.Common.Databases.Labor
         // [Insert(TableName = nameof(Employee))]
         // void InsertEmployeeWithAttributeWithValuesByUnknownClass(EmployeeInsertFields values);
 
+
+        [Upsert(TableName = nameof(Employee))]
+        void UpsertEmployeeViaMethodParams(int? id, string name);
         [Upsert]
         void UpsertMultipleEmployeesWithWorkLogs(IEnumerable<Employee.UpsertFieldsWithWorkLogs> employees);
+
         [Upsert]
         IEnumerable<Employee.IEmployeeId> UpsertMultipleEmployeesWithWorkLogs_OutputIds(IEnumerable<Employee.UpsertFieldsWithWorkLogs> employees);
         [Upsert]
@@ -230,6 +234,9 @@ namespace SigQL.Tests.Common.Databases.Labor
         void UpdateEmployeeById([Set] string name, int id);
 
         // UpdateByKey
+
+        [UpdateByKey(TableName = nameof(Employee))]
+        void UpdateByKeyEmployeeViaMethodParams(int id, string name);
         [UpdateByKey]
         void UpdateByKeyMultipleEmployeesWithWorkLogs(IEnumerable<Employee.UpdateByKeyFieldsWithWorkLogs> employees);
 

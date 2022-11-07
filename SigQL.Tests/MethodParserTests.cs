@@ -1551,6 +1551,14 @@ select ""WorkLog<WorkLog>"".""Id"" ""Id"", ""WorkLog<WorkLog>"".""StartDate"" ""
         #region Upsert
 
         [TestMethod]
+        public void UpsertViaMethodParams()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpsertEmployeeViaMethodParams(1, "bob"));
+
+            AssertSqlEqual(@"update ", sql);
+        }
+
+        [TestMethod]
         public void UpsertMultipleWithOneToManyNavigationProperty_Void_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.UpsertMultipleEmployeesWithWorkLogs(
@@ -1640,9 +1648,7 @@ update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLo
 update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDate"" = ""WorkLogLookup"".""EndDate"", ""EmployeeId"" = (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""WorkLogLookup"".""EmployeeId_index"")) from ""WorkLog"" inner join @WorkLogLookup ""WorkLogLookup"" on (""WorkLogLookup"".""Id"" = ""WorkLog"".""Id"") where not exists (select 1 from ""WorkLog"" inner join @insertedWorkLog ""insertedWorkLog"" on ((""WorkLog"".""Id"" = ""insertedWorkLog"".""Id"")) where ((""WorkLogLookup"".""Id"" = ""insertedWorkLog"".""Id"")));
 select ""Employee"".""Id"" ""Id"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on ((""Employee"".""Id"" = ""EmployeeLookup"".""Id"")) order by ""EmployeeLookup"".""_index""", sql);
         }
-
-
-
+        
         [TestMethod]
         public void UpsertMultipleWithAdjacentAndManyToManyNavigationProperties_Void_ReturnsExpectedSql()
         {
@@ -1736,12 +1742,18 @@ merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""Emplo
  when not matched then
  insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index"")));", sql);
         }
-
-        // upsert - many to many
-
+        
         #endregion
 
         #region UpdateByKey
+
+        [TestMethod]
+        public void UpdateByKey_ViaMethodParams_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateByKeyEmployeeViaMethodParams(1, "bob"));
+
+            AssertSqlEqual(@"update ""Employee"" set ""Name""=@name where ""Id""=@id", sql);
+        }
 
         [TestMethod]
         public void UpdateByKeyMultipleWithOneToManyNavigationProperty_Void_ReturnsExpectedSql()
