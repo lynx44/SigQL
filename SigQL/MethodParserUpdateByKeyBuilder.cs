@@ -20,52 +20,7 @@ namespace SigQL
             var tokens = new List<TokenPath>();
             if (insertSpec.IsSingular)
             {
-                var update = new Update();
-                var tableRelations = insertSpec.UpsertTableRelationsCollection[0];
-                update.SetClause = tableRelations.ColumnParameters
-                    .Where(cp =>
-                        !tableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Any(c => ColumnEqualityComparer.Default.Equals(c, cp.Column)))
-                    .Select(cp =>
-                    new SetEqualOperator().SetArgs(
-                        new ColumnIdentifier().SetArgs(
-                            new RelationalColumn()
-                            {
-                                Label = cp.Column.Name
-                            }
-                        ),
-                        new NamedParameterIdentifier()
-                        {
-                            Name = cp.ParameterPath.SqlParameterName
-                        }
-                    )
-                ).ToList();
-                update.WhereClause = new WhereClause();
-                update.WhereClause.SetArgs(
-                        new AndOperator().SetArgs(
-                            tableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
-                                new EqualsOperator().SetArgs(
-                                    new ColumnIdentifier().SetArgs(
-                                        new RelationalColumn()
-                                        {
-                                            Label = c.Name
-                                        }
-                                    ),
-                                    new NamedParameterIdentifier()
-                                    {
-                                        Name = tableRelations.ColumnParameters.Single(cp => ColumnEqualityComparer.Default.Equals(cp.Column, c)).ParameterPath.SqlParameterName
-                                    }
-                                )
-                            )
-                        )
-                );
-                update.SetArgs(
-                    new TableIdentifier().SetArgs(
-                        new RelationalTable()
-                        {
-                            Label = tableRelations.TableRelations.TableName
-                        }
-                    )
-                );
+                var update = BuildUpdateSingleAst(insertSpec);
                 statement.Add(update);
             }
             else
@@ -106,6 +61,60 @@ namespace SigQL
             };
 
             return sqlStatement;
+        }
+
+        private static Update BuildUpdateSingleAst(UpsertSpec insertSpec)
+        {
+            var update = new Update();
+            var tableRelations = insertSpec.UpsertTableRelationsCollection[0];
+            update.SetClause = tableRelations.ColumnParameters
+                .Where(cp =>
+                    !tableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Any(c =>
+                        ColumnEqualityComparer.Default.Equals(c, cp.Column)))
+                .Select(cp =>
+                    new SetEqualOperator().SetArgs(
+                        new ColumnIdentifier().SetArgs(
+                            new RelationalColumn()
+                            {
+                                Label = cp.Column.Name
+                            }
+                        ),
+                        new NamedParameterIdentifier()
+                        {
+                            Name = cp.ParameterPath.SqlParameterName
+                        }
+                    )
+                ).ToList();
+            update.WhereClause = new WhereClause();
+            update.WhereClause.SetArgs(
+                new AndOperator().SetArgs(
+                    tableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
+                        new EqualsOperator().SetArgs(
+                            new ColumnIdentifier().SetArgs(
+                                new RelationalColumn()
+                                {
+                                    Label = c.Name
+                                }
+                            ),
+                            new NamedParameterIdentifier()
+                            {
+                                Name = tableRelations.ColumnParameters
+                                    .Single(cp => ColumnEqualityComparer.Default.Equals(cp.Column, c)).ParameterPath
+                                    .SqlParameterName
+                            }
+                        )
+                    )
+                )
+            );
+            update.SetArgs(
+                new TableIdentifier().SetArgs(
+                    new RelationalTable()
+                    {
+                        Label = tableRelations.TableRelations.TableName
+                    }
+                )
+            );
+            return update;
         }
 
         private Update BuildUpdateFromLookupStatement(UpsertTableRelations upsertTableRelations, string lookupTableName)

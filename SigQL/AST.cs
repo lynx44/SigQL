@@ -86,6 +86,11 @@ namespace SigQL
         public string Direction { get; set; }
     }
 
+    public class If : AstNode
+    {
+        public AstNode Condition { get; set; }
+    }
+
     public class Statement : AstNode
     {
         public IEnumerable<Clause> Where { get; set; }

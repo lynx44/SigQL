@@ -46,6 +46,7 @@ namespace SigQL.Tests
             itvfGetWorkLogsByEmployeeIdFunction.ObjectType = DatabaseObjectType.Function;
             workLogTable.PrimaryKey = new TableKeyDefinition(workLogTable.Columns.FindByName(nameof(WorkLog.Id)));
             employeeTable.PrimaryKey = new TableKeyDefinition(employeeTable.Columns.FindByName(nameof(Employee.Id)));
+            ((ColumnDefinition) employeeTable.PrimaryKey.Columns.First()).IsIdentity = true;
             locationTable.PrimaryKey = new TableKeyDefinition(locationTable.Columns.FindByName(nameof(Location.Id)));
             addressTable.PrimaryKey = new TableKeyDefinition(addressTable.Columns.FindByName(nameof(Address.Id)));
             diagnosticLogTable.PrimaryKey = new TableKeyDefinition();
@@ -1555,7 +1556,8 @@ select ""WorkLog<WorkLog>"".""Id"" ""Id"", ""WorkLog<WorkLog>"".""StartDate"" ""
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.UpsertEmployeeViaMethodParams(1, "bob"));
 
-            AssertSqlEqual(@"update ", sql);
+            AssertSqlEqual(@"update ""Employee"" set ""Name"" = @name where ((""Id"" = @id));
+if (@@ROWCOUNT = 0) begin insert ""Employee""(""Name"") values(@name) end", sql);
         }
 
         [TestMethod]
@@ -1752,7 +1754,7 @@ merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""Emplo
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.UpdateByKeyEmployeeViaMethodParams(1, "bob"));
 
-            AssertSqlEqual(@"update ""Employee"" set ""Name""=@name where ""Id""=@id", sql);
+            AssertSqlEqual(@"update ""Employee"" set ""Name"" = @name where ((""Id"" = @id));", sql);
         }
 
         [TestMethod]

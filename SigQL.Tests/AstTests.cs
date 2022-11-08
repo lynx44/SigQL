@@ -1494,6 +1494,38 @@ namespace SigQL.Tests
                             " insert (\"Name\") values(\"i\".\"Name\") output \"inserted\".\"id\", \"i\".\"_index\" into @insertedEmployee(\"id\", \"_index\");", sql);
         }
 
+        [TestMethod]
+        public void If()
+        {
+            var ast = new If()
+            {
+                Condition = new EqualsOperator().SetArgs(
+                    new NamedParameterIdentifier()
+                    {
+                        Name = "age"
+                    },
+                    new Literal()
+                    {
+                        Value = "21"
+                    }
+                )
+            }.SetArgs(
+                new SetEqualOperator().SetArgs(
+                    new NamedParameterIdentifier()
+                    {
+                        Name = "qualified"
+                    },
+                    new Literal()
+                    {
+                        Value = "1"
+                    }
+                )
+            );
+
+            var sql = Build(ast);
+            Assert.AreEqual(@"if (@age = 21) begin set @qualified = 1 end", sql);
+        }
+
         private string Build(AstNode arg)
         {
             return builder.Build(arg);

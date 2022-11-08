@@ -3218,6 +3218,39 @@ namespace SigQL.SqlServer.Tests
             Assert.AreEqual("Taco Hut", efLocation2.Name);
 
         }
+        
+        [TestMethod]
+        public void Upsert_Single_NullKey_InsertsRow()
+        {
+            this.monolithicRepository.UpsertEmployeeViaMethodParams(null, "bob");
+
+            var actual = laborDbContext.Employee.Single();
+
+            Assert.AreEqual("bob", actual.Name);
+        }
+        
+        [TestMethod]
+        public void Upsert_Single_NonExistingKey_InsertsRow()
+        {
+            this.monolithicRepository.UpsertEmployeeViaMethodParams(2, "bob");
+
+            var actual = laborDbContext.Employee.Single();
+
+            Assert.AreEqual(1, actual.Id);
+            Assert.AreEqual("bob", actual.Name);
+        }
+        
+        [TestMethod]
+        public void Upsert_Single_ExistingKey_UpdatesRow()
+        {
+            this.monolithicRepository.InsertEmployeeWithAttributeTableNameWithValuesByParams("bob");
+            this.monolithicRepository.UpsertEmployeeViaMethodParams(1, "joe");
+
+            var actual = laborDbContext.Employee.Single();
+
+            Assert.AreEqual(1, actual.Id);
+            Assert.AreEqual("joe", actual.Name);
+        }
 
         [TestMethod]
         public void UpdateByKey_Single_InsertsRow()

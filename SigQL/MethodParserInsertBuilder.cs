@@ -65,38 +65,17 @@ namespace SigQL
             
             for (var index = 0; index < insertSpec.UpsertTableRelationsCollection.Count; index++)
             {
-                var valuesListClause = new ValuesListClause();
                 var upsertTableRelations = insertSpec.UpsertTableRelationsCollection[index];
-                var upsertColumnList = upsertTableRelations.ColumnParameters.Where(cp => !cp.Column.IsIdentity).Select(cp =>
-                    new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = cp.Column.Name }))
-                    .Concat(upsertTableRelations.ForeignTableColumns.SelectMany(fk =>
-                        fk.ForeignKey.GetForeignColumns().Select(fc =>
-                            new ColumnIdentifier().SetArgs(
-                                new RelationalColumn() { Label = fc.Name }))
-                    ))
-                    .ToList();
                 
                 if (insertSpec.IsSingular)
                 {
-                    valuesListClause.SetArgs(
-                        new ValuesList().SetArgs(
-                            upsertTableRelations.ColumnParameters.Select(cp =>
-                                new NamedParameterIdentifier()
-                                {
-                                    Name = cp.ParameterPath.SqlParameterName
-                                })
-                        )
-                    );
-                    statement.Add(new Insert()
-                    {
-                        Object = new TableIdentifier().SetArgs(new RelationalTable() { Label = insertSpec.Table.Name }),
-                        ColumnList =
-                            upsertColumnList,
-                        ValuesList = valuesListClause
-                    });
+                    var insert = BuildInsertSingleAst(insertSpec);
+                    statement.Add(insert);
                 }
                 else
                 {
+                    var insertColumnList = GenerateInsertColumnListAst(upsertTableRelations);
+                    var valuesListClause = new ValuesListClause();
                     var mergeTableAlias = "i";
 
                     var insertColumnParameter = upsertTableRelations.ColumnParameters.FirstOrDefault();
@@ -167,7 +146,7 @@ namespace SigQL
                         {
                             Insert = new MergeInsert()
                             {
-                                ColumnList = upsertColumnList,
+                                ColumnList = insertColumnList,
                                 ValuesList = valuesListClause
                             }
                         }
@@ -286,6 +265,42 @@ namespace SigQL
             }
 
             return builderAstCollection;
+        }
+
+        private static Insert BuildInsertSingleAst(UpsertSpec insertSpec)
+        {
+            var tableRelations = insertSpec.UpsertTableRelationsCollection[0];
+            var insertColumnList = GenerateInsertColumnListAst(tableRelations);
+            var valuesListClause = new ValuesListClause();
+            valuesListClause.SetArgs(
+                new ValuesList().SetArgs(
+                    tableRelations.ColumnParameters.Where(c => !c.Column.IsIdentity).Select(cp =>
+                        new NamedParameterIdentifier()
+                        {
+                            Name = cp.ParameterPath.SqlParameterName
+                        })
+                )
+            );
+            var insert = new Insert()
+            {
+                Object = new TableIdentifier().SetArgs(new RelationalTable() {Label = insertSpec.Table.Name}),
+                ColumnList =
+                    insertColumnList,
+                ValuesList = valuesListClause
+            };
+            return insert;
+        }
+
+        private static List<ColumnIdentifier> GenerateInsertColumnListAst(UpsertTableRelations upsertTableRelations)
+        {
+            return upsertTableRelations.ColumnParameters.Where(cp => !cp.Column.IsIdentity).Select(cp =>
+                    new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = cp.Column.Name }))
+                .Concat(upsertTableRelations.ForeignTableColumns.SelectMany(fk =>
+                    fk.ForeignKey.GetForeignColumns().Select(fc =>
+                        new ColumnIdentifier().SetArgs(
+                            new RelationalColumn() { Label = fc.Name }))
+                ))
+                .ToList();
         }
 
         private static List<Tuple<IColumnDefinition, AstNode>> BuildForeignValueLookupStatements(UpsertTableRelations upsertTableRelations, string sourceTableAlias)
