@@ -1434,6 +1434,25 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void SetParameter()
+        {
+            var set = new SetParameter()
+                {
+                Parameter = new NamedParameterIdentifier()
+                {
+                    Name = "name"
+                },
+                Value = new Literal()
+                {
+                    Value = "'joe'"
+                }
+            };
+
+            var sql = Build(set);
+            Assert.AreEqual("set @name = 'joe';", sql);
+        }
+
+        [TestMethod]
         public void Merge_WhenNotMatched()
         {
             var ast = new Merge()

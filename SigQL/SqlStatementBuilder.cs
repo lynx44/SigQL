@@ -163,6 +163,9 @@ namespace SigQL
                             sql.Add(Walk(a.Args));
                             sql.Add("end");
                             break;
+                        case SetParameter a:
+                            sql.Add($"set {Walk(a.Parameter)} = {Walk(a.Value)};");
+                            break;
                         case Predicate a: 
                             sql.Add($"({Walk(a.Args.Take(1))} {a.Keyword} {Walk(a.Args.Skip(1).Single())})".Trim());
                             break;

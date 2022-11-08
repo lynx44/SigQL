@@ -107,6 +107,12 @@ namespace SigQL
         public DataType DataType { get; set; }
     }
 
+    public class SetParameter : AstNode
+    {
+        public NamedParameterIdentifier Parameter { get; set; }
+        public AstNode Value { get; set; }
+    }
+
     public class DataType : AstNode
     {
         public Literal Type { get; set; }
