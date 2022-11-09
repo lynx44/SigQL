@@ -18,12 +18,12 @@ namespace SigQL
             var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
 
             var tokens = new List<TokenPath>();
-            if (insertSpec.IsSingular)
-            {
-                var update = BuildUpdateSingleAst(insertSpec);
-                statement.Add(update);
-            }
-            else
+            //if (insertSpec.IsSingular)
+            //{
+            //    var update = BuildUpdateSingleAst(insertSpec);
+            //    statement.Add(update);
+            //}
+            //else
             {
                 for (var index = 0; index < insertSpec.UpsertTableRelationsCollection.Count; index++)
                 {
@@ -40,7 +40,8 @@ namespace SigQL
 
                     var lookupParameterTableInsertResult = BuildLookupParameterTableInsert(parameterPaths, lookupTableName, tableColumns, foreignColumns, upsertTableRelations, insertColumnParameter, insertSpec.Table.Name, insertSpec.RootMethodInfo.Name);
                     statement.Add(lookupParameterTableInsertResult.Item1);
-                    tokens.Add(lookupParameterTableInsertResult.Item2);
+                    if(lookupParameterTableInsertResult.Item2 != null)
+                        tokens.Add(lookupParameterTableInsertResult.Item2);
 
                     var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations, lookupTableName);
                     statement.Add(updateFromLookupStatement);
@@ -63,59 +64,59 @@ namespace SigQL
             return sqlStatement;
         }
 
-        private static Update BuildUpdateSingleAst(UpsertSpec insertSpec)
-        {
-            var update = new Update();
-            var tableRelations = insertSpec.UpsertTableRelationsCollection[0];
-            update.SetClause = tableRelations.ColumnParameters
-                .Where(cp =>
-                    !tableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Any(c =>
-                        ColumnEqualityComparer.Default.Equals(c, cp.Column)))
-                .Select(cp =>
-                    new SetEqualOperator().SetArgs(
-                        new ColumnIdentifier().SetArgs(
-                            new RelationalColumn()
-                            {
-                                Label = cp.Column.Name
-                            }
-                        ),
-                        new NamedParameterIdentifier()
-                        {
-                            Name = cp.ParameterPath.SqlParameterName
-                        }
-                    )
-                ).ToList();
-            update.WhereClause = new WhereClause();
-            update.WhereClause.SetArgs(
-                new AndOperator().SetArgs(
-                    tableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
-                        new EqualsOperator().SetArgs(
-                            new ColumnIdentifier().SetArgs(
-                                new RelationalColumn()
-                                {
-                                    Label = c.Name
-                                }
-                            ),
-                            new NamedParameterIdentifier()
-                            {
-                                Name = tableRelations.ColumnParameters
-                                    .Single(cp => ColumnEqualityComparer.Default.Equals(cp.Column, c)).ParameterPath
-                                    .SqlParameterName
-                            }
-                        )
-                    )
-                )
-            );
-            update.SetArgs(
-                new TableIdentifier().SetArgs(
-                    new RelationalTable()
-                    {
-                        Label = tableRelations.TableRelations.TableName
-                    }
-                )
-            );
-            return update;
-        }
+        //private static Update BuildUpdateSingleAst(UpsertSpec insertSpec)
+        //{
+        //    var update = new Update();
+        //    var tableRelations = insertSpec.UpsertTableRelationsCollection[0];
+        //    update.SetClause = tableRelations.ColumnParameters
+        //        .Where(cp =>
+        //            !tableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Any(c =>
+        //                ColumnEqualityComparer.Default.Equals(c, cp.Column)))
+        //        .Select(cp =>
+        //            new SetEqualOperator().SetArgs(
+        //                new ColumnIdentifier().SetArgs(
+        //                    new RelationalColumn()
+        //                    {
+        //                        Label = cp.Column.Name
+        //                    }
+        //                ),
+        //                new NamedParameterIdentifier()
+        //                {
+        //                    Name = cp.ParameterPath.SqlParameterName
+        //                }
+        //            )
+        //        ).ToList();
+        //    update.WhereClause = new WhereClause();
+        //    update.WhereClause.SetArgs(
+        //        new AndOperator().SetArgs(
+        //            tableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
+        //                new EqualsOperator().SetArgs(
+        //                    new ColumnIdentifier().SetArgs(
+        //                        new RelationalColumn()
+        //                        {
+        //                            Label = c.Name
+        //                        }
+        //                    ),
+        //                    new NamedParameterIdentifier()
+        //                    {
+        //                        Name = tableRelations.ColumnParameters
+        //                            .Single(cp => ColumnEqualityComparer.Default.Equals(cp.Column, c)).ParameterPath
+        //                            .SqlParameterName
+        //                    }
+        //                )
+        //            )
+        //        )
+        //    );
+        //    update.SetArgs(
+        //        new TableIdentifier().SetArgs(
+        //            new RelationalTable()
+        //            {
+        //                Label = tableRelations.TableRelations.TableName
+        //            }
+        //        )
+        //    );
+        //    return update;
+        //}
 
         private Update BuildUpdateFromLookupStatement(UpsertTableRelations upsertTableRelations, string lookupTableName)
         {

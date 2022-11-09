@@ -2363,6 +2363,14 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void InsertSingle_Params_OutputIds()
+        {
+            var result = monolithicRepository.InsertEmployeeWithAttributeTableNameWithValuesByParamsOutputId("bob");
+
+            Assert.AreEqual(1, result.Id);
+        }
+
+        [TestMethod]
         public void InsertMultiple_Void_ValuesByDetectedClassInstance_ReturnsExpected()
         {
             var insertFields = new List<Employee.InsertFields>() 
@@ -3224,7 +3232,7 @@ namespace SigQL.SqlServer.Tests
         {
             this.monolithicRepository.UpsertEmployeeViaMethodParams(null, "bob");
 
-            var actual = laborDbContext.Employee.Single();
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
 
             Assert.AreEqual("bob", actual.Name);
         }
@@ -3234,7 +3242,7 @@ namespace SigQL.SqlServer.Tests
         {
             this.monolithicRepository.UpsertEmployeeViaMethodParams(2, "bob");
 
-            var actual = laborDbContext.Employee.Single();
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
 
             Assert.AreEqual(1, actual.Id);
             Assert.AreEqual("bob", actual.Name);
@@ -3243,23 +3251,44 @@ namespace SigQL.SqlServer.Tests
         [TestMethod]
         public void Upsert_Single_ExistingKey_UpdatesRow()
         {
-            this.monolithicRepository.InsertEmployeeWithAttributeTableNameWithValuesByParams("bob");
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "bob" });
+            laborDbContext.SaveChanges();
             this.monolithicRepository.UpsertEmployeeViaMethodParams(1, "joe");
 
-            var actual = laborDbContext.Employee.Single();
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+
+            Assert.AreEqual(1, actual.Id);
+            Assert.AreEqual("joe", actual.Name);
+        }
+        
+        [TestMethod]
+        public void Upsert_Single_Update_ReturnValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "bob" });
+            laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.UpsertEmployeeViaMethodParamsReturnValue(1, "joe");
 
             Assert.AreEqual(1, actual.Id);
             Assert.AreEqual("joe", actual.Name);
         }
 
         [TestMethod]
+        public void Upsert_Single_Insert_ReturnValue()
+        {
+            var actual = this.monolithicRepository.UpsertEmployeeViaMethodParamsReturnValue(2, "bob");
+
+            Assert.AreEqual(1, actual.Id);
+            Assert.AreEqual("bob", actual.Name);
+        }
+
+        [TestMethod]
         public void UpdateByKey_Single_InsertsRow()
         {
-            this.monolithicRepository.InsertEmployeeWithAttributeTableNameWithValuesByParams("bill");
-
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "bill" });
+            laborDbContext.SaveChanges();
             this.monolithicRepository.UpdateByKeyEmployeeViaMethodParams(1, "bob");
 
-            var actual = laborDbContext.Employee.Single();
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
 
             Assert.AreEqual("bob", actual.Name);
         }

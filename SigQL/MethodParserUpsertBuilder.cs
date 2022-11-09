@@ -17,33 +17,33 @@ namespace SigQL
             List<AstNode> statements;
             List<TokenPath> tokenPaths;
             ConcurrentDictionary<string, ITableKeyDefinition> tablePrimaryKeyDefinitions;
-            if (upsertSpec.IsSingular)
-            {
-                statements = new List<AstNode>();
-                tokenPaths = new List<TokenPath>();
-                tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
-                var update = BuildUpdateSingleAst(upsertSpec);
-                statements.Add(update);
-                var insert = BuildInsertSingleAst(upsertSpec);
-                var ifStatement = new If()
-                {
-                    Condition = new EqualsOperator().SetArgs(
-                        new NamedParameterIdentifier()
-                        {
-                            Name = "@ROWCOUNT"
-                        },
-                        new Literal()
-                        {
-                            Value = "0"
-                        }
-                    )
-                }.SetArgs(
-                    insert
-                );
+            //if (upsertSpec.IsSingular)
+            //{
+            //    statements = new List<AstNode>();
+            //    tokenPaths = new List<TokenPath>();
+            //    tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
+            //    var update = BuildUpdateSingleAst(upsertSpec);
+            //    statements.Add(update);
+            //    var insert = BuildInsertSingleAst(upsertSpec);
+            //    var ifStatement = new If()
+            //    {
+            //        Condition = new EqualsOperator().SetArgs(
+            //            new NamedParameterIdentifier()
+            //            {
+            //                Name = "@ROWCOUNT"
+            //            },
+            //            new Literal()
+            //            {
+            //                Value = "0"
+            //            }
+            //        )
+            //    }.SetArgs(
+            //        insert
+            //    );
 
-                statements.Add(ifStatement);
-            }
-            else
+            //    statements.Add(ifStatement);
+            //}
+            //else
             {
                 var builderAstCollection = BuildInsertAstCollection(upsertSpec, parameterPaths);
                 for (var index = 0; index < upsertSpec.UpsertTableRelationsCollection.Count; index++)
