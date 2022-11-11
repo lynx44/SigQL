@@ -212,7 +212,7 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         [Upsert(TableName = nameof(Employee))]
         void UpsertEmployeeViaMethodParams(int? id, string name);
-        [Upsert(TableName = nameof(Employee))]
+        [Upsert]
         Employee UpsertEmployeeViaMethodParamsReturnValue(int? id, string name);
         [Upsert]
         void UpsertMultipleEmployeesWithWorkLogs(IEnumerable<Employee.UpsertFieldsWithWorkLogs> employees);
