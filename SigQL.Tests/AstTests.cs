@@ -309,6 +309,28 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void BasicWhereNotExists()
+        {
+            var select1 = new Select();
+            select1.SelectClause = new SelectClause().SetArgs(new Literal() { Value = "1" });
+            var selectStatement = new Select()
+            {
+                SelectClause = new SelectClause()
+                {
+                    Args = new[] {new ColumnIdentifier() {Args = new[] {new RelationalColumn() {Label = "name"}}},}
+                },
+                FromClause = new FromClause()
+                {
+                    Args = new [] {new TableIdentifier() { Args = new[] { new RelationalTable() { Label = "person" } }}}
+                },
+                WhereClause = new WhereClause().SetArgs(new NotExists().SetArgs(select1))
+            };
+
+            var statement = Build(selectStatement);
+            Assert.AreEqual("select \"name\" from \"person\" where not exists (select 1)", statement);
+        }
+
+        [TestMethod]
         public void BasicWhereWithLike()
         {
             var selectStatement = new Select()
@@ -687,6 +709,44 @@ namespace SigQL.Tests
 
             var statement = Build(selectStatement);
             Assert.AreEqual("select ROW_NUMBER() over(order by \"table\".\"column\")", statement);
+        }
+        
+        [TestMethod]
+        public void OverWithPartition()
+        {
+            var selectStatement = new Select()
+            {
+                SelectClause = new SelectClause().SetArgs(new OverClause()
+                {
+                    Function = new Function()
+                    {
+                        Name = "ROW_NUMBER"
+                    }
+                }.SetArgs(
+                    new PartitionByClause().SetArgs(
+                        new ColumnIdentifier().SetArgs(
+                            new RelationalTable()
+                            {
+                                Label = "p1"
+                            },
+                            new RelationalColumn()
+                            {
+                                Label = "col"
+                            })),
+                    new OrderByClause().SetArgs(
+                        new ColumnIdentifier().SetArgs(
+                            new RelationalTable()
+                            {
+                                Label = "table"
+                            },
+                            new RelationalColumn()
+                            {
+                                Label = "column"
+                            }))))
+            };
+
+            var statement = Build(selectStatement);
+            Assert.AreEqual("select ROW_NUMBER() over(partition by \"p1\".\"col\" order by \"table\".\"column\")", statement);
         }
 
         [TestMethod]
@@ -1374,6 +1434,25 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void SetParameter()
+        {
+            var set = new SetParameter()
+                {
+                Parameter = new NamedParameterIdentifier()
+                {
+                    Name = "name"
+                },
+                Value = new Literal()
+                {
+                    Value = "'joe'"
+                }
+            };
+
+            var sql = Build(set);
+            Assert.AreEqual("set @name = 'joe';", sql);
+        }
+
+        [TestMethod]
         public void Merge_WhenNotMatched()
         {
             var ast = new Merge()
@@ -1432,6 +1511,37 @@ namespace SigQL.Tests
             Assert.AreEqual("merge \"Employee\" using (values(@Name0, 0), (@Name1, 1)) as i (\"Name\",\"_index\") on (1 = 0)\n" +
                             " when not matched then\n" +
                             " insert (\"Name\") values(\"i\".\"Name\") output \"inserted\".\"id\", \"i\".\"_index\" into @insertedEmployee(\"id\", \"_index\");", sql);
+        }
+
+        [TestMethod]
+        public void If()
+        {
+            var ast = new If()
+            {
+                Condition = new EqualsOperator().SetArgs(
+                    new NamedParameterIdentifier()
+                    {
+                        Name = "age"
+                    },
+                    new Literal()
+                    {
+                        Value = "21"
+                    }
+                )
+            }.SetArgs(
+                new Select()
+                {
+                    SelectClause = new SelectClause().SetArgs(
+                        new Literal()
+                        {
+                            Value = "1"
+                        }
+                    )
+                }
+            );
+
+            var sql = Build(ast);
+            Assert.AreEqual(@"if (@age = 21) begin select 1 end", sql);
         }
 
         private string Build(AstNode arg)

@@ -200,8 +200,8 @@ namespace SigQL.Sql
 
     internal class TableRelationColumnDefinition : TableRelationColumnIdentifierDefinition
     {
-        public TableRelationColumnDefinition(string name, string dataTypeDeclaration, ITableDefinition table, IArgument argument, TableRelationsColumnSource source)
-            : base(name, table, argument, source)
+        public TableRelationColumnDefinition(string name, string dataTypeDeclaration, ITableDefinition table, IArgument argument, TableRelationsColumnSource source, bool isIdentity)
+            : base(name, table, argument, source, isIdentity)
         {
             this.DataTypeDeclaration = dataTypeDeclaration;
         }
@@ -216,13 +216,14 @@ namespace SigQL.Sql
 
         public string Name => this.name;
         public string DataTypeDeclaration { get; protected set; }
+        public bool IsIdentity { get; }
 
         public ITableDefinition Table => this.table;
 
         public TableRelationsColumnSource Source { get; }
         public TableRelations TableRelations { get; set; }
 
-        public TableRelationColumnIdentifierDefinition(string name, ITableDefinition table, IArgument argument, TableRelationsColumnSource source)
+        public TableRelationColumnIdentifierDefinition(string name, ITableDefinition table, IArgument argument, TableRelationsColumnSource source, bool isIdentity)
         {
             this.name = name;
             this.table = table;
@@ -230,13 +231,14 @@ namespace SigQL.Sql
             if(argument != null)
                 this.Arguments.AddArgument(argument, source);
             this.Source = source;
+            this.IsIdentity = isIdentity;
         }
     }
 
     class TableRelationColumnRowNumberFunctionDefinition : TableRelationColumnIdentifierDefinition
     {
-        public TableRelationColumnRowNumberFunctionDefinition(string name, ITableDefinition table, TableRelationsColumnSource source) 
-            : base(name, table, null, source)
+        public TableRelationColumnRowNumberFunctionDefinition(string name, ITableDefinition table, TableRelationsColumnSource source, bool isIdentity) 
+            : base(name, table, null, source, isIdentity)
         {
         }
     }

@@ -20,6 +20,7 @@ The goal of SigQL is to enable developers quick and concise access to data by me
  - [SELECT Queries](#select-queries) 
  - [Projections](#projections) 
    - [POCOs](#pocos)
+   - [SqlIdentifier Attribute](#sqlidentifier-attribute)
    - [Ignoring Properties](#ignoring-properties)
  - [WHERE Clause](#where-clause) 
    - [Parameter Alias](#parameter-alias)
@@ -32,6 +33,7 @@ The goal of SigQL is to enable developers quick and concise access to data by me
  - [Collection Results](#collection-results)
  - [Filtering by related tables](#filtering-by-related-tables)
  - [Returning Relations](#returning-relations)
+   - [JoinRelation Attribute](#joinrelation-attribute)
    - [Circular References](#circular-references)
  - [Perspective](#perspective)
  - [Count](#count)
@@ -41,10 +43,12 @@ The goal of SigQL is to enable developers quick and concise access to data by me
    - [Input Matrix](#input-parameter-matrix)
    - [Output Matrix](#output-matrix)
 
-**Insert, Update, and Delete**
+**Insert, Update, Upsert, and Delete**
 
  - [Insert](#insert)
  - [Update](#update)
+ - [UpdateByKey](#updatebykey)
+ - [Upsert](#upsert)
  - [Delete](#delete)
  
 **Custom SQL**
@@ -190,6 +194,16 @@ Plain Old CLR Objects (POCOs) are supported as projections:
 
 *Note that get and set properties need to be public*
 
+##### SqlIdentifier Attribute
+
+Instead of using an inner class, the [SqlIdentifier] attribute can be used to specify the projected table:
+
+    [SqlIdentifier("Employee")]
+    public class EmployeeName 
+    {
+	    public string Name { get; set; }
+    }
+
 ##### Ignoring Properties
 
 If a projection property should be ignored by SigQL, use the ClrOnly attribute:
@@ -262,9 +276,9 @@ Other logical operators are supported as Attributes:
 
 IN clauses can be specified by passing a collection:
 
-    IEnumerable<Employee.IName> GetWithNames(IEnumerable<string> name);
+    IEnumerable<Employee.IName> GetWithNames(IEnumerable<string> names);
 
-*Note that the parameter is still named name rather than names. Pluralization is not currently supported*
+*Note that the parameter is called names, even though the column identifier in the database is name (non-plural). Basic pluralization is supported, but the most reliable and unambiguous naming scheme would use the exact column identifier*
 
 ##### Ignoring null or empty parameters
 
@@ -409,6 +423,23 @@ Returning related tables is supported:
 *Note that the name of the property WorkLogs is not important. SigQL understands to use the WorkLog table because IWorkLogWithStartDate is an inner class of WorkLog.*
 
 *Note also that joined rows are de-duplicated into a single instance based on their primary key.*
+
+##### JoinRelation Attribute
+
+In cases where a manual join is desired, the [JoinRelation] attribute can be specified:
+
+     public interface IWorkLogToView
+        {
+            int Id { get; }
+            [JoinRelation("WorkLog(EmployeeId)->(EmployeeId)WorkLogEmployeeView")]
+            WorkLogEmployeeView.IFields View { get; }
+        }
+
+The _path_ parameter specifies the relational path from one table to the next. Columns are enclosed in parenthesis, and adjoining arrows relate the specified columns together.
+
+If a multi-tabled relational path is desired, columns can be specified on both sides of the adjoining table:
+
+    [JoinRelation("WorkLog(EmployeeId)->(Id)Employee(Id)->(EmployeesId)AddressEmployee(AddressesId)->(Id)Address")]
 
 ##### Circular References
 
@@ -652,7 +683,47 @@ Insert multiple and return values with any corresponding relations:
     [Insert]
     IEnumerable<Employee.IWithWorkLogs> Insert(IEnumerable<Employee.Insert> employees);
 
-*Note that inserting relations is currently unsupported.*
+Insert with relations:
+
+    public class InsertEmployeeWithWorkLogs
+    {
+            public string Name { get; set; }
+            public IEnumerable<WorkLog> WorkLogs { get; set; }
+    }
+
+*Note that all relations will be inserted. If updating existing relations is desired, use the [Upsert] attribute*
+
+#### UpdateByKey
+
+UpdateByKey will update one or multiple rows, including relations, based on a provided primary key.
+
+Update by parameters only:
+
+    [UpdateByKey(TableName = nameof(Employee))]
+    void UpdateEmployee(int id, string name);
+
+Update by one or multiple classes and relations:
+
+    [UpdateByKey]
+    void UpdateEmployees(IEnumerable<Employee.UpdateWithWorkLogs> employeesWithWorkLogs);
+
+*Note that all relations will be updated. If inserting new relations is desired, use the [Upsert] attribute*
+
+#### Upsert
+
+Upsert will insert or update one or multiple rows, including relations, based on the existence of a primary key.
+
+Upsert by parameters only:
+
+    [Upsert]
+    Employee UpsertEmployee(int? id, string name);
+
+Upsert by one or multiple classes and relations:
+
+    [Upsert]
+    IEnumerable<Employee> UpsertEmployees(IEnumerable<Employee.UpsertWithWorkLogs> employeesWithWorkLogs);
+
+*Note that all relations will be inserted or updated. Removing items from a collection will not delete the row.*
 
 #### Update
 

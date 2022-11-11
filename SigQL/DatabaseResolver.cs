@@ -44,7 +44,7 @@ namespace SigQL
 
                 return new ColumnDefinitionWithPropertyPath()
                 {
-                    ColumnDefinition = new ColumnAliasColumnDefinition(p.Name, p.DataTypeDeclaration, p.Table, tableRelations),
+                    ColumnDefinition = new ColumnAliasColumnDefinition(p.Name, p.DataTypeDeclaration, p.Table, tableRelations, p.IsIdentity),
                     PropertyPath = new PropertyPath() { PropertyPaths = argument?.FindPropertiesFromRoot().Select(arg => arg.Name).ToList() ?? new List<string>() { p.Name } }
                 }.AsEnumerable();
             }).ToList();
@@ -63,7 +63,7 @@ namespace SigQL
                     {
                         return new ColumnDefinitionWithPropertyPath()
                         {
-                            ColumnDefinition = new ColumnAliasColumnDefinition(c.Name, c.DataTypeDeclaration, c.Table, tableRelations),
+                            ColumnDefinition = new ColumnAliasColumnDefinition(c.Name, c.DataTypeDeclaration, c.Table, tableRelations, c.IsIdentity),
                             PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.AppendOne(c.Name).ToList()}
                         };
                     }).ToList();

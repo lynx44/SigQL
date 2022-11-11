@@ -155,6 +155,7 @@ namespace SigQL.Schema
     {
         string Name { get; }
         string DataTypeDeclaration { get; }
+        bool IsIdentity { get; }
         ITableDefinition Table { get; }
     }
 
@@ -180,6 +181,7 @@ namespace SigQL.Schema
 
         public string Name { get; set; }
         public string DataTypeDeclaration { get; set; }
+        public bool IsIdentity { get; set; }
         public ITableDefinition Table { get; set; }
     }
 

@@ -24,6 +24,12 @@
             public string Name { get; set; }
         }
 
+        public class Upsert
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+        }
+
         public interface ILocationWithAddress
         {
             int Id { get; }

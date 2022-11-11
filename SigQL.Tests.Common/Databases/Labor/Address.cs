@@ -69,6 +69,14 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string State { get; set; }
         }
 
+        public class UpsertFields
+        {
+            public int? Id { get; set; }
+            public string StreetAddress { get; set; }
+            public string City { get; set; }
+            public string State { get; set; }
+        }
+
         public interface IEmployeeToWorkLogView
         {
             Employee.IEmployeeToWorkLogView Employee { get; }

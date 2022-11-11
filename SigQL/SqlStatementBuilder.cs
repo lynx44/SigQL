@@ -34,6 +34,9 @@ namespace SigQL
                         case Exists a: 
                             sql.Add($"exists ({Walk(a.Args.SingleOrDefault())})".Trim());
                             break;
+                        case NotExists a: 
+                            sql.Add($"not exists ({Walk(a.Args.SingleOrDefault())})".Trim());
+                            break;
                         case Alias a: 
                             sql.Add($"{(a.Args != null ? $"{Walk(a.Args.SingleOrDefault())}" : string.Empty)} \"{a.Label}\"".Trim());
                             break;
@@ -153,6 +156,15 @@ namespace SigQL
                             break;
                         case FromClauseNode a:
                             sql.Add($"{string.Join(" ", a.Args.Select(a => Walk(a)))}".Trim());
+                            break;
+                        case If a:
+                            sql.Add($"if {Walk(a.Condition)}");
+                            sql.Add($"begin");
+                            sql.Add(Walk(a.Args));
+                            sql.Add("end");
+                            break;
+                        case SetParameter a:
+                            sql.Add($"set {Walk(a.Parameter)} = {Walk(a.Value)};");
                             break;
                         case Predicate a: 
                             sql.Add($"({Walk(a.Args.Take(1))} {a.Keyword} {Walk(a.Args.Skip(1).Single())})".Trim());

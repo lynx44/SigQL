@@ -2363,6 +2363,14 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void InsertSingle_Params_OutputIds()
+        {
+            var result = monolithicRepository.InsertEmployeeWithAttributeTableNameWithValuesByParamsOutputId("bob");
+
+            Assert.AreEqual(1, result.Id);
+        }
+
+        [TestMethod]
         public void InsertMultiple_Void_ValuesByDetectedClassInstance_ReturnsExpected()
         {
             var insertFields = new List<Employee.InsertFields>() 
@@ -2851,6 +2859,438 @@ namespace SigQL.SqlServer.Tests
             var actual = laborDbContext.WorkLog.Select(wl => new { StartDate = wl.StartDate.Value, EndDate = wl.EndDate.Value }).ToList();
             
             CustomAssert.AreEquivalent<dynamic>(Enumerable.Range(0, 2).Select(i => new { StartDate = new DateTime(2022, 2, 2), EndDate = new DateTime(2022, 2, 3) }), actual);
+        }
+
+        [TestMethod]
+        public void Upsert_Multiple()
+        {
+            var insertFields = new Employee.InsertFieldsWithWorkLogs[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(insertFields);
+
+            this.monolithicRepository.UpsertMultipleEmployeesWithWorkLogs(
+                new Employee.UpsertFieldsWithWorkLogs[]
+                {
+                    new Employee.UpsertFieldsWithWorkLogs()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpsertFields()
+                                {Id = 1, StartDate = new DateTime(2022, 1, 1), EndDate = new DateTime(2022, 1, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2022, 2, 1), EndDate = new DateTime(2022, 2, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2022, 3, 1), EndDate = new DateTime(2022, 3, 2)}
+                        }
+                    },
+                    new Employee.UpsertFieldsWithWorkLogs()
+                    {
+                        Name = "Geno",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpsertFields()
+                                {Id = 2, StartDate = new DateTime(2022, 4, 1), EndDate = new DateTime(2022, 4, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2022, 5, 1), EndDate = new DateTime(2022, 5, 2)}
+                        }
+                    }
+                });
+
+            var actual = laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+
+            Assert.IsFalse(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            var actualEmployee1 = actual.Single(e => e.Id == 1);
+            Assert.AreEqual("Kyle", actualEmployee1.Name);
+            Assert.AreEqual(3, actualEmployee1.WorkLogs.Count);
+            Assert.AreEqual(new DateTime(2022, 1, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).StartDate);
+            Assert.AreEqual(new DateTime(2022, 1, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).EndDate);
+            Assert.AreEqual(new DateTime(2022, 2, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 5).StartDate);
+            Assert.AreEqual(new DateTime(2022, 2, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 5).EndDate);
+            Assert.AreEqual(new DateTime(2022, 3, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 6).StartDate);
+            Assert.AreEqual(new DateTime(2022, 3, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 6).EndDate);
+            var actualEmployee2 = actual.Single(e => e.Id == 3);
+            Assert.AreEqual(2, actualEmployee2.WorkLogs.Count);
+            Assert.AreEqual(new DateTime(2022, 4, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 2).StartDate);
+            Assert.AreEqual(new DateTime(2022, 4, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 2).EndDate);
+            Assert.AreEqual(new DateTime(2022, 5, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 7).StartDate);
+            Assert.AreEqual(new DateTime(2022, 5, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 7).EndDate);
+        }
+
+        [TestMethod]
+        public void Upsert_Multiple_OutputIds()
+        {
+            var insertFields = new Employee.InsertFieldsWithWorkLogs[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(insertFields);
+
+            var result = this.monolithicRepository.UpsertMultipleEmployeesWithWorkLogs_OutputIds(
+                new Employee.UpsertFieldsWithWorkLogs[]
+                {
+                    new Employee.UpsertFieldsWithWorkLogs()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpsertFields()
+                                {Id = 1, StartDate = new DateTime(2022, 1, 1), EndDate = new DateTime(2022, 1, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2022, 2, 1), EndDate = new DateTime(2022, 2, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2022, 3, 1), EndDate = new DateTime(2022, 3, 2)}
+                        }
+                    },
+                    new Employee.UpsertFieldsWithWorkLogs()
+                    {
+                        Name = "Geno",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.UpsertFields()
+                                {Id = 2, StartDate = new DateTime(2022, 4, 1), EndDate = new DateTime(2022, 4, 2)},
+                            new WorkLog.UpsertFields()
+                                {StartDate = new DateTime(2022, 5, 1), EndDate = new DateTime(2022, 5, 2)}
+                        }
+                    }
+                });
+            
+            AreEquivalent(new [] { 1, 3 }, result.Select(c => c.Id));
+        }
+        
+        [TestMethod]
+        public void UpsertMultiple_ReturnResult_ValuesWithManyToOneAdjacentAndNestedManyToManyNavigationTables_ReturnsExpected()
+        {
+            var insertFields = new[]
+            {
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee =
+                        new Employee.InsertFieldsWithAddress()
+                        {
+                            Name = "Mike",
+                            Addresses = new Address.InsertFields[]
+                            {
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "123 fake st",
+                                    City = "Pennsylvania",
+                                    State = "PA"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "456 fake st",
+                                    City = "Portland",
+                                    State = "OR"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "567 fake st",
+                                    City = "San Diego",
+                                    State = "CA"
+                                }
+                            }
+
+                        },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Ice Queen"
+                    }
+                },
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 3, 1),
+                    EndDate = new DateTime(2021, 1, 2),
+                    Employee =
+                        new Employee.InsertFieldsWithAddress()
+                            {
+                                Name = "Lester",
+                                Addresses = new Address.InsertFields[]
+                                {
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "234 fake st",
+                                        City = "New York",
+                                        State = "NY"
+                                    },
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "345 fake st",
+                                        City = "Manchester",
+                                        State = "NH"
+                                    }
+                                }
+
+                            },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Burger Hut"
+                    }
+                }
+            };
+            monolithicRepository.InsertMultipleWorkLogsWithAdjacentAndNestedRelations(insertFields);
+
+            var upsertFields = new[]
+            {
+                new WorkLog.UpsertFieldsWithEmployeeAndLocation()
+                {
+                    Id = 1,
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee =
+                        new Employee.UpsertFieldsWithAddress()
+                        {
+                            Id = 1,
+                            Name = "Mike",
+                            Addresses = new []
+                            {
+                                new Address.UpsertFields()
+                                {
+                                    Id = 1,
+                                    StreetAddress = "123 fake st",
+                                    City = "Pennsylvania",
+                                    State = "PA"
+                                },
+                                new Address.UpsertFields()
+                                {
+                                    Id = 2,
+                                    StreetAddress = "456 fake st",
+                                    City = "Portland",
+                                    State = "OR"
+                                }
+                            }
+
+                        },
+                    Location = new Location.Upsert()
+                    {
+                        Name = "Eleven Til Seven"
+                    }
+                },
+                new WorkLog.UpsertFieldsWithEmployeeAndLocation()
+                {
+                    Id = 2,
+                    StartDate = new DateTime(2022, 3, 1),
+                    EndDate = new DateTime(2022, 1, 2),
+                    Employee =
+                        new Employee.UpsertFieldsWithAddress()
+                            {
+                                Id = 2,
+                                Name = "Lester",
+                                Addresses = new []
+                                {
+                                    new Address.UpsertFields()
+                                    {
+                                        Id = 3,
+                                        StreetAddress = "567 fake st",
+                                        City = "San Diego",
+                                        State = "CA"
+                                    },
+                                    new Address.UpsertFields()
+                                    {
+                                        Id = 4,
+                                        StreetAddress = "234 fake st",
+                                        City = "New York",
+                                        State = "NY"
+                                    },
+                                    new Address.UpsertFields()
+                                    {
+                                        Id = 5,
+                                        StreetAddress = "345 fake st",
+                                        City = "Manchester",
+                                        State = "NH"
+                                    },
+                                    new Address.UpsertFields()
+                                    {
+                                        StreetAddress = "789 sesame st",
+                                        City = "New Jersey",
+                                        State = "NJ"
+                                    }
+                                }
+
+                            },
+                    Location = new Location.Upsert()
+                    {
+                        Id = 2,
+                        Name = "Taco Hut"
+                    }
+                }
+            };
+            this.monolithicRepository.UpsertMultipleWorkLogsWithAdjacentAndNestedRelations(upsertFields);
+            var actual = laborDbContext.WorkLog
+                .Include(wl => wl.Employee)
+                .ThenInclude(e => e.Addresses)
+                .Include(wl => wl.Location).ToList();
+
+            Assert.AreEqual(2, actual.Count());
+            AreSame(actual.Select(p => p.Employee.Name).ToList(), upsertFields.Select(wl => wl.Employee.Name).ToList());
+            Assert.AreEqual(2, actual.Count());
+
+            var efWorkLog1 = actual.First();
+            Assert.AreEqual(new DateTime(2021, 1, 1), efWorkLog1.StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 2), efWorkLog1.EndDate);
+
+            var efEmployee1 = efWorkLog1.Employee;
+            Assert.AreEqual("Mike", efEmployee1.Name);
+            Assert.AreEqual(3, efEmployee1.Addresses.Count());
+
+            var efEmployee1Address1 = efEmployee1.Addresses.First();
+            Assert.AreEqual("123 fake st", efEmployee1Address1.StreetAddress);
+            Assert.AreEqual("Pennsylvania", efEmployee1Address1.City);
+            Assert.AreEqual("PA", efEmployee1Address1.State);
+
+            var efEmployee1Address2 = efEmployee1.Addresses.Skip(1).First();
+            Assert.AreEqual("456 fake st", efEmployee1Address2.StreetAddress);
+            Assert.AreEqual("Portland", efEmployee1Address2.City);
+            Assert.AreEqual("OR", efEmployee1Address2.State);
+
+            var efLocation1 = efWorkLog1.Location;
+            Assert.AreEqual(3, efLocation1.Id);
+            Assert.AreEqual("Eleven Til Seven", efLocation1.Name);
+
+            var efWorkLog2 = actual.Last();
+            Assert.AreEqual(new DateTime(2022, 3, 1), efWorkLog2.StartDate);
+            Assert.AreEqual(new DateTime(2022, 1, 2), efWorkLog2.EndDate);
+
+            var efEmployee2 = efWorkLog2.Employee;
+            Assert.AreEqual("Lester", efEmployee2.Name);
+            Assert.AreEqual(4, efEmployee2.Addresses.Count());
+
+            var efEmployee2Address1 = efEmployee2.Addresses.Single(a => a.Id == 3);
+            Assert.AreEqual("567 fake st", efEmployee2Address1.StreetAddress);
+            Assert.AreEqual("San Diego", efEmployee2Address1.City);
+            Assert.AreEqual("CA", efEmployee2Address1.State);
+
+            var efEmployee2Address2 = efEmployee2.Addresses.Single(a => a.Id == 4);
+            Assert.AreEqual("234 fake st", efEmployee2Address2.StreetAddress);
+            Assert.AreEqual("New York", efEmployee2Address2.City);
+            Assert.AreEqual("NY", efEmployee2Address2.State);
+
+            var efEmployee2Address3 = efEmployee2.Addresses.Single(a => a.Id == 5);
+            Assert.AreEqual("345 fake st", efEmployee2Address3.StreetAddress);
+            Assert.AreEqual("Manchester", efEmployee2Address3.City);
+            Assert.AreEqual("NH", efEmployee2Address3.State);
+
+            var efEmployee2Address4 = efEmployee2.Addresses.Single(a => a.Id == 6);
+            Assert.AreEqual("789 sesame st", efEmployee2Address4.StreetAddress);
+            Assert.AreEqual("New Jersey", efEmployee2Address4.City);
+            Assert.AreEqual("NJ", efEmployee2Address4.State);
+
+            var efLocation2 = efWorkLog2.Location;
+            Assert.AreEqual("Taco Hut", efLocation2.Name);
+
+        }
+        
+        [TestMethod]
+        public void Upsert_Single_NullKey_InsertsRow()
+        {
+            this.monolithicRepository.UpsertEmployeeViaMethodParams(null, "bob");
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+
+            Assert.AreEqual("bob", actual.Name);
+        }
+        
+        [TestMethod]
+        public void Upsert_Single_NonExistingKey_InsertsRow()
+        {
+            this.monolithicRepository.UpsertEmployeeViaMethodParams(2, "bob");
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+
+            Assert.AreEqual(1, actual.Id);
+            Assert.AreEqual("bob", actual.Name);
+        }
+        
+        [TestMethod]
+        public void Upsert_Single_ExistingKey_UpdatesRow()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "bob" });
+            laborDbContext.SaveChanges();
+            this.monolithicRepository.UpsertEmployeeViaMethodParams(1, "joe");
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+
+            Assert.AreEqual(1, actual.Id);
+            Assert.AreEqual("joe", actual.Name);
+        }
+        
+        [TestMethod]
+        public void Upsert_Single_Update_ReturnValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "bob" });
+            laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.UpsertEmployeeViaMethodParamsReturnValue(1, "joe");
+
+            Assert.AreEqual(1, actual.Id);
+            Assert.AreEqual("joe", actual.Name);
+        }
+
+        [TestMethod]
+        public void Upsert_Single_Insert_ReturnValue()
+        {
+            var actual = this.monolithicRepository.UpsertEmployeeViaMethodParamsReturnValue(2, "bob");
+
+            Assert.AreEqual(1, actual.Id);
+            Assert.AreEqual("bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_Single_InsertsRow()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "bill" });
+            laborDbContext.SaveChanges();
+            this.monolithicRepository.UpdateByKeyEmployeeViaMethodParams(1, "bob");
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+
+            Assert.AreEqual("bob", actual.Name);
         }
 
         [TestMethod]

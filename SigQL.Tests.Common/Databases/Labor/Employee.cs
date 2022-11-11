@@ -52,6 +52,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<Address.InsertFields> Addresses  { get; set; }
         }
 
+        public class UpsertFieldsWithAddress
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public IEnumerable<Address.UpsertFields> Addresses  { get; set; }
+        }
+
         public class InsertFieldsWithWorkLogs
         {
             public string Name { get; set; }
@@ -63,6 +70,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             public int Id { get; set; }
             public string Name { get; set; }
             public IEnumerable<WorkLog.UpdateByKeyFields> WorkLogs { get; set; }
+        }
+
+        public class UpsertFieldsWithWorkLogs
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public IEnumerable<WorkLog.UpsertFields> WorkLogs { get; set; }
         }
 
         public interface IEmployeeWithAddresses

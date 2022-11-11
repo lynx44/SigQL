@@ -65,6 +65,14 @@ namespace SigQL
         public OffsetClause Offset { get; set; }
     }
 
+    public class PartitionByClause : Clause
+    {
+        public PartitionByClause()
+        {
+            this.Keyword = "partition by";
+        }
+    }
+
     public class GroupByClause : Clause
     {
         public GroupByClause()
@@ -76,6 +84,11 @@ namespace SigQL
     public class OrderByIdentifier : AstNode
     {
         public string Direction { get; set; }
+    }
+
+    public class If : AstNode
+    {
+        public AstNode Condition { get; set; }
     }
 
     public class Statement : AstNode
@@ -92,6 +105,12 @@ namespace SigQL
     {
         public NamedParameterIdentifier Parameter { get; set; }
         public DataType DataType { get; set; }
+    }
+
+    public class SetParameter : AstNode
+    {
+        public NamedParameterIdentifier Parameter { get; set; }
+        public AstNode Value { get; set; }
     }
 
     public class DataType : AstNode
@@ -298,6 +317,10 @@ namespace SigQL
     }
 
     public class Exists : AstNode
+    {
+    }
+
+    public class NotExists : AstNode
     {
     }
 

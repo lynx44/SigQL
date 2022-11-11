@@ -33,13 +33,18 @@ namespace SigQL
             var statementType = DetectStatementType(methodInfo);
             if (statementType == StatementType.Insert)
             {
-                var insertSpec = GetUpsertSpec(methodInfo);
-                return BuildInsertStatement(insertSpec, Enumerable.Select<UpsertColumnParameter, ParameterPath>(insertSpec.UpsertTableRelationsCollection.First().ColumnParameters, cp => cp.ParameterPath).ToList());
+                var spec = GetUpsertSpec(methodInfo);
+                return BuildInsertStatement(spec, Enumerable.Select<UpsertColumnParameter, ParameterPath>(spec.UpsertTableRelationsCollection.First().ColumnParameters, cp => cp.ParameterPath).ToList());
             }
             if (statementType == StatementType.UpdateByKey)
             {
-                var insertSpec = GetUpsertSpec(methodInfo);
-                return BuildUpdateByKeyStatement(insertSpec, Enumerable.Select<UpsertColumnParameter, ParameterPath>(insertSpec.UpsertTableRelationsCollection.First().ColumnParameters, cp => cp.ParameterPath).ToList());
+                var spec = GetUpsertSpec(methodInfo);
+                return BuildUpdateByKeyStatement(spec, Enumerable.Select<UpsertColumnParameter, ParameterPath>(spec.UpsertTableRelationsCollection.First().ColumnParameters, cp => cp.ParameterPath).ToList());
+            }
+            if (statementType == StatementType.Upsert)
+            {
+                var spec = GetUpsertSpec(methodInfo);
+                return BuildUpsertStatement(spec, Enumerable.Select<UpsertColumnParameter, ParameterPath>(spec.UpsertTableRelationsCollection.First().ColumnParameters, cp => cp.ParameterPath).ToList());
             }
             if (statementType == StatementType.Delete)
             {
@@ -466,6 +471,10 @@ namespace SigQL
             {
                 return StatementType.UpdateByKey;
             }
+            if (IsUpsertMethod(methodInfo))
+            {
+                return StatementType.Upsert;
+            }
 
             return StatementType.Select;
         }
@@ -482,6 +491,10 @@ namespace SigQL
         private bool IsUpdateByKeyMethod(MethodInfo methodInfo)
         {
             return (methodInfo.GetCustomAttributes(typeof(UpdateByKeyAttribute), false)?.Any()).GetValueOrDefault(false);
+        }
+        private bool IsUpsertMethod(MethodInfo methodInfo)
+        {
+            return (methodInfo.GetCustomAttributes(typeof(UpsertAttribute), false)?.Any()).GetValueOrDefault(false);
         }
 
         private WhereClause BuildWhereClauseFromTargetTablePerspective(AstNode primaryTableReference, TableRelations whereClauseTableRelations, List<ParameterPath> parameterPaths, List<TokenPath> tokens)
@@ -1157,7 +1170,8 @@ namespace SigQL
             Insert,
             Update,
             Delete,
-            UpdateByKey
+            UpdateByKey,
+            Upsert
         }
     }
 
@@ -1281,8 +1295,8 @@ namespace SigQL
         public ColumnAliasForeignKeyPair(IForeignKeyPair foreignKeyPair)
         {
             this.foreignKeyPair = foreignKeyPair;
-            this.ForeignTableColumnWithAlias = new ColumnAliasColumnDefinition(this.ForeignTableColumn.Name, this.ForeignTableColumn.DataTypeDeclaration, this.ForeignTableColumn.Table, null);
-            this.PrimaryTableColumnWithAlias = new ColumnAliasColumnDefinition(this.PrimaryTableColumn.Name, this.PrimaryTableColumn.DataTypeDeclaration, this.PrimaryTableColumn.Table, null);
+            this.ForeignTableColumnWithAlias = new ColumnAliasColumnDefinition(this.ForeignTableColumn.Name, this.ForeignTableColumn.DataTypeDeclaration, this.ForeignTableColumn.Table, null, this.ForeignTableColumn.IsIdentity);
+            this.PrimaryTableColumnWithAlias = new ColumnAliasColumnDefinition(this.PrimaryTableColumn.Name, this.PrimaryTableColumn.DataTypeDeclaration, this.PrimaryTableColumn.Table, null, this.ForeignTableColumn.IsIdentity);
         }
 
         public ColumnAliasColumnDefinition ForeignTableColumnWithAlias { get; }
@@ -1294,12 +1308,13 @@ namespace SigQL
         private readonly IColumnDefinition columnDefinition;
         public string Name { get; }
         public string DataTypeDeclaration { get; }
+        public bool IsIdentity { get; }
 
         public ITableDefinition Table { get; }
 
         public string TableAlias { get; }
 
-        public ColumnAliasColumnDefinition(string name, string dataTypeDeclaration, ITableDefinition table, ITableHierarchyAlias tableAlias)
+        public ColumnAliasColumnDefinition(string name, string dataTypeDeclaration, ITableDefinition table, ITableHierarchyAlias tableAlias, bool isIdentity)
         {
             Name = name;
             DataTypeDeclaration = dataTypeDeclaration;

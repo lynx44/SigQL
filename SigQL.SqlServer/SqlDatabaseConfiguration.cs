@@ -180,6 +180,7 @@ namespace SigQL.SqlServer
 
         public string Name => column.Name;
         public string DataTypeDeclaration { get; }
+        public bool IsIdentity => column.Identity;
         public ITableDefinition Table => tableDefinition;
     }
 }
