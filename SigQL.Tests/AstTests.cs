@@ -1529,20 +1529,19 @@ namespace SigQL.Tests
                     }
                 )
             }.SetArgs(
-                new SetEqualOperator().SetArgs(
-                    new NamedParameterIdentifier()
-                    {
-                        Name = "qualified"
-                    },
-                    new Literal()
-                    {
-                        Value = "1"
-                    }
-                )
+                new Select()
+                {
+                    SelectClause = new SelectClause().SetArgs(
+                        new Literal()
+                        {
+                            Value = "1"
+                        }
+                    )
+                }
             );
 
             var sql = Build(ast);
-            Assert.AreEqual(@"if (@age = 21) begin set @qualified = 1 end", sql);
+            Assert.AreEqual(@"if (@age = 21) begin select 1 end", sql);
         }
 
         private string Build(AstNode arg)

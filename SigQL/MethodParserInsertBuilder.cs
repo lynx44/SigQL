@@ -170,15 +170,16 @@ namespace SigQL
                     builderAstCollection.RegisterReference(upsertTableRelations.TableRelations.TargetTable, InsertBuilderAstCollection.AstReferenceSource.Merge, merge);
                     statement.Add(merge);
 
-                    if (upsertTableRelations.TableRelations.TargetTable.PrimaryKey != null && (FindRootArgument(upsertTableRelations.TableRelations.Argument).Type != typeof(void)))
+                    if (upsertTableRelations.TableRelations.TargetTable.PrimaryKey != null && 
+                        (FindRootArgument(upsertTableRelations.TableRelations.Argument).Type != typeof(void)))
                     {
                         var updateLookupTablePKsStatement = BuildUpdateLookupStatement(upsertTableRelations.TableRelations);
                         if (updateLookupTablePKsStatement != null)
                         {
                             statement.Add(updateLookupTablePKsStatement);
                             builderAstCollection.RegisterReference(upsertTableRelations.TableRelations.TargetTable, InsertBuilderAstCollection.AstReferenceSource.UpdateLookupIds, updateLookupTablePKsStatement);
-                        }   
-
+                        }
+                            
                         var outputParameterTableName = GetInsertedTableName(upsertTableRelations.TableRelations);
                         var declareOutputParameterStatement = BuildDeclareInsertedTableParameterStatement(outputParameterTableName, upsertTableRelations);
                         statement.Insert(0, declareOutputParameterStatement);

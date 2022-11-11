@@ -1153,7 +1153,13 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.InsertEmployeeWithAttributeTableNameWithValuesByParams));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("insert \"Employee\"(\"Name\") values(@name)", sql);
+            Assert.AreEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Name"", ""_index"") values(@name, 0)
+merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"") as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");", sql);
         }
 
         //[TestMethod]
@@ -1173,10 +1179,17 @@ namespace SigQL.Tests
         [TestMethod]
         public void InsertSingle_Void_ValuesByDetectedClass_ReturnsExpectedSql()
         {
-            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.InsertEmployeeWithAttributeWithValuesByDetectedClass));
-            var sql = GetSqlFor(methodInfo);
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.InsertEmployeeWithAttributeWithValuesByDetectedClass(new Employee.InsertFields()
+                    { Name = "John" }));
 
-            Assert.AreEqual("insert \"Employee\"(\"Name\") values(@valuesName)", sql);
+            Assert.AreEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Name"", ""_index"") values(@valuesName0, 0)
+merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"") as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");", sql);
         }
 
         [TestMethod]
@@ -1201,11 +1214,13 @@ select ""Employee"".""Id"" ""Id"" from ""Employee"" inner join @EmployeeLookup "
             var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleEmployeesWithAttributeWithValuesByDetectedClass(
                 new Employee.InsertFields[] { new Employee.InsertFields() { Name = "bah" }, new Employee.InsertFields() { Name = "baah" } }));
 
-            AssertSqlEqual(@"declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+            AssertSqlEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
 insert @EmployeeLookup(""Name"", ""_index"") values(@employeesName0, 0), (@employeesName1, 1)
 merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"") as i (""Name"",""_index"") on (1 = 0)
  when not matched then
- insert (""Name"") values(""i"".""Name"");", sql);
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");", sql);
         }
 
         [TestMethod]
@@ -1218,11 +1233,13 @@ merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup ""Emp
                     new Address.InsertFields() { StreetAddress = "456 fake", City = "Portland", State = "OR" }
                 }));
 
-            AssertSqlEqual(@"declare @AddressLookup table(""Id"" int, ""StreetAddress"" nvarchar(max), ""City"" nvarchar(max), ""State"" nvarchar(max), ""_index"" int)
+            AssertSqlEqual(@"declare @insertedAddress table(""Id"" int, ""_index"" int)
+declare @AddressLookup table(""Id"" int, ""StreetAddress"" nvarchar(max), ""City"" nvarchar(max), ""State"" nvarchar(max), ""_index"" int)
 insert @AddressLookup(""StreetAddress"", ""City"", ""State"", ""_index"") values(@addressesStreetAddress0, @addressesCity0, @addressesState0, 0), (@addressesStreetAddress1, @addressesCity1, @addressesState1, 1)
 merge ""Address"" using (select ""StreetAddress"", ""City"", ""State"", ""_index"" from @AddressLookup ""AddressLookup"") as i (""StreetAddress"",""City"",""State"",""_index"") on (1 = 0)
  when not matched then
- insert (""StreetAddress"", ""City"", ""State"") values(""i"".""StreetAddress"", ""i"".""City"", ""i"".""State"");", sql);
+ insert (""StreetAddress"", ""City"", ""State"") values(""i"".""StreetAddress"", ""i"".""City"", ""i"".""State"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedAddress(""Id"", ""_index"");
+update ""AddressLookup"" set ""Id"" = ""insertedAddress"".""Id"" from @AddressLookup ""AddressLookup"" inner join @insertedAddress ""insertedAddress"" on (""AddressLookup"".""_index"" = ""insertedAddress"".""_index"");", sql);
         }
 
         [TestMethod]
@@ -1556,8 +1573,14 @@ select ""WorkLog<WorkLog>"".""Id"" ""Id"", ""WorkLog<WorkLog>"".""StartDate"" ""
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.UpsertEmployeeViaMethodParams(1, "bob"));
 
-            AssertSqlEqual(@"update ""Employee"" set ""Name"" = @name where ((""Id"" = @id));
-if (@@ROWCOUNT = 0) begin insert ""Employee""(""Name"") values(@name) end", sql);
+            AssertSqlEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@id, @name, 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Employee"" where ((""Employee"".""Id"" = ""EmployeeLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on ((""Employee"".""Id"" = ""insertedEmployee"".""Id"")) where ((""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id"")));", sql);
         }
 
         [TestMethod]
@@ -1593,7 +1616,7 @@ declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int
 insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0), (@employeesId1, @employeesName1, 1)
 merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Employee"" where ((""Employee"".""Id"" = ""EmployeeLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
  when not matched then
- insert (""Id"", ""Name"") values(""i"".""Id"", ""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
 update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on ((""Employee"".""Id"" = ""insertedEmployee"".""Id"")) where ((""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id"")));
 declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
@@ -1638,7 +1661,7 @@ declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int
 insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0), (@employeesId1, @employeesName1, 1)
 merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Employee"" where ((""Employee"".""Id"" = ""EmployeeLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
  when not matched then
- insert (""Id"", ""Name"") values(""i"".""Id"", ""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
 update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on ((""Employee"".""Id"" = ""insertedEmployee"".""Id"")) where ((""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id"")));
 declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
@@ -1714,7 +1737,7 @@ declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int
 insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesEmployee_Id0, @employeesEmployee_Name0, 0), (@employeesEmployee_Id1, @employeesEmployee_Name1, 1)
 merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Employee"" where ((""Employee"".""Id"" = ""EmployeeLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
  when not matched then
- insert (""Id"", ""Name"") values(""i"".""Id"", ""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
 update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on ((""Employee"".""Id"" = ""insertedEmployee"".""Id"")) where ((""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id"")));
 declare @AddressLookup table(""Id"" int, ""StreetAddress"" nvarchar(max), ""City"" nvarchar(max), ""State"" nvarchar(max), ""_index"" int)
@@ -1754,7 +1777,9 @@ merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""Emplo
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.UpdateByKeyEmployeeViaMethodParams(1, "bob"));
 
-            AssertSqlEqual(@"update ""Employee"" set ""Name"" = @name where ((""Id"" = @id));", sql);
+            AssertSqlEqual(@"declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@id, @name, 0)
+update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"");", sql);
         }
 
         [TestMethod]
