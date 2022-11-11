@@ -1153,7 +1153,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.InsertEmployeeWithAttributeTableNameWithValuesByParams));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+            AssertSqlEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
 declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
 insert @EmployeeLookup(""Name"", ""_index"") values(@name, 0)
 merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"") as i (""Name"",""_index"") on (1 = 0)
@@ -1183,7 +1183,7 @@ update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @Employe
                 monolithicRepository.InsertEmployeeWithAttributeWithValuesByDetectedClass(new Employee.InsertFields()
                     { Name = "John" }));
 
-            Assert.AreEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+            AssertSqlEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
 declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
 insert @EmployeeLookup(""Name"", ""_index"") values(@valuesName0, 0)
 merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"") as i (""Name"",""_index"") on (1 = 0)
