@@ -396,6 +396,11 @@ namespace SigQL.Tests.Common.Databases.Labor
             public Employee.UpsertFieldsWithAddress Employee { get; set; }
             public Location.Upsert Location { get; set; }
         }
+
+        public interface IEmployeeID_MismatchingCase
+        {
+            Employee.IEmployeeID_MismatchingCase Employee { get; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

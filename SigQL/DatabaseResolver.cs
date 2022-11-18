@@ -27,12 +27,12 @@ namespace SigQL
         public IEnumerable<ColumnDefinitionWithPropertyPath> ResolveColumnsForSelectStatement(
             TableRelations tableRelations, 
             IEnumerable<ColumnAliasForeignKeyDefinition> allForeignKeys,
-            ConcurrentDictionary<string, ITableKeyDefinition> tableKeyDefinitions)
+            ConcurrentDictionary<string, IEnumerable<string>> tableKeyDefinitions)
         {
             ITableDefinition table = null;
             table = tableRelations.TargetTable;
-            
-            var columns = tableRelations.ProjectedColumns.SelectMany(p =>
+
+            var tableColumns = tableRelations.ProjectedColumns.SelectMany(p =>
             {
                 //var targetColumn = table.Columns.FindByName(p.Name);
                 var argument = p.Arguments.GetArguments(TableRelationsColumnSource.ReturnType).FirstOrDefault();
@@ -42,41 +42,48 @@ namespace SigQL
                 //        $"Unable to identify matching database column for property {argument.FullyQualifiedName()}. Column {p.Name} does not exist in table {table.Name}.");
                 //}
 
+                var propertyPaths = argument?.FindFromPropertyRoot().Select(arg => arg.Name).ToList();
                 return new ColumnDefinitionWithPropertyPath()
                 {
                     ColumnDefinition = new ColumnAliasColumnDefinition(p.Name, p.DataTypeDeclaration, p.Table, tableRelations, p.IsIdentity),
-                    PropertyPath = new PropertyPath() { PropertyPaths = argument?.FindPropertiesFromRoot().Select(arg => arg.Name).ToList() ?? new List<string>() { p.Name } }
+                    PropertyPath = new PropertyPath() { PropertyPaths = (propertyPaths?.Any()).GetValueOrDefault(false) ? propertyPaths :  new List<string>() { p.Name } }
                 }.AsEnumerable();
             }).ToList();
+            var columns = tableColumns.ToList();
 
             columns.AddRange(tableRelations.NavigationTables.SelectMany(p =>
             {
                 return ResolveColumnsForSelectStatement(p, allForeignKeys, tableKeyDefinitions);
             }));
             
-            var currentPaths = tableRelations.Argument.FindPropertiesFromRoot().Select(p => p.Name).ToList();
+            var currentPaths = tableRelations.Argument.FindFromPropertyRoot().Select(p => p.Name).ToList();
             
             if ((tableRelations.PrimaryKey?.Any()).GetValueOrDefault(false))
             {
-                var primaryColumns = tableRelations.PrimaryKey
-                    .Select(c =>
-                    {
-                        return new ColumnDefinitionWithPropertyPath()
+                var missingPkColumns = tableRelations.PrimaryKey.Where(pkc =>
+                    !columns.Any(c => ColumnEqualityComparer.Default.Equals(pkc, c.ColumnDefinition))).ToList();
+                if (missingPkColumns.Any())
+                {
+                    var primaryColumns = missingPkColumns
+                        .Select(c =>
                         {
-                            ColumnDefinition = new ColumnAliasColumnDefinition(c.Name, c.DataTypeDeclaration, c.Table, tableRelations, c.IsIdentity),
-                            PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.AppendOne(c.Name).ToList()}
-                        };
-                    }).ToList();
-
+                            return new ColumnDefinitionWithPropertyPath()
+                            {
+                                ColumnDefinition = new ColumnAliasColumnDefinition(c.Name, c.DataTypeDeclaration, c.Table, tableRelations, c.IsIdentity),
+                                PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.AppendOne(c.Name).ToList()}
+                            };
+                        }).ToList();
                 
-                tableKeyDefinitions[string.Join(".", currentPaths)] = new TableKeyDefinition(tableRelations.PrimaryKey.ToArray());
-            
-                primaryColumns.AddRange(columns);
-                columns = primaryColumns.ToList();
-            }
-            else
-            {
+                    primaryColumns.AddRange(tableColumns);
+                    tableColumns = primaryColumns.ToList();
+                }
 
+                var selectedPrimaryColumns = tableColumns.Where(c =>
+                    tableRelations.PrimaryKey.Any(pkc =>
+                        ColumnEqualityComparer.Default.Equals(c.ColumnDefinition, pkc))).ToList();
+                tableKeyDefinitions[string.Join(".", currentPaths)] = selectedPrimaryColumns.Select(c => c.Alias.Replace(string.Join(".", currentPaths) + ".", "")).ToList();
+                selectedPrimaryColumns.AddRange(columns.Except(selectedPrimaryColumns));
+                columns = selectedPrimaryColumns.ToList();
             }
             
             columns = columns.GroupBy(c => c.Alias, c => c).Select(c => c.First()).ToList();

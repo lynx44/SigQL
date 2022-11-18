@@ -31,6 +31,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetClrOnlyFilterClassProperty(WorkLog.ClrOnlyFilter filter);
         Employees.IEmployeeFields GetEmployeesPlural(int id);
         EmployeeStatus.IId GetEmployeeStatusSingular(int id);
+        Employee.IEmployeeID_MismatchingCase GetEmployeeMismatchingPKCase(int id);
+        WorkLog.IEmployeeID_MismatchingCase GetWorkLogWithEmployeeMismatchingPKCase(int id);
 
 
 

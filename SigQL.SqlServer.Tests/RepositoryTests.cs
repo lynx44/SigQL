@@ -349,6 +349,36 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Get_MismatchingPKCase()
+        {
+            var allEmployees = new[] { 1, 2, 3, 4, 5 }.Select(i => new EFEmployee() { Name = "Name" + i }).ToList();
+            this.laborDbContext.Employee.AddRange(allEmployees);
+            this.laborDbContext.SaveChanges();
+            var expected = allEmployees.FirstOrDefault(e => e.Id == 3);
+            var actual = this.monolithicRepository.GetEmployeeMismatchingPKCase(3);
+
+            Assert.AreEqual(expected.Id, actual.ID);
+        }
+
+        [TestMethod]
+        public void Get_NestedMismatchingPKCase()
+        {
+            var workLog = new EFWorkLog()
+            {
+                Employee = new EFEmployee()
+                {
+                    Name = "mark"
+                }
+            };
+            this.laborDbContext.WorkLog.Add(workLog);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetWorkLogWithEmployeeMismatchingPKCase(1);
+
+            Assert.AreEqual(1, actual.Employee.ID);
+        }
+
+        [TestMethod]
         public void GetWithEnumProperty()
         {
             var addAddress = new EFAddress() { Classification = AddressClassification.Work };

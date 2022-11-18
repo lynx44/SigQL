@@ -44,7 +44,7 @@ namespace SigQL
         
         public object Materialize(Type outputType, PreparedSqlStatement sqlStatement)
         {
-            return Materialize(sqlStatement, new EmptyTableKeyDefinition(), new ConcurrentDictionary<string, ITableKeyDefinition>(), outputType);
+            return Materialize(sqlStatement, new EmptyTableKeyDefinition(), new ConcurrentDictionary<string, IEnumerable<string>>(), outputType);
         }
         
         public T Materialize<T>(PreparedSqlStatement sqlStatement)
@@ -69,7 +69,7 @@ namespace SigQL
         }
 
         private object Materialize(PreparedSqlStatement statement, ITableKeyDefinition targetTablePrimaryKey,
-            IDictionary<string, ITableKeyDefinition> tablePrimaryKeyDefinitions, Type returnType)
+            IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions, Type returnType)
         {
             RowValueCollection rowValueCollection;
             var outputInvocations = new List<object>();
@@ -77,7 +77,7 @@ namespace SigQL
 
             using (var reader = queryExecutor.ExecuteReader(statement.CommandText, statement.Parameters))
             {
-                rowValueCollection = ReadRowValues(reader, targetTablePrimaryKey.Columns.Select(c => c.Name).ToList(),
+                rowValueCollection = ReadRowValues(reader, tablePrimaryKeyDefinitions.Keys.Any(k => k == string.Empty) ? tablePrimaryKeyDefinitions[""].ToList() : new List<string>(),
                     tablePrimaryKeyDefinitions);
             }
 
@@ -156,7 +156,7 @@ namespace SigQL
         }
 
         private RowValueCollection ReadRowValues(IDataReader reader, IEnumerable<string> keyColumnNames,
-            IDictionary<string, ITableKeyDefinition> tablePrimaryKeyDefinitions)
+            IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions)
         {
             var rowValueCollection = new RowValueCollection();
             int rowNumber = 0;
@@ -182,7 +182,7 @@ namespace SigQL
         /// </remarks>
         private void ReadRow(Dictionary<string, object> rowValues, string aliasName, IEnumerable<string> keyColumnNames,
             RowValueCollection bucket,
-            IDictionary<string, ITableKeyDefinition> tablePrimaryKeyDefinitions, int rowNumber)
+            IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions, int rowNumber)
         {
             RowValues rowValueContainer = null;
             var keys = new RowKey(keyColumnNames.Select(c => new KeyValue(c, rowValues[c])));
@@ -204,7 +204,7 @@ namespace SigQL
                 var navigationPropertyName = navigationPropertyColumns.Key;
                 var qualifiedAliasName = $"{aliasName}{(aliasName != null ? "." : string.Empty)}{navigationPropertyName}";
                 var navigationKeyColumnNames = 
-                    tablePrimaryKeyDefinitions[qualifiedAliasName].Columns.Select(c => c.Name).ToList();
+                    tablePrimaryKeyDefinitions[qualifiedAliasName].ToList();
                 var navigationRowValues = new Dictionary<string, object>(StringComparer.InvariantCultureIgnoreCase);
                 foreach (var keyValuePair in rowValues)
                 {

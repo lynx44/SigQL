@@ -15,7 +15,7 @@ namespace SigQL
             var targetTableType = insertSpec.UnwrappedReturnType;
 
             var statement = new List<AstNode>();
-            var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
+            var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, IEnumerable<string>>();
 
             var tokens = new List<TokenPath>();
             //if (insertSpec.IsSingular)

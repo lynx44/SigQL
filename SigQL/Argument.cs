@@ -114,6 +114,42 @@ namespace SigQL
         }
     }
 
+    internal class ColumnArgument : IArgument
+    {
+        private readonly IColumnDefinition column;
+
+        public ColumnArgument(IColumnDefinition column, IArgument parent)
+        {
+            this.column = column;
+            this.ClassProperties = Array.Empty<IArgument>();
+            this.Parent = parent;
+        }
+
+        public Type Type { get; }
+        public string Name => column.Name;
+        public TAttribute GetCustomAttribute<TAttribute>() where TAttribute : Attribute
+        {
+            return null;
+        }
+
+        public IEnumerable<IArgument> ClassProperties { get; set; }
+        public IArgument Parent { get; set; }
+        public ParameterInfo GetParameterInfo()
+        {
+            throw new NotImplementedException();
+        }
+
+        public PropertyInfo GetPropertyInfo()
+        {
+            throw new NotImplementedException();
+        }
+
+        public string GetCallsiteTypeName()
+        {
+            return "generated";
+        }
+    }
+
     internal static class MethodInfoExtensions
     {
         public static IEnumerable<IArgument> AsArguments(this IEnumerable<ParameterInfo> parameters, DatabaseResolver databaseResolver)
@@ -151,6 +187,21 @@ namespace SigQL
         {
             return
                 argument.RootToPath().Where(arg => arg is PropertyArgument).ToList();
+        }
+
+        public static IEnumerable<IArgument> FindFromPropertyRoot(this IArgument argument)
+        {
+            var rootToPath = argument.RootToPath().ToList();
+            var firstProperty = rootToPath.FirstOrDefault(arg => arg is PropertyArgument);
+
+            if (firstProperty != null)
+            {
+                var remainder = rootToPath.Skip(rootToPath.IndexOf(firstProperty)).ToList();
+                return
+                    remainder.ToList();
+            }
+
+            return Array.Empty<IArgument>();
         }
 
         public static string FullyQualifiedName(this IArgument argument)

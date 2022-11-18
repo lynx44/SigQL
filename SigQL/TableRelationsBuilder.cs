@@ -20,7 +20,7 @@ namespace SigQL
             ITableDefinition tableDefinition, 
             IArgument argument, 
             TableRelationsColumnSource source,
-            ConcurrentDictionary<string, ITableKeyDefinition> tableKeyDefinitions)
+            ConcurrentDictionary<string, IEnumerable<string>> tableKeyDefinitions)
         {
             var columnFields = argument.ClassProperties.Where(p => !ColumnAttributes.IsDecoratedNonColumn(p)).Select(p => new ColumnField()
             {
@@ -106,7 +106,7 @@ namespace SigQL
                         !columns.Any(cl => ColumnEqualityComparer.Default.Equals(c, cl))).ToList();
 
                     var additionalProjectedKeyColumns = missingProjectedKeyColumns.Select(c =>
-                        new TableRelationColumnIdentifierDefinition(c.Name, tableDefinition, null, source, c.IsIdentity)).ToList();
+                        new TableRelationColumnIdentifierDefinition(c.Name, tableDefinition, new ColumnArgument(c, argument), source, c.IsIdentity)).ToList();
                     columns.AddRange(additionalProjectedKeyColumns);
 
                     primaryKey = existingProjectedKeyColumns.Concat(additionalProjectedKeyColumns).ToList();
@@ -218,7 +218,7 @@ namespace SigQL
         }
 
         internal TableRelations BuildTableRelationsFromRelationalPath(IArgument argument,
-            string relationalPath, string endpointColumnName, TableRelationsColumnSource source, ConcurrentDictionary<string, ITableKeyDefinition> tableKeyDefinitions)
+            string relationalPath, string endpointColumnName, TableRelationsColumnSource source, ConcurrentDictionary<string, IEnumerable<string>> tableKeyDefinitions)
         {
             var relations =
                 relationalPath.
@@ -347,12 +347,12 @@ namespace SigQL
                         if (tableRelation.TargetTable.PrimaryKey != null &&
                             tableRelation.TargetTable.PrimaryKey.Columns.Any())
                         {
-                            tableKeyDefinitions[tableRelation.Argument.Name] = tableRelation.TargetTable.PrimaryKey;
+                            tableKeyDefinitions[tableRelation.Argument.Name] = tableRelation.TargetTable.PrimaryKey.Columns.Select(c => c.Name).ToList();
                         }
                         else
                         {
                             tableKeyDefinitions[tableRelation.Argument.Name] =
-                                new TableKeyDefinition(new ColumnDefinition[0]);
+                                Array.Empty<string>();
                         }
 
                     }

@@ -18,7 +18,7 @@ namespace SigQL
             var parameterPaths = new List<ParameterPath>();
             var methodInfo = deleteSpec.RootMethodInfo;
             
-            var tableRelations = this.databaseResolver.BuildTableRelations(deleteSpec.Table, new TableArgument(deleteSpec.Table, deleteSpec.RootMethodInfo.GetParameters().AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, ITableKeyDefinition>());
+            var tableRelations = this.databaseResolver.BuildTableRelations(deleteSpec.Table, new TableArgument(deleteSpec.Table, deleteSpec.RootMethodInfo.GetParameters().AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>());
             var primaryTable = tableRelations.TargetTable;
             var whereClause = BuildWhereClauseFromTargetTablePerspective(
                 new RelationalTable() { Label = primaryTable.Name }, tableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause), parameterPaths,

@@ -123,7 +123,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWithAliasedColumnName(1));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"WorkLog\".\"Id\" \"WorkLogId\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" = @id))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"WorkLogId\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" = @id))", sql);
         }
 
         [TestMethod]
@@ -1141,6 +1141,14 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() => this.monolithicRepository.CountWorkLogs());
 
             Assert.AreEqual("select count(1) \"Count\" from (select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\") Subquery", sql);
+        }
+
+        [TestMethod]
+        public void Get_MismatchingPKCase()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeeMismatchingPKCase(1));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"ID\" from \"Employee\" where ((\"Employee\".\"Id\" = @id))", sql);
         }
 
         #endregion Queries

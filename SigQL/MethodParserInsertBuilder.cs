@@ -219,7 +219,7 @@ namespace SigQL
             return builderAstCollection;
         }
 
-        private Select BuildUpsertOutputSelectStatement(UpsertSpec insertSpec, ConcurrentDictionary<string, ITableKeyDefinition> tablePrimaryKeyDefinitions)
+        private Select BuildUpsertOutputSelectStatement(UpsertSpec insertSpec, ConcurrentDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions)
         {
             var tableRelations = this.databaseResolver.BuildTableRelations(insertSpec.Table,
                 new TypeArgument(insertSpec.ReturnType, this.databaseResolver), TableRelationsColumnSource.ReturnType,
@@ -965,7 +965,7 @@ namespace SigQL
                 var parameterTableRelations = this.databaseResolver.BuildTableRelations(insertSpec.Table,
                     new TableArgument(insertSpec.Table,
                         methodInfo.GetParameters().AsArguments(this.databaseResolver)),
-                    TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, ITableKeyDefinition>());
+                    TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>());
 
 
                 var dependencyOrderedTableRelations = GetInsertTableRelationsOrderedByDependencies(parameterTableRelations).ToList();
@@ -1179,7 +1179,7 @@ namespace SigQL
         private class InsertBuilderAstCollection
         {
             internal List<AstNode> Statements { get; }
-            internal ConcurrentDictionary<string, ITableKeyDefinition> TablePrimaryKeyDefinitions { get; }
+            internal ConcurrentDictionary<string, IEnumerable<string>> TablePrimaryKeyDefinitions { get; }
             internal List<TokenPath> Tokens { get; }
 
             private IDictionary<ITableDefinition, IDictionary<AstReferenceSource, AstNode>> astReferences;
@@ -1187,7 +1187,7 @@ namespace SigQL
             public InsertBuilderAstCollection()
             {
                 this.Statements = new List<AstNode>();
-                this.TablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
+                this.TablePrimaryKeyDefinitions = new ConcurrentDictionary<string, IEnumerable<string>>();
                 this.Tokens = new List<TokenPath>();
                 this.astReferences = new Dictionary<ITableDefinition, IDictionary<AstReferenceSource, AstNode>>(TableEqualityComparer.Default);
             }

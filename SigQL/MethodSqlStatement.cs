@@ -42,7 +42,7 @@ namespace SigQL
         // sent through method arguments. For example, the direction of the order by clause
         public IEnumerable<TokenPath> Tokens { get; set; }
         public ITableKeyDefinition TargetTablePrimaryKey { get; set; }
-        public IDictionary<string, ITableKeyDefinition> TablePrimaryKeyDefinitions { get; set; }
+        public IDictionary<string, IEnumerable<string>> TablePrimaryKeyDefinitions { get; set; }
         internal SqlStatementBuilder SqlBuilder { get; set; }
 
         public IDictionary<string, object> GetParameters(IEnumerable<ParameterArg> methodArgs)

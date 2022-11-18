@@ -77,7 +77,7 @@ namespace SigQL
             var arguments = methodParameters.AsArguments(this.databaseResolver);
 
             var tableDefinition = this.databaseResolver.DetectTable(projectionType);
-            var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
+            var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, IEnumerable<string>>();
 
             TableRelations allTableRelations;
             TableRelations orderbyTableRelations;
@@ -85,7 +85,7 @@ namespace SigQL
                 var projectionTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TypeArgument(projectionType, this.databaseResolver),
                     TableRelationsColumnSource.ReturnType, tablePrimaryKeyDefinitions);
                 var parametersTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, arguments),
-                    TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, ITableKeyDefinition>());
+                    TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>());
                 
                 orderbyTableRelations = parametersTableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.OrderBy);
                 allTableRelations = this.databaseResolver.MergeTableRelations(
@@ -244,7 +244,7 @@ namespace SigQL
                 Parameters = parameterPaths,
                 Tokens = tokens,
                 TargetTablePrimaryKey = !isCountResult ? new TableKeyDefinition(allTableRelations.PrimaryKey.ToArray()) : new TableKeyDefinition(),
-                TablePrimaryKeyDefinitions = !isCountResult ? tablePrimaryKeyDefinitions : new ConcurrentDictionary<string, ITableKeyDefinition>()
+                TablePrimaryKeyDefinitions = !isCountResult ? tablePrimaryKeyDefinitions : new ConcurrentDictionary<string, IEnumerable<string>>()
             };
             return sqlStatement;
         }
@@ -1000,7 +1000,7 @@ namespace SigQL
                 parameterArgument,
                 viaRelationPath,
                 viaRelationColumnName,
-                TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, ITableKeyDefinition>());
+                TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>());
 
             var tableRelationPaths = new List<string>();
             var currTableRelations = tableRelations;

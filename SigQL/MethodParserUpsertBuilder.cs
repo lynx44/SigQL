@@ -16,7 +16,7 @@ namespace SigQL
 
             List<AstNode> statements;
             List<TokenPath> tokenPaths;
-            ConcurrentDictionary<string, ITableKeyDefinition> tablePrimaryKeyDefinitions;
+            ConcurrentDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions;
             //if (upsertSpec.IsSingular)
             //{
             //    statements = new List<AstNode>();

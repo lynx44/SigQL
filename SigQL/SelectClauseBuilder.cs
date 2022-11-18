@@ -25,12 +25,12 @@ namespace SigQL
         {
             var projectionType = OutputFactory.UnwrapType(outputType);
 
-            var fromClauseRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.DetectTable(outputType), new TypeArgument(outputType, databaseResolver), TableRelationsColumnSource.ReturnType, new ConcurrentDictionary<string, ITableKeyDefinition>());
+            var fromClauseRelations = this.databaseResolver.BuildTableRelations(this.databaseResolver.DetectTable(outputType), new TypeArgument(outputType, databaseResolver), TableRelationsColumnSource.ReturnType, new ConcurrentDictionary<string, IEnumerable<string>>());
 
-            return Build(fromClauseRelations, new ConcurrentDictionary<string, ITableKeyDefinition>());
+            return Build(fromClauseRelations, new ConcurrentDictionary<string, IEnumerable<string>>());
         }
 
-        internal ResolvedSelectClause Build(TableRelations projectionTableRelations, ConcurrentDictionary<string, ITableKeyDefinition> primaryKeyDefinitions)
+        internal ResolvedSelectClause Build(TableRelations projectionTableRelations, ConcurrentDictionary<string, IEnumerable<string>> primaryKeyDefinitions)
         {
             var tableRelations = projectionTableRelations.Mask(TableRelationsColumnSource.ReturnType, ColumnFilters.SelectClause);
             var tablePrimaryKeyDefinitions = primaryKeyDefinitions;
@@ -51,7 +51,7 @@ namespace SigQL
         }
 
         private SelectClause BuildSelectClause(TableRelations fromClauseRelations,
-            ConcurrentDictionary<string, ITableKeyDefinition> tablePrimaryKeyDefinitions)
+            ConcurrentDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions)
         {
             var columnAliasForeignKeyDefinitions = this.databaseResolver.FindAllForeignKeys(fromClauseRelations)
                 .ToColumnAliasForeignKeyDefinitions().ToList();
@@ -90,7 +90,7 @@ namespace SigQL
             this.statementBuilder = statementBuilder;
         }
         public SelectClause Ast { get; set; }
-        public IDictionary<string, ITableKeyDefinition> TableKeyDefinitions { get; internal set; }
+        public IDictionary<string, IEnumerable<string>> TableKeyDefinitions { get; internal set; }
         public string AsText => this.statementBuilder.Build(Ast);
         internal TableRelations FromClauseRelations { get; set; }
     }

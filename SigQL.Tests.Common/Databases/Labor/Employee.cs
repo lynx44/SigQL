@@ -35,6 +35,11 @@ namespace SigQL.Tests.Common.Databases.Labor
             int Id { get; set; }
         }
 
+        public interface IEmployeeID_MismatchingCase
+        {
+            int ID { get; set; }
+        }
+
         public interface IEmployeeFields
         {
             int Id { get; set; }
