@@ -50,7 +50,7 @@ namespace SigQL.SqlServer
                                 this.tables.FindByName(fk.ReferencedTable).Columns.FindByName(c.ReferencedColumn))).ToList())).ToList();
 
                 tableDefinition.ForeignKeyCollection =
-                    new ForeignKeyDefinitionCollection().AddForeignKeys(foreignKeyDefinitions.Cast<IForeignKeyDefinition>()
+                    new ForeignKeyDefinitionCollection().Add(foreignKeyDefinitions.Cast<IForeignKeyDefinition>()
                         .ToArray());
 
                 var primaryKeyColumnNames = sqlTable.Indexes.Cast<Index>()

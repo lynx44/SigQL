@@ -12,12 +12,13 @@ namespace SigQL.Schema
 
     public class DatabaseConfiguration : IDatabaseConfiguration
     {
-        public DatabaseConfiguration(ITableDefinitionCollection tables)
+        public DatabaseConfiguration(List<TableDefinition> tables)
         {
-            Tables = tables;
+            Tables = new TableDefinitionCollection(tables);
         }
 
-        public ITableDefinitionCollection Tables { get; set; }
+        ITableDefinitionCollection IDatabaseConfiguration.Tables => this.Tables;
+        public TableDefinitionCollection Tables { get; }
     }
 
     public interface ITableDefinitionCollection : IEnumerable<ITableDefinition>
@@ -30,25 +31,42 @@ namespace SigQL.Schema
         {
             return tables.FirstOrDefault(t => t.Name.Equals(tableName, StringComparison.InvariantCultureIgnoreCase));
         }
+        public static TableDefinition FindByName(this List<TableDefinition> tables, string tableName)
+        {
+            return tables.FirstOrDefault(t => t.Name.Equals(tableName, StringComparison.InvariantCultureIgnoreCase));
+        }
     }
 
     public class TableDefinitionCollection : ITableDefinitionCollection
     {
-        private readonly IEnumerable<ITableDefinition> tableDefinitions;
+        private List<ITableDefinition> TableDefinitions { get; }
+
+        public void Add(params TableDefinition[] tableDefinitions)
+        {
+            TableDefinitions.AddRange(tableDefinitions);
+        }
+
+        public void Remove(params TableDefinition[] tableDefinitions)
+        {
+            foreach (var tableDefinition in tableDefinitions)
+            {
+                TableDefinitions.Remove(tableDefinition);
+            }
+        }
 
         public TableDefinitionCollection(IEnumerable<ITableDefinition> tableDefinitions)
         {
-            this.tableDefinitions = tableDefinitions;
+            this.TableDefinitions = tableDefinitions.ToList();
         }
 
         public IEnumerator<ITableDefinition> GetEnumerator()
         {
-            return tableDefinitions.GetEnumerator();
+            return TableDefinitions.GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return ((IEnumerable) tableDefinitions).GetEnumerator();
+            return ((IEnumerable) TableDefinitions).GetEnumerator();
         }
     }
 
@@ -86,27 +104,32 @@ namespace SigQL.Schema
 
     public class TableDefinition : ITableDefinition
     {
-        public TableDefinition(ISchemaDefinition schema, string name, IEnumerable<string> columnNames)
+        public TableDefinition(SchemaDefinition schema, string name, IEnumerable<string> columnNames)
+            : this(schema, name, columnNames.Select(c => new ColumnDefinitionField() { Name = c }))
+        {
+            //Schema = schema;
+            //Name = name;
+            //this.Columns = new TableColumnDefinitionCollection(this).AddColumns(columnNames.Select(c => new ColumnDefinition(c, this)));
+            //this.ForeignKeyCollection = new ForeignKeyDefinitionCollection();
+        }
+
+        public TableDefinition(SchemaDefinition schema, string name, IEnumerable<ColumnDefinitionField> columns)
         {
             Schema = schema;
             Name = name;
-            this.Columns = new TableColumnDefinitionCollection(this).AddColumns(columnNames.Select(c => new ColumnDefinition(c, this)));
+            this.Columns = new TableColumnDefinitionCollection(this).AddColumns(columns.Select(c => new ColumnDefinition(c, this)).ToList());
             this.ForeignKeyCollection = new ForeignKeyDefinitionCollection();
         }
 
-        public TableDefinition(ISchemaDefinition schema, string name, IEnumerable<ColumnDefinitionField> columns)
-        {
-            Schema = schema;
-            Name = name;
-            this.Columns = new TableColumnDefinitionCollection(this).AddColumns(columns.Select(c => new ColumnDefinition(c, this)));
-            this.ForeignKeyCollection = new ForeignKeyDefinitionCollection();
-        }
-
-        public ISchemaDefinition Schema { get; set; }
+        ISchemaDefinition ITableDefinition.Schema => this.Schema;
+        public SchemaDefinition Schema { get; set; }
         public string Name { get; set; }
-        public ITableColumnDefinitionCollection Columns { get; set; }
-        public IForeignKeyDefinitionCollection ForeignKeyCollection { get; set; }
-        public ITableKeyDefinition PrimaryKey { get; set; }
+        ITableColumnDefinitionCollection ITableDefinition.Columns => this.Columns;
+        public TableColumnDefinitionCollection Columns { get; }
+        IForeignKeyDefinitionCollection ITableDefinition.ForeignKeyCollection => this.ForeignKeyCollection;
+        public ForeignKeyDefinitionCollection ForeignKeyCollection { get; }
+        ITableKeyDefinition ITableDefinition.PrimaryKey => this.PrimaryKey;
+        public TableKeyDefinition PrimaryKey { get; set; }
         public DatabaseObjectType ObjectType { get; set; }
     }
 
@@ -124,30 +147,48 @@ namespace SigQL.Schema
 
     public class TableColumnDefinitionCollection : ITableColumnDefinitionCollection
     {
-        private readonly ITableDefinition table;
-        private List<IColumnDefinition> columnDefinitions;
+        private readonly TableDefinition table;
+        private List<ColumnDefinition> ColumnDefinitions { get; }
 
-        public TableColumnDefinitionCollection(ITableDefinition table)
+        public void Add(params ColumnDefinition[] columns)
         {
-            this.table = table;
-            this.columnDefinitions = new List<IColumnDefinition>();
+            foreach (var column in columns)
+            {
+                column.Table = table;
+            }
+            
+            this.ColumnDefinitions.AddRange(columns);
         }
 
-        public TableColumnDefinitionCollection AddColumns(IEnumerable<IColumnDefinition> columns)
+        public void Remove(params ColumnDefinition[] columns)
         {
-            this.columnDefinitions.AddRange(columns);
+            foreach (var column in columns)
+            {
+                this.ColumnDefinitions.Remove(column);
+            }
+        }
+
+        public TableColumnDefinitionCollection(TableDefinition table)
+        {
+            this.table = table;
+            this.ColumnDefinitions = new List<ColumnDefinition>();
+        }
+
+        public TableColumnDefinitionCollection AddColumns(IEnumerable<ColumnDefinition> columns)
+        {
+            this.ColumnDefinitions.AddRange(columns);
 
             return this;
         }
 
         public IEnumerator<IColumnDefinition> GetEnumerator()
         {
-            return columnDefinitions.GetEnumerator();
+            return ColumnDefinitions.GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return ((IEnumerable) columnDefinitions).GetEnumerator();
+            return ((IEnumerable) ColumnDefinitions).GetEnumerator();
         }
     }
 
@@ -166,13 +207,13 @@ namespace SigQL.Schema
             Name = name;
         }
 
-        public ColumnDefinition(string name, ITableDefinition table)
+        public ColumnDefinition(string name, TableDefinition table)
         {
             Name = name;
             Table = table;
         }
 
-        public ColumnDefinition(ColumnDefinitionField field, ITableDefinition table)
+        public ColumnDefinition(ColumnDefinitionField field, TableDefinition table)
         {
             this.Name = field.Name;
             this.DataTypeDeclaration = field.DataTypeDeclaration;
@@ -182,7 +223,8 @@ namespace SigQL.Schema
         public string Name { get; set; }
         public string DataTypeDeclaration { get; set; }
         public bool IsIdentity { get; set; }
-        public ITableDefinition Table { get; set; }
+        ITableDefinition IColumnDefinition.Table => this.Table;
+        public TableDefinition Table { get; set; }
     }
 
     public class ColumnDefinitionField
@@ -210,28 +252,36 @@ namespace SigQL.Schema
 
     public class ForeignKeyDefinitionCollection : IForeignKeyDefinitionCollection
     {
-        private List<IForeignKeyDefinition> foreignKeyDefinitions;
-
-        public ForeignKeyDefinitionCollection()
+        private List<ForeignKeyDefinition> ForeignKeyDefinitions { get; }
+        
+        public ForeignKeyDefinitionCollection Add(params ForeignKeyDefinition[] foreignKeys)
         {
-            this.foreignKeyDefinitions = new List<IForeignKeyDefinition>();
-        }
-
-        public ForeignKeyDefinitionCollection AddForeignKeys(params IForeignKeyDefinition[] foreignKeys)
-        {
-            this.foreignKeyDefinitions.AddRange(foreignKeys);
+            this.ForeignKeyDefinitions.AddRange(foreignKeys);
 
             return this;
         }
 
+        public void Remove(params ForeignKeyDefinition[] foreignKeyDefinitions)
+        {
+            foreach (var foreignKeyDefinition in foreignKeyDefinitions)
+            {
+                this.ForeignKeyDefinitions.Remove(foreignKeyDefinition);
+            }
+        }
+
+        public ForeignKeyDefinitionCollection()
+        {
+            this.ForeignKeyDefinitions = new List<ForeignKeyDefinition>();
+        }
+
         public IEnumerator<IForeignKeyDefinition> GetEnumerator()
         {
-            return foreignKeyDefinitions.GetEnumerator();
+            return ForeignKeyDefinitions.GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return ((IEnumerable) foreignKeyDefinitions).GetEnumerator();
+            return ((IEnumerable) ForeignKeyDefinitions).GetEnumerator();
         }
     }
 
@@ -243,18 +293,20 @@ namespace SigQL.Schema
 
     public class ForeignKeyDefinition : IForeignKeyDefinition
     {
-        public ForeignKeyDefinition(ITableDefinition primaryKeyTable, IEnumerable<IForeignKeyPair> keyPairs)
+        public ForeignKeyDefinition(TableDefinition primaryKeyTable, IEnumerable<ForeignKeyPair> keyPairs)
         {
             PrimaryKeyTable = primaryKeyTable;
-            KeyPairs = keyPairs;
+            KeyPairs = keyPairs.ToList();
         }
 
-        public ForeignKeyDefinition(ITableDefinition primaryKeyTable, params IForeignKeyPair[] keyPairs) : this(primaryKeyTable, (IEnumerable<IForeignKeyPair>) keyPairs)
+        public ForeignKeyDefinition(TableDefinition primaryKeyTable, params ForeignKeyPair[] keyPairs) : this(primaryKeyTable, (IEnumerable<ForeignKeyPair>) keyPairs)
         {
         }
 
-        public ITableDefinition PrimaryKeyTable { get; set; }
-        public IEnumerable<IForeignKeyPair> KeyPairs { get; set; }
+        ITableDefinition IForeignKeyDefinition.PrimaryKeyTable => this.PrimaryKeyTable;
+        public TableDefinition PrimaryKeyTable { get; set; }
+        IEnumerable<IForeignKeyPair> IForeignKeyDefinition.KeyPairs => this.KeyPairs;
+        public List<ForeignKeyPair> KeyPairs { get; }
     }
 
     public static class ForeignKeyDefinitionExtensions
@@ -273,14 +325,16 @@ namespace SigQL.Schema
 
     public class ForeignKeyPair : IForeignKeyPair
     {
-        public ForeignKeyPair(IColumnDefinition foreignTableColumn, IColumnDefinition primaryTableColumn)
+        public ForeignKeyPair(ColumnDefinition foreignTableColumn, ColumnDefinition primaryTableColumn)
         {
             ForeignTableColumn = foreignTableColumn;
             PrimaryTableColumn = primaryTableColumn;
         }
 
-        public IColumnDefinition ForeignTableColumn { get; set; }
-        public IColumnDefinition PrimaryTableColumn { get; set; }
+        IColumnDefinition IForeignKeyPair.ForeignTableColumn => this.ForeignTableColumn;
+        public ColumnDefinition ForeignTableColumn { get; set; }
+        IColumnDefinition IForeignKeyPair.PrimaryTableColumn => this.PrimaryTableColumn;
+        public ColumnDefinition PrimaryTableColumn { get; set; }
     }
     
     public interface ITableKeyDefinition
@@ -290,11 +344,13 @@ namespace SigQL.Schema
 
     public class TableKeyDefinition : ITableKeyDefinition
     {
-        public TableKeyDefinition(params IColumnDefinition[] columns)
+        public TableKeyDefinition(params ColumnDefinition[] columns)
         {
             this.Columns = columns.ToList();
         }
-        public IEnumerable<IColumnDefinition> Columns { get; set; }
+
+        IEnumerable<IColumnDefinition> ITableKeyDefinition.Columns => this.Columns;
+        public List<ColumnDefinition> Columns { get; }
     }
 
     public class TableEqualityComparer : IEqualityComparer<ITableDefinition>
