@@ -101,7 +101,7 @@ namespace SigQL.SqlServer
                     var tableName = row["TABLE_NAME"].ToString();
                     var table = (SqlTableDefinition) this.tables.FindByName(tableName);
                     ((TableColumnDefinitionCollection) table.Columns).AddColumns(
-                        new SqlColumnDefinition(row, table, identityDataTable.Rows.Cast<DataRow>().Any(r => r["TableName"] == tableName && r["ColumnName"] == row["COLUMN_NAME"])).AsEnumerable());
+                        new SqlColumnDefinition(row, table, identityDataTable.Rows.Cast<DataRow>().Any(r => (string) r["TableName"] == tableName && (string) r["ColumnName"] == (string) row["COLUMN_NAME"])).AsEnumerable());
                 }
 
                 var primaryKeysByTable = pkTable.Rows.Cast<DataRow>().GroupBy(d => (string) d["table_name"]);
@@ -112,55 +112,55 @@ namespace SigQL.SqlServer
                     table.PrimaryKey = new TableKeyDefinition(columnDefinitions);
                 }
 
-                var foreignKeys = connection.GetSchema("ForeignKeys", new string[] {null, null, null});
-                foreach (DataRow row in foreignKeys.Rows)
+                // Query sys.foreign_keys for foreign key information for the current table
+                var query = "SELECT fk.name AS FK_NAME, " +
+                            "col.name AS FK_COLUMN_NAME, " +
+                            "OBJECT_NAME(fk.referenced_object_id) AS PK_TABLE_NAME, " +
+                            "col_pk.name AS PK_COLUMN_NAME, " +
+                            "OBJECT_NAME(fk.parent_object_id) AS FK_TABLE_NAME " +
+                            "FROM sys.foreign_keys AS fk " +
+                            "INNER JOIN sys.foreign_key_columns AS fkc " +
+                            "ON fkc.constraint_object_id = fk.object_id " +
+                            "INNER JOIN sys.columns AS col " +
+                            "ON col.object_id = fkc.parent_object_id " +
+                            "AND col.column_id = fkc.parent_column_id " +
+                            "INNER JOIN sys.columns AS col_pk " +
+                            "ON col_pk.object_id = fkc.referenced_object_id " +
+                            "AND col_pk.column_id = fkc.referenced_column_id ";
+                var fkDataTable = new DataTable();
+                using (var selectCommand = new SqlCommand(query, connection))
                 {
-                    var tableName = row["TABLE_NAME"].ToString();
+                    var sqlDataAdapter = new SqlDataAdapter(selectCommand);
+                    sqlDataAdapter.Fill(fkDataTable);
+                }
+
+                //var foreignKeyNames = fkDataTable.Rows.Cast<DataRow>().Select(r => (string) r["FK_NAME"]).Distinct();
+                foreach (var tableName in fkDataTable.Rows.Cast<DataRow>().Select(r => (string) r["FK_TABLE_NAME"]).Distinct().ToList())
+                {
+                    //var fkRows = fkDataTable.Rows.Cast<DataRow>().Where(r => (string) r["FK_NAME"] == fkName).ToList();
+                    //var tableName = fkRows.First()["TABLE_NAME"].ToString();
                     var table = (SqlTableDefinition) this.tables.FindByName(tableName);
 
-                    // Query sys.foreign_keys for foreign key information for the current table
-                    var query = "SELECT fk.name AS FK_NAME, " +
-                                "col.name AS FK_COLUMN_NAME, " +
-                                "OBJECT_NAME(fk.referenced_object_id) AS PK_TABLE_NAME, " +
-                                "col_pk.name AS PK_COLUMN_NAME " +
-                                "FROM sys.foreign_keys AS fk " +
-                                "INNER JOIN sys.foreign_key_columns AS fkc " +
-                                "ON fkc.constraint_object_id = fk.object_id " +
-                                "INNER JOIN sys.columns AS col " +
-                                "ON col.object_id = fkc.parent_object_id " +
-                                "AND col.column_id = fkc.parent_column_id " +
-                                "INNER JOIN sys.columns AS col_pk " +
-                                "ON col_pk.object_id = fkc.referenced_object_id " +
-                                "AND col_pk.column_id = fkc.referenced_column_id " +
-                                $"WHERE OBJECT_NAME(fk.parent_object_id) = '{tableName}'";
-                    var fkDataTable = new DataTable();
-                    using (var selectCommand = new SqlCommand(query, connection))
-                    {
-                        var sqlDataAdapter = new SqlDataAdapter(selectCommand);
-                        sqlDataAdapter.Fill(fkDataTable);
-                    }
+                    var tableFkRows = fkDataTable.Rows.Cast<DataRow>().Where(r => (string) r["FK_TABLE_NAME"] == tableName).ToList();
+                    var tableFkGroups = tableFkRows.GroupBy(r => (string) r["FK_NAME"]);
 
                     // Loop through the rows in the table and build foreign key information
-                    foreach (DataRow fkRow in fkDataTable.Rows)
+                    foreach (var fkRow in tableFkGroups)
                     {
                         // Get foreign key columns
-                        var fkColumns = fkRow["FK_COLUMN_NAME"].ToString();
-                        var fkColumnDefinitions = table.Columns.FindByName(fkColumns).AsEnumerable();
+                        var fkColumnDefinitions = fkRow.Select(r => table.Columns.FindByName((string) r["FK_COLUMN_NAME"])).ToList();
 
                         // Get referenced primary key table
-                        var fkReferenceTable = this.tables.FindByName(fkRow["PK_TABLE_NAME"].ToString());
+                        var fkReferenceTable = this.tables.FindByName(fkRow.First()["PK_TABLE_NAME"].ToString());
 
                         // Get primary key columns
-                        var fkReferenceColumns = fkRow["PK_COLUMN_NAME"].ToString().Split(',').Select(x => x.Trim())
-                            .ToList();
                         var fkReferenceColumnDefinitions =
-                            fkReferenceColumns.Select(x => fkReferenceTable.Columns.FindByName(x)).ToList();
+                            fkRow.Select(r => fkReferenceTable.Columns.FindByName((string)r["PK_COLUMN_NAME"])).ToList(); ;
 
                         // Zip the foreign key and primary key columns together and create a list of ForeignKeyPair objects
                         var fkPairs = fkColumnDefinitions
                             .Zip(fkReferenceColumnDefinitions, (c, r) => new ForeignKeyPair(c, r)).ToList();
                         var fkDefinition = new ForeignKeyDefinition(fkReferenceTable, fkPairs);
-                        table.ForeignKeyCollection ??= new ForeignKeyDefinitionCollection();
                         ((ForeignKeyDefinitionCollection) table.ForeignKeyCollection).AddForeignKeys(fkDefinition);
                     }
                 }
@@ -179,6 +179,7 @@ namespace SigQL.SqlServer
             this.columns = new TableColumnDefinitionCollection(this);
             this.Name = tableName;
             this.Schema = new SchemaDefinition(schemaName);
+            this.ForeignKeyCollection = new ForeignKeyDefinitionCollection();
         }
 
     public ISchemaDefinition Schema { get; }
