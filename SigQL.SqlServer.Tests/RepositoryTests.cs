@@ -5,6 +5,8 @@ using System.Linq;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using SigQL.Extensions;
+using SigQL.Schema;
 using SigQL.SqlServer.Tests.Data;
 using SigQL.SqlServer.Tests.Infrastructure;
 using SigQL.Tests.Common.Databases.Labor;
@@ -35,7 +37,7 @@ namespace SigQL.SqlServer.Tests
             laborDbContext.Database.Migrate();
             sqlStatements = new List<PreparedSqlStatement>();
 
-            var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.DataSource, sqlConnection.Database);
+            var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.ConnectionString);
             repositoryBuilder = new RepositoryBuilder(new SqlQueryExecutor(() => laborDbConnection), sqlDatabaseConfiguration, statement =>
             {
                 Console.WriteLine(statement.CommandText);
@@ -3719,5 +3721,9 @@ namespace SigQL.SqlServer.Tests
                 Assert.Fail($"Collections are not equal. {(expected.Count() != actual.Count() ? "The number of items do not match. " : null)}Expected: [{string.Join(",", expected)}]. Actual: [{string.Join(",", actual)}]");
             }
         }
+
+
+
+        
     }
 }

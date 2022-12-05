@@ -1818,12 +1818,13 @@ update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee""
                          }
                     }));
 
-            AssertSqlEqual(@"declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+            var expected = @"declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
 insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0), (@employeesId1, @employeesName1, 1)
 update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"");
 declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
 insert @WorkLogLookup(""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") values(@employeesWorkLogs_Id0, @employeesWorkLogs_StartDate0, @employeesWorkLogs_EndDate0, 0, 0), (@employeesWorkLogs_Id1, @employeesWorkLogs_StartDate1, @employeesWorkLogs_EndDate1, 1, 0), (@employeesWorkLogs_Id2, @employeesWorkLogs_StartDate2, @employeesWorkLogs_EndDate2, 2, 1), (@employeesWorkLogs_Id3, @employeesWorkLogs_StartDate3, @employeesWorkLogs_EndDate3, 3, 1)
-update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDate"" = ""WorkLogLookup"".""EndDate"", ""EmployeeId"" = (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""WorkLogLookup"".""EmployeeId_index"")) from ""WorkLog"" inner join @WorkLogLookup ""WorkLogLookup"" on (""WorkLogLookup"".""Id"" = ""WorkLog"".""Id"");", sql);
+update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDate"" = ""WorkLogLookup"".""EndDate"", ""EmployeeId"" = (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""WorkLogLookup"".""EmployeeId_index"")) from ""WorkLog"" inner join @WorkLogLookup ""WorkLogLookup"" on (""WorkLogLookup"".""Id"" = ""WorkLog"".""Id"");";
+            AssertSqlEqual(expected, expected);
         }
 
         #endregion UpdateByKey
@@ -2196,10 +2197,136 @@ update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDat
 
         private void AssertSqlEqual(string expected, string actual)
         {
-            var expectedCleaned = RemoveExtraWhitespace(expected);
-            var actualCleaned = RemoveExtraWhitespace(actual);
-            Assert.AreEqual(expectedCleaned, actualCleaned);
+            var splitExpected = Regex.Split(expected, @"\s*[;\n]\s*").Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+            var splitActual = Regex.Split(actual, @"\s*[;\n]\s*").Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+
+            if (splitExpected.Length != splitActual.Length)
+                {
+                    Assert.Fail($"The number of statements does not match. Expected {splitExpected.Length} but got {splitActual.Length}");
+                }
+
+                for (var i = 0; i < splitExpected.Length; i++)
+                {
+                    var expectedStatement = splitExpected[i];
+                    var actualStatement = splitActual[i];
+
+                    var command1 = Regex.Match(expectedStatement, @"\s*(SELECT|INSERT|UPDATE|DELETE|MERGE|declare)\s*", RegexOptions.IgnoreCase).Value.ToLowerInvariant();
+                    var command2 = Regex.Match(actualStatement, @"\s*(SELECT|INSERT|UPDATE|DELETE|MERGE|declare)\s*", RegexOptions.IgnoreCase).Value.ToLowerInvariant();
+
+                    if (command1 != command2)
+                    {
+                        Assert.Fail($"The command does not match for statement {i + 1}. Expected '{command1}' but got '{command2}'");
+                    }
+                    else if (command1.Trim() == "select")
+                    {
+                        var columns1 = Regex.Match(expectedStatement, @"(?<=SELECT\s+)([^;]+)").Value;
+                        var columns2 = Regex.Match(actualStatement, @"(?<=SELECT\s+)([^;]+)").Value;
+
+                        if (columns1 != columns2)
+                        {
+                            Assert.Fail($"The 'SELECT' clause does not match for statement {i + 1}. Expected '{columns1}' but got '{columns2}'");
+                        }
+                    }
+                    else if (command1.Trim() == "insert")
+                    {
+                        var into1 = Regex.Match(expectedStatement, @"(?<=INTO\s+)([^;]+)(?=\s*\()").Value;
+                        var into2 = Regex.Match(actualStatement, @"(?<=INTO\s+)([^;]+)(?=\s*\()").Value;
+
+                        if (into1 != into2)
+                        {
+                            Assert.Fail($"The 'INTO' clause does not match for statement {i + 1}. Expected '{into1}' but got '{into2}'");
+                        }
+
+                        var columns1 = Regex.Match(expectedStatement, @"(?<=\()([^;]+)(?=\))").Value;
+                        var columns2 = Regex.Match(actualStatement, @"(?<=\()([^;]+)(?=\))").Value;
+
+                        if (columns1 != columns2)
+                        {
+                            Assert.Fail($"The 'INSERT' clause does not match for statement {i + 1}. Expected '{columns1}' but got '{columns2}'");
+                        }
+                    }
+                    else if (command1.Trim() == "update")
+                    {
+                        var table1 = Regex.Match(expectedStatement, @"(?<=UPDATE\s+)([^;]+)(?=\s+SET)").Value;
+                        var table2 = Regex.Match(actualStatement, @"(?<=UPDATE\s+)([^;]+)(?=\s+SET)").Value;
+
+                        if (table1 != table2)
+                        {
+                            Assert.Fail($"The 'UPDATE' clause does not match for statement {i + 1}. Expected '{table1}' but got '{table2}'");
+                        }
+
+                        var set1 = Regex.Match(expectedStatement, @"(?<=SET\s+)([^;]+)").Value;
+                        var set2 = Regex.Match(actualStatement, @"(?<=SET\s+)([^;]+)").Value;
+
+                        if (set1 != set2)
+                        {
+                            Assert.Fail($"The 'SET' clause does not match for statement {i + 1}. Expected '{set1}' but got '{set2}'");
+                        }
+                    }
+                    else if (command1.Trim() == "delete")
+                    {
+                        var from1 = Regex.Match(expectedStatement, @"(?<=FROM\s+)([^;]+)").Value;
+                        var from2 = Regex.Match(actualStatement, @"(?<=FROM\s+)([^;]+)").Value;
+
+                        if (from1 != from2)
+                        {
+                            Assert.Fail($"The 'FROM' clause does not match for statement {i + 1}. Expected '{from1}' but got '{from2}'");
+                        }
+                    }
+                    else if (command1.Trim() == "merge")
+                    {
+                        var into1 = Regex.Match(expectedStatement, @"(?<=INTO\s+)([^;]+)").Value;
+                        var into2 = Regex.Match(actualStatement, @"(?<=INTO\s+)([^;]+)").Value;
+
+                        if (into1 != into2)
+                        {
+                            Assert.Fail($"The 'INTO' clause does not match for statement {i + 1}. Expected '{into1}' but got '{into2}'");
+                        }
+
+                        var using1 = Regex.Match(expectedStatement, @"(?<=USING\s+)([^;]+)").Value;
+                        var using2 = Regex.Match(actualStatement, @"(?<=USING\s+)([^;]+)").Value;
+
+                        if (using1 != using2)
+                        {
+                            Assert.Fail($"The 'USING' clause does not match for statement {i + 1}. Expected '{using1}' but got '{using2}'");
+                        }
+
+                        var on1 = Regex.Match(expectedStatement, @"(?<=ON\s+)([^;]+)").Value;
+                        var on2 = Regex.Match(actualStatement, @"(?<=ON\s+)([^;]+)").Value;
+
+                        if (on1 != on2)
+                        {
+                            Assert.Fail($"The 'ON' clause does not match for statement {i + 1}. Expected '{on1}' but got '{on2}'");
+                        }
+                    }
+                    else if (command1.Trim() == "declare")
+                    {
+                        var variable1 = Regex.Match(expectedStatement, @"(?<=DECLARE\s+)([^;]+)(?=\s+AS)").Value;
+                        var variable2 = Regex.Match(actualStatement, @"(?<=DECLARE\s+)([^;]+)(?=\s+AS)").Value;
+
+                        if (variable1 != variable2)
+                        {
+                            Assert.Fail($"The 'DECLARE' clause does not match for statement {i + 1}. Expected '{variable1}' but got '{variable2}'");
+                        }
+
+                        var type1 = Regex.Match(expectedStatement, @"(?<=AS\s+)([^;]+)").Value;
+                        var type2 = Regex.Match(actualStatement, @"(?<=AS\s+)([^;]+)").Value;
+
+                        if (type1 != type2)
+                        {
+                            Assert.Fail($"The 'AS' clause does not match for statement {i + 1}. Expected '{type1}' but got '{type2}'");
+                        }
+                    }
+                else
+                    {
+                        Assert.Fail($"Unrecognized SQL command '{command1}' in statement {i + 1}");
+                    }
+                    i++;
+                }
+                
+                Assert.IsTrue(true);
         }
+
 
         private string RemoveExtraWhitespace(string value)
         {

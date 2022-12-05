@@ -102,6 +102,14 @@ namespace SigQL.Schema
             this.ForeignKeyCollection = new ForeignKeyDefinitionCollection();
         }
 
+        public TableDefinition(ISchemaDefinition schema, string name, IEnumerable<IColumnDefinition> columns)
+        {
+            Schema = schema;
+            Name = name;
+            this.Columns = new TableColumnDefinitionCollection(this).AddColumns(columns);
+            this.ForeignKeyCollection = new ForeignKeyDefinitionCollection();
+        }
+
         public ISchemaDefinition Schema { get; set; }
         public string Name { get; set; }
         public ITableColumnDefinitionCollection Columns { get; set; }

@@ -30,7 +30,7 @@ namespace SigQL.SqlServer.Tests
             laborDbContext.Database.Migrate();
             sqlStatements = new List<PreparedSqlStatement>();
 
-            var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.DataSource, sqlConnection.Database);
+            var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.ConnectionString);
             var sqlExecutor = new SqlQueryExecutor(() => laborDbConnection);
             materializer = new AdoMaterializer(sqlExecutor, (s) => sqlStatements.Add(s));
             selectClauseBuilder = new SelectClauseBuilder(sqlDatabaseConfiguration, DefaultPluralizationHelper.Instance);
