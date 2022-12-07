@@ -180,6 +180,7 @@ namespace SigQL.SqlServer
             this.Name = tableName;
             this.Schema = new SchemaDefinition(schemaName);
             this.ForeignKeyCollection = new ForeignKeyDefinitionCollection();
+            this.PrimaryKey = new TableKeyDefinition();
         }
 
     public ISchemaDefinition Schema { get; }
@@ -263,9 +264,9 @@ public class SqlFunctionDefinition : ITableDefinition
                 switch (dataType)
                 {
                     case "bigint": return "bigint";
-                    case "binary": return $"binary({row["CHARACTER_MAXIMUM_LENGTH"]})";
+                    case "binary": return $"binary({ConvertCharacterLength(row["CHARACTER_MAXIMUM_LENGTH"])})";
                     case "bit": return "bit";
-                    case "char": return $"char({row["CHARACTER_MAXIMUM_LENGTH"]})";
+                    case "char": return $"char({ConvertCharacterLength(row["CHARACTER_MAXIMUM_LENGTH"])})";
                     case "date": return "date";
                     case "datetime": return "datetime";
                     case "datetime2": return $"datetime2({row["DATETIME_PRECISION"]})";
@@ -275,10 +276,10 @@ public class SqlFunctionDefinition : ITableDefinition
                     case "image": return "image";
                     case "int": return "int";
                     case "money": return "money";
-                    case "nchar": return $"nchar({row["CHARACTER_MAXIMUM_LENGTH"]})";
+                    case "nchar": return $"nchar({ConvertCharacterLength(row["CHARACTER_MAXIMUM_LENGTH"])})";
                     case "ntext": return "ntext";
                     case "numeric": return $"numeric({row["NUMERIC_PRECISION"]}, {row["NUMERIC_SCALE"]})";
-                    case "nvarchar": return $"nvarchar({row["CHARACTER_MAXIMUM_LENGTH"]})";
+                    case "nvarchar": return $"nvarchar({ConvertCharacterLength(row["CHARACTER_MAXIMUM_LENGTH"])})";
                     case "real": return "real";
                     case "smalldatetime": return "smalldatetime";
                     case "smallint": return "smallint";
@@ -287,11 +288,20 @@ public class SqlFunctionDefinition : ITableDefinition
                     case "time": return $"time({row["DATETIME_PRECISION"]})";
                     case "tinyint": return "tinyint";
                     case "uniqueidentifier": return "uniqueidentifier";
-                    case "varbinary": return $"varbinary({row["CHARACTER_MAXIMUM_LENGTH"]})";
-                    case "varchar": return $"varchar({row["CHARACTER_MAXIMUM_LENGTH"]})";
+                    case "varbinary": return $"varbinary({ConvertCharacterLength(row["CHARACTER_MAXIMUM_LENGTH"])})";
+                    case "varchar": return $"varchar({ConvertCharacterLength(row["CHARACTER_MAXIMUM_LENGTH"])})";
                     default: throw new NotImplementedException(dataType);
                 }
             }
+        }
+
+        private string ConvertCharacterLength(object maxLength)
+        {
+            return maxLength != DBNull.Value ? 
+                (int)maxLength >= 0 ?
+                    maxLength.ToString() : 
+                    "max" : 
+                string.Empty;
         }
     }
 }
