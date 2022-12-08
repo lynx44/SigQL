@@ -51,7 +51,28 @@ namespace SigQL.SqlServer
                         .ToList());
 
                 
-                var columns = connection.GetSchema("Columns", new string[] {null, null, null});
+                //var columns = connection.GetSchema("Columns", new string[] {null, null, null});
+
+                var columnsQuery =
+                    @"SELECT o.name TABLE_NAME, 
+c.name COLUMN_NAME, 
+c.max_length CHARACTER_MAXIMUM_LENGTH, 
+c.precision ""PRECISION"", 
+c.scale SCALE, 
+c.is_nullable,
+st.name AS DATA_TYPE
+FROM sys.objects o
+INNER JOIN sys.columns c ON o.object_id = c.object_id
+INNER JOIN sys.types st ON c.system_type_id = st.system_type_id
+AND c.user_type_id = st.user_type_id
+WHERE o.is_ms_shipped = 0;";
+                var columns = new DataTable();
+                using (var selectCommand = new SqlCommand(columnsQuery, connection))
+                {
+                    var sqlDataAdapter = new SqlDataAdapter(selectCommand);
+                    sqlDataAdapter.Fill(columns);
+                }
+
                 var identityQuery = @"SELECT
                 t.name AS TableName,
                     c.name AS ColumnName,
@@ -99,7 +120,7 @@ namespace SigQL.SqlServer
                 foreach (DataRow row in columns.Rows)
                 {
                     var tableName = row["TABLE_NAME"].ToString();
-                    var table = (SqlTableDefinition) this.tables.FindByName(tableName);
+                    var table = (ISqlObjectWithColumns) this.tables.FindByName(tableName);
                     ((TableColumnDefinitionCollection) table.Columns).AddColumns(
                         new SqlColumnDefinition(row, table, identityDataTable.Rows.Cast<DataRow>().Any(r => (string) r["TableName"] == tableName && (string) r["ColumnName"] == (string) row["COLUMN_NAME"])).AsEnumerable());
                 }
@@ -169,10 +190,13 @@ namespace SigQL.SqlServer
 
         public ITableDefinitionCollection Tables => tables;
     }
-    public class SqlTableDefinition : ITableDefinition
-    {
-        private readonly ITableColumnDefinitionCollection columns;
 
+    internal interface ISqlObjectWithColumns: ITableDefinition {
+        public TableColumnDefinitionCollection Columns { get; internal set; }
+    }
+    public class SqlTableDefinition : ITableDefinition, ISqlObjectWithColumns
+    {
+        private TableColumnDefinitionCollection columns;
 
         public SqlTableDefinition(string schemaName, string tableName)
         {
@@ -191,11 +215,17 @@ namespace SigQL.SqlServer
     public IForeignKeyDefinitionCollection ForeignKeyCollection { get; internal set; }
     public ITableKeyDefinition PrimaryKey { get; internal set; }
     public DatabaseObjectType ObjectType => DatabaseObjectType.Table;
+
+    TableColumnDefinitionCollection ISqlObjectWithColumns.Columns
+    {
+        get => columns;
+        set => columns = value;
+    }
 }
 
-public class SqlViewDefinition : ITableDefinition
+public class SqlViewDefinition : ITableDefinition, ISqlObjectWithColumns
 {
-    private readonly TableColumnDefinitionCollection columns;
+    private TableColumnDefinitionCollection columns;
     private readonly ITableKeyDefinition primaryKeyDefinition;
 
     public SqlViewDefinition(string schema, string viewName)
@@ -215,11 +245,17 @@ public class SqlViewDefinition : ITableDefinition
     public IForeignKeyDefinitionCollection ForeignKeyCollection { get; internal set; }
     public ITableKeyDefinition PrimaryKey => primaryKeyDefinition;
     public DatabaseObjectType ObjectType => DatabaseObjectType.View;
-}
+        
+    TableColumnDefinitionCollection ISqlObjectWithColumns.Columns
+    {
+        get => columns;
+        set => columns = value;
+    }
+    }
 
-public class SqlFunctionDefinition : ITableDefinition
+public class SqlFunctionDefinition : ITableDefinition, ISqlObjectWithColumns
 {
-    private readonly TableColumnDefinitionCollection columns;
+    private TableColumnDefinitionCollection columns;
     private readonly ITableKeyDefinition primaryKeyDefinition;
 
     public SqlFunctionDefinition(string schema, string name)
@@ -239,7 +275,13 @@ public class SqlFunctionDefinition : ITableDefinition
     public IForeignKeyDefinitionCollection ForeignKeyCollection { get; internal set; }
     public ITableKeyDefinition PrimaryKey => primaryKeyDefinition;
     public DatabaseObjectType ObjectType => DatabaseObjectType.Function;
-}
+        
+    TableColumnDefinitionCollection ISqlObjectWithColumns.Columns
+    {
+        get => columns;
+        set => columns = value;
+    }
+    }
     public class SqlColumnDefinition : IColumnDefinition
     {
         private readonly DataRow row;
@@ -269,23 +311,23 @@ public class SqlFunctionDefinition : ITableDefinition
                     case "char": return $"char({ConvertCharacterLength(row["CHARACTER_MAXIMUM_LENGTH"])})";
                     case "date": return "date";
                     case "datetime": return "datetime";
-                    case "datetime2": return $"datetime2({row["DATETIME_PRECISION"]})";
-                    case "datetimeoffset": return $"datetimeoffset({row["DATETIME_PRECISION"]})";
-                    case "decimal": return $"decimal({row["NUMERIC_PRECISION"]}, {row["NUMERIC_SCALE"]})";
+                    case "datetime2": return $"datetime2({row["SCALE"]})";
+                    case "datetimeoffset": return $"datetimeoffset({row["SCALE"]})";
+                    case "decimal": return $"decimal({row["PRECISION"]}, {row["SCALE"]})";
                     case "float": return "float";
                     case "image": return "image";
                     case "int": return "int";
                     case "money": return "money";
                     case "nchar": return $"nchar({ConvertCharacterLength(row["CHARACTER_MAXIMUM_LENGTH"])})";
                     case "ntext": return "ntext";
-                    case "numeric": return $"numeric({row["NUMERIC_PRECISION"]}, {row["NUMERIC_SCALE"]})";
+                    case "numeric": return $"numeric({row["PRECISION"]}, {row["SCALE"]})";
                     case "nvarchar": return $"nvarchar({ConvertCharacterLength(row["CHARACTER_MAXIMUM_LENGTH"])})";
                     case "real": return "real";
                     case "smalldatetime": return "smalldatetime";
                     case "smallint": return "smallint";
                     case "smallmoney": return "smallmoney";
                     case "text": return "text";
-                    case "time": return $"time({row["DATETIME_PRECISION"]})";
+                    case "time": return $"time({row["SCALE"]})";
                     case "tinyint": return "tinyint";
                     case "uniqueidentifier": return "uniqueidentifier";
                     case "varbinary": return $"varbinary({ConvertCharacterLength(row["CHARACTER_MAXIMUM_LENGTH"])})";
@@ -298,7 +340,7 @@ public class SqlFunctionDefinition : ITableDefinition
         private string ConvertCharacterLength(object maxLength)
         {
             return maxLength != DBNull.Value ? 
-                (int)maxLength >= 0 ?
+                (Int16)maxLength >= 0 ?
                     maxLength.ToString() : 
                     "max" : 
                 string.Empty;
