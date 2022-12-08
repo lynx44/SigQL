@@ -3,8 +3,6 @@ using System.Data;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Data.SqlClient;
-using Microsoft.SqlServer.Management.Common;
-using Microsoft.SqlServer.Management.Smo;
 using SigQL.Extensions;
 using SigQL.Schema;
 
