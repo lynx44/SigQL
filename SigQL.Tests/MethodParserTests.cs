@@ -572,6 +572,14 @@ namespace SigQL.Tests
 
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" in (@ids0)))", sql);
         }
+        
+        [TestMethod]
+        public void Where_NullParameter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyId(null));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" in (select null where (0 = 1))))", sql);
+        }
 
         [TestMethod]
         public void Where_GreaterThan_ReturnsExpectedSql()

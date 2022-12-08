@@ -744,11 +744,11 @@ namespace SigQL
                             else
                             {
                                 // set the in clause to an empty set:
-                                //   where colName in (select 1 where 0=1)
+                                //   where colName in (select null where 0=1)
                                 //
                                 // this will cause no results to return
                                 var emptySelect = new Select();
-                                emptySelect.SelectClause = new SelectClause().SetArgs(new Literal() { Value = "1" });
+                                emptySelect.SelectClause = new SelectClause().SetArgs(new Literal() { Value = "null" });
                                 emptySelect.WhereClause = new WhereClause().SetArgs(
                                     new EqualsOperator().SetArgs(
                                         new Literal() { Value = "0"},
