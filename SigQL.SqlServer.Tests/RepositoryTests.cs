@@ -35,7 +35,7 @@ namespace SigQL.SqlServer.Tests
             laborDbContext.Database.Migrate();
             sqlStatements = new List<PreparedSqlStatement>();
 
-            var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.DataSource, sqlConnection.Database);
+            var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.ConnectionString);
             repositoryBuilder = new RepositoryBuilder(new SqlQueryExecutor(() => laborDbConnection), sqlDatabaseConfiguration, statement =>
             {
                 Console.WriteLine(statement.CommandText);
