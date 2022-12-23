@@ -477,7 +477,7 @@ namespace SigQL
                 var tokenPath = new TokenPath(FindRootArgument(insertTableRelations.TableRelations.Argument).FindParameter())
                 {
                     SqlParameterName = insertColumnParameter?.ParameterPath.SqlParameterName,
-                    UpdateNodeFunc = (parameterValue, tokenPath) =>
+                    UpdateNodeFunc = (parameterValue, tokenPath, allParameterArgs) =>
                     {
                         var orderedParameterLookup = new OrderedParameterValueLookup();
                         OrderParameterValues(orderedParameterLookup, parameterValue,

@@ -68,7 +68,7 @@ namespace SigQL
             {
                 object value = GetValueForParameterPath(joinedParam.Arg.Value, joinedParam.Path.Properties);
 
-                var newParameters = joinedParam.Path.UpdateNodeFunc.Invoke(value, joinedParam.Path);
+                var newParameters = joinedParam.Path.UpdateNodeFunc.Invoke(value, joinedParam.Path, parameterArgs);
                 allParameters = MergeParameters(allParameters, newParameters);
             }
 

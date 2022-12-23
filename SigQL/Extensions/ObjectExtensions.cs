@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -46,6 +47,34 @@ namespace SigQL.Extensions
             }
             
             return false;
+        }
+
+        public static IEnumerable<T> SelectRecursive<T>(this T o, Func<T, T> next)
+        where T: class
+        {
+            var nextChild = o;
+            var children = new List<T>();
+            while (nextChild != null)
+            {
+                children.Add(nextChild);
+                nextChild = next(nextChild);
+            }
+
+            return children;
+        }
+
+        public static IEnumerable<T> SelectManyRecursive<T>(this IEnumerable<T> o, Func<T, IEnumerable<T>> next)
+        where T: class
+        {
+            var nextChild = o;
+            var children = new List<T>();
+            while ((nextChild?.Any()).GetValueOrDefault(false))
+            {
+                children.AddRange(nextChild);
+                nextChild = nextChild.SelectMany(n => next(n));
+            }
+
+            return children;
         }
     }
 }

@@ -192,6 +192,14 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<string> Names { get; set; }
         }
 
+        public class GetEmployeeNamesAndAddressCitiesViaRelation
+        {
+            [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee), nameof(Labor.Employee.Name))]
+            public IEnumerable<string> EmployeeNames { get; set; }
+            [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address), nameof(Labor.Address.City))]
+            public IEnumerable<string> AddressCities { get; set; }
+        }
+
         public class DataFields
         {
             public DateTime? StartDate { get; set; }

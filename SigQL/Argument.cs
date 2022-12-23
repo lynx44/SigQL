@@ -372,4 +372,124 @@ namespace SigQL
                 ? OutputFactory.UnwrapType(this.Type).GetProperties().Select(p => new PropertyArgument(p, this, databaseResolver)).ToList()
                 : new List<PropertyArgument>();
     }
+
+    internal class ArgumentTreeNode
+    {
+        internal IArgument Argument { get; set; }
+        internal object Value { get; set; }
+        internal IEnumerable<ArgumentTreeNode> Children { get; set; }
+        internal ArgumentTreeNode Parent { get; set;  }
+
+        internal IEnumerable<ArgumentTreeNode> FindParents()
+        {
+            var parents = new List<ArgumentTreeNode>();
+            var parent = this.Parent;
+            while (parent != null)
+            {
+                parents.Add(parent);
+                parent = parent.Parent;
+            }
+
+            return parents;
+        }
+    }
+
+    internal class ArgumentTree
+    {
+        private IEnumerable<ArgumentTreeNode> nodes;
+
+        public ArgumentTree(DatabaseResolver databaseResolver, IEnumerable<ParameterArg> parameters)
+        {
+            nodes = Build(databaseResolver, parameters);
+        }
+
+        internal IEnumerable<ArgumentTreeNode> FindTreeNodes(IEnumerable<IArgument> arguments)
+        {
+            var result = new List<ArgumentTreeNode>();
+            Traverse(node =>
+            {
+                if (arguments.Any(a => a.EquivalentTo(node.Argument)))
+                {
+                    result.Add(node);
+                }
+            }, nodes);
+
+            return result;
+        }
+
+        //internal IEnumerable<ArgumentTreeNode> FindRelatedTreeNodes(IEnumerable<IArgument> arguments, IArgument parentArgument)
+        //{
+        //    var result = new List<ArgumentTreeNode>();
+        //    Traverse(node =>
+        //    {
+        //        if (node.Argument.Equals(parentArgument))
+        //        {
+        //            result.AddRange(node.FindParents().Where(p => arguments.Any(a => a.Equals(p.Argument))));
+        //            Traverse(childNode =>
+        //            {
+        //                if (arguments.Any(a => a.Equals(childNode.Argument)))
+        //                {
+        //                    result.Add(childNode);
+        //                }
+        //            }, node.Children);
+        //        }
+        //    }, nodes);
+
+        //    return result;
+        //}
+
+        //internal IEnumerable<ArgumentTreeNode> FindChildTreeNodes(IArgument parent, object parentValue)
+        //{
+        //    IEnumerable<ArgumentTreeNode> result = new List<ArgumentTreeNode>();
+        //    Traverse(node =>
+        //    {
+        //        if (node.Argument.Equals(parent) && node.Value == parentValue)
+        //        {
+        //            result = node.Children;
+        //        }
+        //    }, nodes);
+
+        //    return result;
+        //}
+
+        private void Traverse(Action<ArgumentTreeNode> action, IEnumerable<ArgumentTreeNode> nodeList)
+        {
+            foreach (var node in nodeList)
+            {
+                action(node);
+                Traverse(action, node.Children);
+            }
+        }
+
+        private IEnumerable<ArgumentTreeNode> Build(DatabaseResolver databaseResolver, IEnumerable<ParameterArg> parameters)
+        {
+            return parameters.Select(p =>
+            {
+                var node = BuildNode(new ParameterArgument(p.Parameter, databaseResolver), p.Value, null);
+                return node;
+            }).ToList();
+        }
+
+        private ArgumentTreeNode BuildNode(IArgument argument, object value, ArgumentTreeNode parent)
+        {
+            var node = new ArgumentTreeNode()
+            {
+                Argument = argument,
+                Value = value,
+                Parent = parent
+            };
+            node.Children = argument.ClassProperties.Select(c =>
+            {
+                var childValue = GetChildValue(c, value);
+                return BuildNode(c, childValue, node);
+            }).ToList();
+            return node;
+        }
+
+        private object GetChildValue(IArgument argument, object parentValue)
+        {
+            return MethodSqlStatement.GetValueForParameterPath(
+                parentValue, argument.GetPropertyInfo().AsEnumerable());
+        }
+    }
 }

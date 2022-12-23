@@ -588,10 +588,15 @@ namespace SigQL
                                     if (comparisonSpec.IgnoreIfNull ||
                                         comparisonSpec.IgnoreIfNullOrEmpty)
                                     {
-                                        t.UpdateNodeFunc = (parameterValue, parameterArg) =>
+                                        t.UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                                         {
-                                            if ((parameterValue == null && (comparisonSpec.IgnoreIfNull || comparisonSpec.IgnoreIfNullOrEmpty)) ||
-                                                (parameterValue.IsEmpty() && comparisonSpec.IgnoreIfNullOrEmpty))
+                                            var argumentTree = new ArgumentTree(this.databaseResolver, allParameterArgs);
+                                            var tableRelationParameterArguments = c.TableRelations.NavigationTables.SelectManyRecursive(t => t.NavigationTables).SelectMany(t => t.ProjectedColumns.SelectMany(c => c.Arguments.GetArguments(TableRelationsColumnSource.Parameters))).ToList();
+                                            var childTreeNodes = argumentTree.FindTreeNodes(tableRelationParameterArguments);
+                                            if (((parameterValue == null && (comparisonSpec.IgnoreIfNull || comparisonSpec.IgnoreIfNullOrEmpty)) ||
+                                                (parameterValue.IsEmpty() && comparisonSpec.IgnoreIfNullOrEmpty)) &&
+                                                childTreeNodes.All(a => (a.Value == null && (a.Argument.GetCustomAttribute<IgnoreIfNullAttribute>() != null || a.Argument.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null)) ||
+                                                                        (a.Value.IsEmpty() && (a.Argument.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null))))
                                             {
                                                 notNullTokenCountForTable--;
                                                 if (notNullTokenCountForTable == 0)
@@ -604,7 +609,7 @@ namespace SigQL
                                             }
                                             else
                                             {
-                                                return existingFunc(parameterValue, parameterArg);
+                                                return existingFunc(parameterValue, parameterArg, allParameterArgs);
                                             }
                                         };
                                     }
@@ -646,7 +651,7 @@ namespace SigQL
                 var token = new TokenPath(argument)
                 {
                     SqlParameterName = parameterName,
-                    UpdateNodeFunc = (parameterValue, parameterArg) =>
+                    UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                     {
 
                         var additionalParameters = new Dictionary<string, object>();
@@ -715,7 +720,7 @@ namespace SigQL
                 var token = new TokenPath(argument)
                 {
                     SqlParameterName = parameterName,
-                    UpdateNodeFunc = (parameterValue, parameterArg) =>
+                    UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                     {
                         var enumerable = parameterValue as IEnumerable;
                         var sqlParameters = new Dictionary<string, object>();
@@ -816,7 +821,7 @@ namespace SigQL
                 var token = new TokenPath(argument)
                 {
                     SqlParameterName = parameterName,
-                    UpdateNodeFunc = (parameterValue, parameterArg) =>
+                    UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                     {
 
                         var additionalParameters = new Dictionary<string, object>();
@@ -857,7 +862,7 @@ namespace SigQL
                 var token = new TokenPath(argument)
                 {
                     SqlParameterName = parameterName,
-                    UpdateNodeFunc = (parameterValue, parameterArg) =>
+                    UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                     {
                         if ((parameterValue == null && (comparisonSpec.IgnoreIfNull || comparisonSpec.IgnoreIfNullOrEmpty)) ||
                             (parameterValue is string && ((string) parameterValue == "") && comparisonSpec.IgnoreIfNullOrEmpty))
@@ -921,7 +926,7 @@ namespace SigQL
                         var orderByNode = new OrderByIdentifier() { Direction = $"{{{tokenName}}}" };
                         tokens.Add(new TokenPath(p.ParameterPath.Argument)
                         {
-                            UpdateNodeFunc = (parameterValue, parameterArg) =>
+                            UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                             {
                                 var directionString = "asc";
                                 if (parameterValue is OrderByDirection direction)
@@ -960,7 +965,7 @@ namespace SigQL
             List<OrderByIdentifier> orderByClauses = new List<OrderByIdentifier>();
             tokens.Add(new TokenPath(p.ParameterPath.Argument)
             {
-                UpdateNodeFunc = (parameterValue, parameterArg) =>
+                UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                 {
                     var orderBys = p.IsCollection ? parameterValue as IEnumerable<IOrderBy> : (parameterValue as IOrderBy).AsEnumerable();
 
@@ -1295,7 +1300,7 @@ namespace SigQL
             this.Argument.FindPropertiesFromRoot().Select(a => a.GetPropertyInfo()).ToList();
         public string SqlParameterName { get; set; }
         internal IArgument Argument { get; set; }
-        public Func<object, TokenPath, IDictionary<string, object>> UpdateNodeFunc { get; set; }
+        public Func<object, TokenPath, IEnumerable<ParameterArg>, IDictionary<string, object>> UpdateNodeFunc { get; set; }
     }
 
     public class ParameterArg
