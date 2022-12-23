@@ -672,6 +672,36 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Where_In_ViaRelation_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByEmployeeNamesViaRelation(new WorkLog.GetEmployeeNamesViaRelation()
+                    {Names = new[] {"bob", "joe"}}));
+            
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" in (@Employee0Name0, @Employee0Name1))))))", sql);
+        }
+
+        [TestMethod]
+        public void Where_In_ViaRelation_EmptyCollection_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByEmployeeNamesViaRelation(new WorkLog.GetEmployeeNamesViaRelation()
+                    {Names = Array.Empty<string>()}));
+            
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1)))", sql);
+        }
+
+        [TestMethod]
+        public void Where_In_ViaRelation_NullCollection_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByEmployeeNamesViaRelation(new WorkLog.GetEmployeeNamesViaRelation()
+                    {Names = null}));
+            
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1)))", sql);
+        }
+
+        [TestMethod]
         public void OrderByAttribute_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsAttribute(OrderByDirection.Ascending));

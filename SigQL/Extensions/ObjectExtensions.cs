@@ -26,5 +26,26 @@ namespace SigQL.Extensions
         {
             return obj.GetType().GetProperties().ToDictionary(prop => prop.Name, prop => prop.GetValue(obj, null));
         }
+
+        public static bool IsEmpty(this object value)
+        {
+            if (value == null)
+                return false;
+
+            // if it's a string, determine if it's empty
+            var stringValue = value as string;
+            if (stringValue != null)
+                return stringValue.Length == 0;
+
+            // if it's a collection, determine if it's empty
+            var enumerable = value as IEnumerable;
+            if (enumerable != null)
+            {
+                var allItems = enumerable?.Cast<object>();
+                return !allItems.Any();
+            }
+            
+            return false;
+        }
     }
 }

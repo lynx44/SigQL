@@ -1484,6 +1484,61 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void InParameter_WhenInViaRelationProperty_ReturnsExpected()
+        {
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Jake" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Jam" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Kaylee" }}
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expectedNames = new List<string>() {"Jake", "Kaylee"};
+            var expected = laborDbContext.WorkLog.Where(wl => expectedNames.Contains(wl.Employee.Name)).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetWorkLogsByEmployeeNamesViaRelation(new WorkLog.GetEmployeeNamesViaRelation() { Names = expectedNames}).Select(wl => wl.Id);
+        
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void InParameter_WhenInViaRelationPropertyNullCollection_ReturnsExpected()
+        {
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" }},
+                new EFWorkLog(),
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Jam" }},
+                new EFWorkLog()
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expectedNames = new List<string>() {"Jake", "Kaylee"};
+            var expected = laborDbContext.WorkLog.Where(wl => expectedNames.Contains(wl.Employee.Name)).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetWorkLogsByEmployeeNamesViaRelation(new WorkLog.GetEmployeeNamesViaRelation() { Names = null }).Select(wl => wl.Id);
+        
+            Assert.AreEqual(4, actual.Count());
+        }
+
+        [TestMethod]
+        public void InParameter_WhenInViaRelationPropertyEmptyCollection_ReturnsExpected()
+        {
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" }},
+                new EFWorkLog(),
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Jam" }},
+                new EFWorkLog()
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expectedNames = new List<string>() {"Jake", "Kaylee"};
+            var expected = laborDbContext.WorkLog.Where(wl => expectedNames.Contains(wl.Employee.Name)).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetWorkLogsByEmployeeNamesViaRelation(new WorkLog.GetEmployeeNamesViaRelation() { Names = new List<string>() }).Select(wl => wl.Id);
+        
+            Assert.AreEqual(4, actual.Count());
+        }
+
+        [TestMethod]
         public void GreaterThanParameter()
         {
             this.laborDbContext.WorkLog.AddRange(

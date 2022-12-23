@@ -1025,3 +1025,6 @@ Yes, they are supported in return types, parameters and filter classes.
 **What versions of .NET are targeted?**
 .NET Standard 2 (Core) and .NET Framework 4.6.2/4.7.2
 
+**I receive exception: System.ComponentModel.Win32Exception: The certificate chain was issued by an authority that is not trusted**
+SigQL uses Microsoft.Data.SqlClient rather than System.Data.SqlClient, which contains a breaking change for connection strings. The simplest fix is to update your connection string to include _TrustServerCertificate=True;_.
+

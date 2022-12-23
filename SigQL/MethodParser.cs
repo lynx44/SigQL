@@ -571,12 +571,47 @@ namespace SigQL
                             navigationTableRelations.ProjectedColumns.SelectMany(c =>
                             {
                                 var sqlParameterName = $"{navigationTableAlias}{c.Name}";
+                                var parameterArguments = c.Arguments.GetArguments(TableRelationsColumnSource.Parameters).ToList();
+
+                                var astNodes = parameterArguments.Select(arg =>
+                                    BuildComparisonNode(
+                                        new ColumnIdentifier().SetArgs(new Alias() { Label = navigationTableAlias },
+                                            new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Name })),
+                                        sqlParameterName, arg, parameterPaths, tokens)).ToList();
+
+                                var parameterTokens = tokens.Where(t => parameterArguments.Contains(t.Argument)).ToList();
+                                var notNullTokenCountForTable = parameterTokens.Count;
+                                parameterTokens.ForEach(t =>
+                                {
+                                    var existingFunc = t.UpdateNodeFunc;
+                                    var comparisonSpec = this.databaseResolver.GetColumnSpec(t.Argument);
+                                    if (comparisonSpec.IgnoreIfNull ||
+                                        comparisonSpec.IgnoreIfNullOrEmpty)
+                                    {
+                                        t.UpdateNodeFunc = (parameterValue, parameterArg) =>
+                                        {
+                                            if ((parameterValue == null && (comparisonSpec.IgnoreIfNull || comparisonSpec.IgnoreIfNullOrEmpty)) ||
+                                                (parameterValue.IsEmpty() && comparisonSpec.IgnoreIfNullOrEmpty))
+                                            {
+                                                notNullTokenCountForTable--;
+                                                if (notNullTokenCountForTable == 0)
+                                                {
+                                                    selectStatement.FromClause = null;
+                                                    selectStatement.WhereClause = null;
+                                                }
+
+                                                return new Dictionary<string, object>();
+                                            }
+                                            else
+                                            {
+                                                return existingFunc(parameterValue, parameterArg);
+                                            }
+                                        };
+                                    }
+                                    
+                                });
                                 return
-                                    c.Arguments.GetArguments(TableRelationsColumnSource.Parameters).Select(arg =>
-                                        BuildComparisonNode(
-                                            new ColumnIdentifier().SetArgs(new Alias() { Label = navigationTableAlias },
-                                                new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Name })),
-                                            sqlParameterName, arg, parameterPaths, tokens)).ToList();
+                                    astNodes;
 
                             }).ToList()
                         )
@@ -588,6 +623,7 @@ namespace SigQL
                             }).ToList()
                         )
                     ));
+
 
             return new AndOperator().SetArgs(
                 new Exists().SetArgs(selectStatement));

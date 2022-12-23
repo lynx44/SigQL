@@ -186,6 +186,12 @@ namespace SigQL.Tests.Common.Databases.Labor
             public Employee.EmployeeNamesInFilter Employee { get; set; }
         }
 
+        public class GetEmployeeNamesViaRelation
+        {
+            [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Labor.Employee.Name))]
+            public IEnumerable<string> Names { get; set; }
+        }
+
         public class DataFields
         {
             public DateTime? StartDate { get; set; }
