@@ -712,6 +712,16 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Where_In_ViaNestedRelation_EmptyCollection_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelation(new WorkLog.GetEmployeeNamesAndAddressCitiesViaRelation()
+                    {EmployeeNames = new List<string>(), AddressCities = new List<string>() { "City1" } }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (1 = 1) and (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress00\" where ((\"EmployeeAddress00\".\"EmployeeId\" = \"Employee0\".\"Id\") and (exists (select 1 from \"Address\" \"Address000\" where ((\"Address000\".\"Id\" = \"EmployeeAddress00\".\"AddressId\") and (\"Address000\".\"City\" in (@Address000City0))))))))))))", sql);
+        }
+
+        [TestMethod]
         public void OrderByAttribute_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsAttribute(OrderByDirection.Ascending));
@@ -959,6 +969,14 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithOrder(1, OrderByDirection.Ascending));
 
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog0\".\"Id\" from \"WorkLog\" \"WorkLog0\" order by \"WorkLog0\".\"StartDate\" asc offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on ((\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\")) left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
+        }
+
+        [TestMethod]
+        public void Offset_DynamicOrderBy_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithDynamicOrder(1, new List<IOrderBy>() { new OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate)) }));
+
+            Assert.AreEqual("select \"WorkLog<WorkLog>\".\"Id\" \"Id\", \"WorkLog<WorkLog>\".\"StartDate\" \"StartDate\", \"WorkLog<WorkLog>\".\"EndDate\" \"EndDate\", \"WorkLog<WorkLog>\".\"EmployeeId\" \"EmployeeId\", \"WorkLog<WorkLog>\".\"LocationId\" \"LocationId\", \"Employee<WorkLog.Employee>\".\"Id\" \"Employee.Id\", \"Employee<WorkLog.Employee>\".\"Name\" \"Employee.Name\", \"Address<WorkLog.Employee.Addresses>\".\"Id\" \"Employee.Addresses.Id\", \"Address<WorkLog.Employee.Addresses>\".\"StreetAddress\" \"Employee.Addresses.StreetAddress\", \"Address<WorkLog.Employee.Addresses>\".\"City\" \"Employee.Addresses.City\", \"Address<WorkLog.Employee.Addresses>\".\"State\" \"Employee.Addresses.State\", \"Address<WorkLog.Employee.Addresses>\".\"Classification\" \"Employee.Addresses.Classification\", \"Location<WorkLog.Employee.Addresses.Locations>\".\"Id\" \"Employee.Addresses.Locations.Id\", \"Location<WorkLog.Employee.Addresses.Locations>\".\"Name\" \"Employee.Addresses.Locations.Name\", \"Location<WorkLog.Employee.Addresses.Locations>\".\"AddressId\" \"Employee.Addresses.Locations.AddressId\", \"Location<WorkLog.Location>\".\"Id\" \"Location.Id\", \"Location<WorkLog.Location>\".\"Name\" \"Location.Name\", \"Location<WorkLog.Location>\".\"AddressId\" \"Location.AddressId\", \"Address<WorkLog.Location.Address>\".\"Id\" \"Location.Address.Id\", \"Address<WorkLog.Location.Address>\".\"StreetAddress\" \"Location.Address.StreetAddress\", \"Address<WorkLog.Location.Address>\".\"City\" \"Location.Address.City\", \"Address<WorkLog.Location.Address>\".\"State\" \"Location.Address.State\", \"Address<WorkLog.Location.Address>\".\"Classification\" \"Location.Address.Classification\", \"Employee<WorkLog.Location.Address.Employees>\".\"Id\" \"Location.Address.Employees.Id\", \"Employee<WorkLog.Location.Address.Employees>\".\"Name\" \"Location.Address.Employees.Name\" from (select \"WorkLog<WorkLog>0\".\"Id\" from \"WorkLog\" \"WorkLog<WorkLog>0\" order by \"WorkLog<WorkLog>0\".\"StartDate\" asc offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" \"WorkLog<WorkLog>\" on ((\"offset_WorkLog\".\"Id\" = \"WorkLog<WorkLog>\".\"Id\")) left outer join \"Employee\" \"Employee<WorkLog.Employee>\" on ((\"WorkLog<WorkLog>\".\"EmployeeId\" = \"Employee<WorkLog.Employee>\".\"Id\")) left outer join \"EmployeeAddress\" \"EmployeeAddress<WorkLog.Employee>\" on ((\"EmployeeAddress<WorkLog.Employee>\".\"EmployeeId\" = \"Employee<WorkLog.Employee>\".\"Id\")) left outer join \"Address\" \"Address<WorkLog.Employee.Addresses>\" on ((\"EmployeeAddress<WorkLog.Employee>\".\"AddressId\" = \"Address<WorkLog.Employee.Addresses>\".\"Id\")) left outer join \"Location\" \"Location<WorkLog.Employee.Addresses.Locations>\" on ((\"Location<WorkLog.Employee.Addresses.Locations>\".\"AddressId\" = \"Address<WorkLog.Employee.Addresses>\".\"Id\")) left outer join \"Location\" \"Location<WorkLog.Location>\" on ((\"WorkLog<WorkLog>\".\"LocationId\" = \"Location<WorkLog.Location>\".\"Id\")) left outer join \"Address\" \"Address<WorkLog.Location.Address>\" on ((\"Location<WorkLog.Location>\".\"AddressId\" = \"Address<WorkLog.Location.Address>\".\"Id\")) left outer join \"EmployeeAddress\" \"EmployeeAddress<WorkLog.Location.Address>\" on ((\"EmployeeAddress<WorkLog.Location.Address>\".\"AddressId\" = \"Address<WorkLog.Location.Address>\".\"Id\")) left outer join \"Employee\" \"Employee<WorkLog.Location.Address.Employees>\" on ((\"EmployeeAddress<WorkLog.Location.Address>\".\"EmployeeId\" = \"Employee<WorkLog.Location.Address.Employees>\".\"Id\"))", sql);
         }
 
         [TestMethod]

@@ -127,7 +127,7 @@ namespace SigQL
             orderBySpecs = orderBySpecs.OrderBy(o => o.Ordinal).ToList();
             if (orderBySpecs.Any())
             {
-                statement.OrderByClause = BuildOrderByClause(null, orderBySpecs, tokens);
+                statement.OrderByClause = BuildOrderByClause(null, orderBySpecs, tokens, null);
             }
 
             // offset functionality
@@ -138,7 +138,7 @@ namespace SigQL
             {
                 if ((allTableRelations.NavigationTables != null && allTableRelations.NavigationTables.Any()))
                 {
-                    var primaryTableAlias = $"{allTableRelations.TargetTable.Name}0";
+                    var primaryTableAlias = $"{allTableRelations.Alias}0";
                     var offsetFromClause =
                         new FromClauseNode().SetArgs(
                             new Alias() { Label = primaryTableAlias }.SetArgs(
@@ -319,7 +319,7 @@ namespace SigQL
             OrderByClause offsetOrderByClause;
             if (statement.OrderByClause != null)
             {
-                offsetOrderByClause = BuildOrderByClause(primaryTableAlias, orderBySpecs, tokens);
+                offsetOrderByClause = BuildOrderByClause(primaryTableAlias, orderBySpecs, tokens, "0");
                 statement.OrderByClause = null;
             }
             else
@@ -913,7 +913,7 @@ namespace SigQL
             }
         }
 
-        private OrderByClause BuildOrderByClause(string tableAliasName, IEnumerable<OrderBySpec> parameters, List<TokenPath> tokens)
+        private OrderByClause BuildOrderByClause(string tableAliasName, IEnumerable<OrderBySpec> parameters, List<TokenPath> tokens, string tableAliasSuffix)
         {
             var orderByClause = new OrderByClause();
             orderByClause.SetArgs(
@@ -948,7 +948,7 @@ namespace SigQL
                     }
                     else
                     {
-                        return BuildDynamicOrderByIdentifier(orderByClause, tokens, p).AsEnumerable();
+                        return BuildDynamicOrderByIdentifier(orderByClause, tokens, p, tableAliasSuffix).AsEnumerable();
                     }
                     
                 }).ToList()
@@ -958,7 +958,7 @@ namespace SigQL
 
         private IEnumerable<OrderByIdentifier> BuildDynamicOrderByIdentifier(
             OrderByClause orderByClause,
-             List<TokenPath> tokens, OrderBySpec p)
+             List<TokenPath> tokens, OrderBySpec p, string tableAliasSuffix)
         {
             var tokenName = $"{p.ParameterPath.GenerateSuggestedSqlIdentifierName()}_OrderBy";
 
@@ -1018,7 +1018,7 @@ namespace SigQL
 
                         return orderByNode.SetArgs(
                             new ColumnIdentifier().SetArgs(
-                                (AstNode) new RelationalTable() {Label = tableName },
+                                (AstNode) new RelationalTable() {Label = $"{tableName}{tableAliasSuffix}" },
                                 new RelationalColumn() {Label = orderBy.Column}
                             ));
                     }).ToList();

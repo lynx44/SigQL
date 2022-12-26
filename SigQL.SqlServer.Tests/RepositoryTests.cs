@@ -3723,6 +3723,25 @@ namespace SigQL.SqlServer.Tests
 
         #endregion
 
+        //[TestMethod]
+        //public void JoinTest()
+        //{
+        //    var workLog = new EFWorkLog() { StartDate = DateTime.Today, EndDate = DateTime.Today.AddDays(1) };
+        //    var employee = new EFEmployee() { Name = "Joe" };
+        //    workLog.Employee = employee;
+
+        //    var otherWorkLog = new EFWorkLog() { StartDate = DateTime.Today.AddDays(5), EndDate = DateTime.Today.AddDays(6) };
+        //    var otherEmployee = new EFEmployee() { Name = "Bob" };
+        //    otherWorkLog.Employee = otherEmployee;
+
+        //    this.laborDbContext.WorkLog.Add(workLog);
+        //    this.laborDbContext.WorkLog.Add(otherWorkLog);
+        //    this.laborDbContext.SaveChanges();
+
+        //    var efWorkLogs = this.laborDbContext.WorkLog.Include(wl => wl.Employee).ThenInclude(e  => e.Addresses).OrderBy(wl => wl.Employee.Addresses.Select(a => a.City)).Skip(5).ToList();
+
+        //}
+
         // [TestMethod]
         // public void JoinTest()
         // {
