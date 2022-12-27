@@ -152,6 +152,11 @@ namespace SigQL.Sql
         
         public TableRelations FindByTablePaths(IEnumerable<string> tableRelationPath)
         {
+            if (tableRelationPath.FirstOrDefault() == this.TableName && tableRelationPath.Count() == 1)
+            {
+                return this;
+            }
+
             if (tableRelationPath.FirstOrDefault() == this.TableName)
             {
                 return FindViaRelations(tableRelationPath.Skip(1).ToList(), this);
