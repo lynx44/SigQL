@@ -320,7 +320,7 @@ namespace SigQL
             if (statement.OrderByClause != null)
             {
                 offsetOrderByClause = BuildOrderByClause(primaryTableAlias, orderBySpecs, tokens, "0");
-                statement.OrderByClause = null;
+                //statement.OrderByClause = null;
             }
             else
             {
