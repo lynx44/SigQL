@@ -149,6 +149,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsViaClassFilterAndParameter(WorkLog.FilterWithOffsetAndParameter filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithNavigationTableFilterWithOffset(WorkLog.GetByEmployeeNameFilterWithOffset filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithOrder([Offset] int skip, [Column(nameof(WorkLog.StartDate))] OrderByDirection order = OrderByDirection.Ascending);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithOrder([Offset] int skip, IEnumerable<IOrderBy> order);
         IEnumerable<WorkLog> GetNextWorkLogsWithDynamicOrder([Offset] int skip, IEnumerable<IOrderBy> order);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithPrimaryTableFilter([Offset] int skip, DateTime startDate);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithNavigationTableFilter([Offset] int skip, WorkLog.GetByEmployeeNameFilter filter);

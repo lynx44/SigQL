@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Castle.Components.DictionaryAdapter;
+using SigQL.Extensions;
 using SigQL.Schema;
 
 namespace SigQL.Sql
@@ -95,7 +96,26 @@ namespace SigQL.Sql
 
             return thisEndpoint;
         }
-        
+
+        public IEnumerable<TableRelations> CollectPath(TableRelations navigationTable)
+        {
+            var path = new List<TableRelations>();
+            this.Traverse(tr =>
+            {
+                if (tr.Alias == navigationTable.Alias)
+                {
+                    while (tr != null)
+                    {
+                        path.Add(tr);
+                        tr = tr.Parent;
+                    }
+                }
+            });
+            
+            path.Reverse();
+            return path;
+        }
+
         public bool RelationTreeHasAnyTableDefinedMultipleTimes()
         {
             var root = Parent ?? this;
@@ -200,6 +220,23 @@ namespace SigQL.Sql
             }
 
             return depth;
+        }
+
+        public TableRelations Segment(TableRelations tableRelations)
+        {
+            var filteredTableRelations = new TableRelations()
+            {
+                Argument = this.Argument,
+                ForeignKeyToParent = this.ForeignKeyToParent,
+                ProjectedColumns = tableRelations.ProjectedColumns.ToList(),
+                TargetTable = this.TargetTable,
+                PrimaryKey = this.PrimaryKey,
+                FunctionParameters = this.FunctionParameters
+            };
+            var matchingNavigationTables = this.NavigationTables.Where(t => t.Alias == tableRelations.Alias || t.NavigationTables.SelectManyRecursive(t => t.NavigationTables).Any(t => t.Alias == tableRelations.Alias)).ToList();
+            filteredTableRelations.NavigationTables = matchingNavigationTables.ToList();
+
+            return filteredTableRelations;
         }
     }
 

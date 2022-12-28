@@ -127,7 +127,7 @@ namespace SigQL
             orderBySpecs = orderBySpecs.OrderBy(o => o.Ordinal).ToList();
             if (orderBySpecs.Any())
             {
-                statement.OrderByClause = BuildOrderByClause(null, orderBySpecs, tokens, null);
+                statement.OrderByClause = BuildOrderByClause(allTableRelations, orderBySpecs, tokens, null, null);
             }
 
             // offset functionality
@@ -138,7 +138,7 @@ namespace SigQL
             {
                 if ((allTableRelations.NavigationTables != null && allTableRelations.NavigationTables.Any()))
                 {
-                    var primaryTableAlias = $"{allTableRelations.Alias}0";
+                    var primaryTableAlias = allTableRelations.Alias;
                     var offsetFromClause =
                         new FromClauseNode().SetArgs(
                             new Alias() { Label = primaryTableAlias }.SetArgs(
@@ -166,7 +166,35 @@ namespace SigQL
                         offsetWhereClause = BuildWhereClauseFromTargetTablePerspective(new Alias() { Label = primaryTableAlias }, whereClauseTableRelations, parameterPaths, tokens);
                     }
 
-                    OrderByClause offsetOrderByClause = BuildOrderByWithOffsetClause(statement, primaryTableAlias, orderBySpecs, tokens, offsetParameter, parameterPaths, fetchParameter);
+                    TableRelations dynamicTableRelations = null;
+                    OrderByClause offsetOrderByClause = BuildOrderByWithOffsetClause(statement, allTableRelations, orderBySpecs, tokens, offsetParameter, parameterPaths, fetchParameter,
+                        orderByResult =>
+                        {
+                            if (dynamicTableRelations == null)
+                            {
+                                dynamicTableRelations = orderByResult.TableRelations;
+                            }
+                            else
+                            {
+                                dynamicTableRelations = databaseResolver.MergeTableRelations(dynamicTableRelations,
+                                    orderByResult.TableRelations);
+                            }
+                            //var tableRelationsPath = orderByResult.TableRelations.CollectPath(orderByResult.TableRelations.).ToList();
+                            var buildFromClause = BuildFromClause(dynamicTableRelations);
+                            offsetFromClause.Args = buildFromClause.Args;
+
+                            //for (var i = 0; i < tableRelationsPath.Count; i++)
+                            //{
+                            //    if (i + 1 < tableRelationsPath.Count - 1)
+                            //    {
+                            //        var leftTableRelations = tableRelationsPath[i];
+                            //        var rightTableRelations = tableRelationsPath[i + 1];
+
+                            //        var leftOuterJoin = BuildLeftOuterJoin(leftTableRelations, rightTableRelations);
+                            //        offsetFromClause.Args = offsetFromClause.Args.AppendOne(leftOuterJoin);
+                            //    }
+                            //}
+                        });
                     var offsetSubquery = new Select()
                     {
                         SelectClause = new SelectClause().SetArgs(primaryKeyColumnNodes),
@@ -206,7 +234,8 @@ namespace SigQL
                 }
                 else
                 {
-                    var offsetOrderByClause = BuildOrderByWithOffsetClause(statement, null, orderBySpecs, tokens, offsetParameter, parameterPaths, fetchParameter);
+                    var offsetOrderByClause = BuildOrderByWithOffsetClause(statement, allTableRelations, orderBySpecs, tokens, offsetParameter, parameterPaths, fetchParameter,
+                        null);
                     statement.OrderByClause = offsetOrderByClause;
                     if (whereClauseTableRelations.ProjectedColumns.Any() || whereClauseTableRelations.NavigationTables.Any())
                     {
@@ -313,14 +342,13 @@ namespace SigQL
             return parameter.GetCustomAttribute<ParameterAttribute>() != null;
         }
 
-        private OrderByClause BuildOrderByWithOffsetClause(Select statement, string primaryTableAlias, IEnumerable<OrderBySpec> orderBySpecs,
-            List<TokenPath> tokens, ParameterPath offsetParameter, List<ParameterPath> parameterPaths, ParameterPath fetchParameter)
+        private OrderByClause BuildOrderByWithOffsetClause(Select statement, TableRelations tableRelations, IEnumerable<OrderBySpec> orderBySpecs,
+            List<TokenPath> tokens, ParameterPath offsetParameter, List<ParameterPath> parameterPaths, ParameterPath fetchParameter, Action<OrderByResult> orderByResultAction)
         {
             OrderByClause offsetOrderByClause;
             if (statement.OrderByClause != null)
             {
-                offsetOrderByClause = BuildOrderByClause(primaryTableAlias, orderBySpecs, tokens, "0");
-                //statement.OrderByClause = null;
+                offsetOrderByClause = BuildOrderByClause(tableRelations, orderBySpecs, tokens, "0", orderByResultAction);
             }
             else
             {
@@ -407,9 +435,9 @@ namespace SigQL
                         var viaRelationColumn = viaRelationAttribute.Column;
                         var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
                             viaRelationColumn, fromTableRelations.FindByTablePaths);
-                        columnName = result.ColumnName;
+                        columnName = result.GetSingularEndpoint().ProjectedColumns.Single().Name;
                         tableName = result.TableName;
-                        tableAliasName = result.TableAliasName;
+                        tableAliasName = result.Alias;
                     }
                     else
                     {
@@ -913,7 +941,7 @@ namespace SigQL
             }
         }
 
-        private OrderByClause BuildOrderByClause(string tableAliasName, IEnumerable<OrderBySpec> parameters, List<TokenPath> tokens, string tableAliasSuffix)
+        private OrderByClause BuildOrderByClause(TableRelations tableRelations, IEnumerable<OrderBySpec> parameters, List<TokenPath> tokens, string tableAliasSuffix, Action<OrderByResult> orderByResultAction)
         {
             var orderByClause = new OrderByClause();
             orderByClause.SetArgs(
@@ -939,16 +967,25 @@ namespace SigQL
                                 return new Dictionary<string, object>();
                             }
                         });
-                        return orderByNode.SetArgs(
+                        var orderByIdentifier = orderByNode.SetArgs(
                             new ColumnIdentifier().SetArgs(
-                                (AstNode)new RelationalTable() { Label = tableAliasName ?? p.TableName },
+                                (AstNode)new RelationalTable() { Label = tableRelations.Alias ?? p.TableName },
                                 new RelationalColumn() { Label = p.ColumnName }
                             )
-                        ).AsEnumerable();
+                        );
+                        var table = databaseConfiguration.Tables.FindByName(p.TableName);
+                        var orderByResult = new OrderByResult()
+                        {
+                            OrderByIdentifier = orderByIdentifier,
+                            TableRelations = tableRelations,
+                            ColumnDefinition = table.Columns.FindByName(p.ColumnName)
+                        };
+                        orderByResultAction?.Invoke(orderByResult);
+                        return orderByIdentifier.AsEnumerable();
                     }
                     else
                     {
-                        return BuildDynamicOrderByIdentifier(orderByClause, tokens, p, tableAliasSuffix).AsEnumerable();
+                        return BuildDynamicOrderByIdentifier(tableRelations, orderByClause, tokens, p, tableAliasSuffix, orderByResultAction).AsEnumerable();
                     }
                     
                 }).ToList()
@@ -956,9 +993,9 @@ namespace SigQL
             return orderByClause;
         }
 
-        private IEnumerable<OrderByIdentifier> BuildDynamicOrderByIdentifier(
+        private IEnumerable<OrderByIdentifier> BuildDynamicOrderByIdentifier(TableRelations tableRelations,
             OrderByClause orderByClause,
-             List<TokenPath> tokens, OrderBySpec p, string tableAliasSuffix)
+            List<TokenPath> tokens, OrderBySpec p, string tableAliasSuffix, Action<OrderByResult> orderByResultAction)
         {
             var tokenName = $"{p.ParameterPath.GenerateSuggestedSqlIdentifierName()}_OrderBy";
 
@@ -967,71 +1004,115 @@ namespace SigQL
             {
                 UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                 {
-                    var orderBys = p.IsCollection ? parameterValue as IEnumerable<IOrderBy> : (parameterValue as IOrderBy).AsEnumerable();
-
-                    if (orderBys == null || !orderBys.Any())
+                    var orderByResultCollection = ResolveOrderBySpec(tableRelations, orderByClause, p, tableAliasSuffix, parameterValue, tokenName);
+                    foreach (var orderByResult in orderByResultCollection.OrderByResults)
                     {
-                        orderByClause.Args = null;
-                        orderBys = new List<IOrderBy>();
+                        orderByResultAction?.Invoke(orderByResult);
                     }
-
-                    var orderByIdentifiers = orderBys.Select(orderBy =>
-                    {
-                        string tableName;
-                        var orderByRelation = orderBy as OrderByRelation;
-                        if (orderByRelation != null)
-                        {
-                            var viaRelationPath = orderByRelation.ViaRelationPath;
-                            var viaRelationColumn = orderByRelation.ViaRelationColumnName;
-                            var parameterArgument = new ParameterArgument(p.ParameterPath.Parameter, this.databaseResolver);
-                            
-                            var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
-                                viaRelationColumn, p.ResolveTableRelations);
-
-                            orderByRelation.Table = result.TableAliasName;
-                            orderByRelation.Column = result.ColumnName;
-                            tableName = result.TableAliasName;
-                        }
-                        else
-                        {
-                            var tableIdentifier = this.databaseConfiguration.Tables.FindByName(orderBy.Table);
-                            if (tableIdentifier == null)
-                            {
-                                throw new InvalidIdentifierException($"Unable to identify matching database table for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified table name \"{orderBy.Table}\". Table {orderBy.Table} could not be found.");
-                            }
-
-                            if (tableIdentifier.Columns.FindByName(orderBy.Column) == null)
-                            {
-                                throw new InvalidIdentifierException($"Unable to identify matching database column for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified column name \"{orderBy.Column}\". Column {orderBy.Column} does not exist in table {tableIdentifier.Name}.");
-                            }
-
-                            tableName = p.ResolveTableAlias(tableIdentifier.Name);
-                        }
-                        
-
-                        var orderByNode = new OrderByIdentifier()
-                        {
-                            Direction = $"{{{tokenName}}}"
-                        };
-                        var directionString = orderBy.Direction == OrderByDirection.Ascending ? "asc" : "desc";
-                        orderByNode.Direction = directionString;
-
-                        return orderByNode.SetArgs(
-                            new ColumnIdentifier().SetArgs(
-                                (AstNode) new RelationalTable() {Label = $"{tableName}{tableAliasSuffix}" },
-                                new RelationalColumn() {Label = orderBy.Column}
-                            ));
-                    }).ToList();
-
-                    orderByClause.Args = (orderByClause.Args ?? new List<AstNode>()).Concat(orderByIdentifiers).ToList();
-
-                    return new Dictionary<string, object>();
+                    return orderByResultCollection.AdditionalParameters;
                 }
             });
             return new List<OrderByIdentifier>();
         }
 
-        private TableAliasResult ResolveTableAliasNameForViaRelationOrderBy(
+        private OrderByResultCollection ResolveOrderBySpec(TableRelations primaryTableRelations, OrderByClause orderByClause,
+            OrderBySpec p, string tableAliasSuffix,
+            object parameterValue, string tokenName)
+        {
+            var orderBys = p.IsCollection
+                ? parameterValue as IEnumerable<IOrderBy>
+                : (parameterValue as IOrderBy).AsEnumerable();
+
+            if (orderBys == null || !orderBys.Any())
+            {
+                orderByClause.Args = null;
+                orderBys = new List<IOrderBy>();
+            }
+
+            var orderByIdentifiers = orderBys.Select(orderBy =>
+            {
+                string tableName;
+                var orderByResult = new OrderByResult();
+                var orderByRelation = orderBy as OrderByRelation;
+                if (orderByRelation != null)
+                {
+                    var viaRelationPath = orderByRelation.ViaRelationPath;
+                    var viaRelationColumn = orderByRelation.ViaRelationColumnName;
+                    var parameterArgument = new ParameterArgument(p.ParameterPath.Parameter, this.databaseResolver);
+
+                    var tableRelations = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
+                        viaRelationColumn, p.ResolveTableRelations);
+
+                    orderByRelation.Table = tableRelations.Alias;
+                    orderByRelation.Column = tableRelations.GetSingularEndpoint().ProjectedColumns.Single().Name;
+                    tableName = tableRelations.Alias;
+
+                    orderByResult.TableRelations = tableRelations;
+                    orderByResult.ColumnDefinition = tableRelations.GetSingularEndpoint().ProjectedColumns.Single();
+                }
+                else
+                {
+                    var tableIdentifier = this.databaseConfiguration.Tables.FindByName(orderBy.Table);
+                    if (tableIdentifier == null)
+                    {
+                        throw new InvalidIdentifierException(
+                            $"Unable to identify matching database table for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified table name \"{orderBy.Table}\". Table {orderBy.Table} could not be found.");
+                    }
+
+                    if (tableIdentifier.Columns.FindByName(orderBy.Column) == null)
+                    {
+                        throw new InvalidIdentifierException(
+                            $"Unable to identify matching database column for order by parameter {p.ParameterPath.GenerateClassQualifiedName()} with specified column name \"{orderBy.Column}\". Column {orderBy.Column} does not exist in table {tableIdentifier.Name}.");
+                    }
+
+                    var tableRelations = primaryTableRelations.Find(orderBy.Table);
+                    var relations = primaryTableRelations.Segment(tableRelations);
+                    tableName = p.ResolveTableAlias(tableIdentifier.Name);
+                    orderByResult.TableRelations = relations;
+                    orderByResult.ColumnDefinition = tableRelations.TargetTable.Columns.FindByName(orderBy.Column);
+                }
+
+
+                var orderByNode = new OrderByIdentifier()
+                {
+                    Direction = $"{{{tokenName}}}"
+                };
+                var directionString = orderBy.Direction == OrderByDirection.Ascending ? "asc" : "desc";
+                orderByNode.Direction = directionString;
+
+                var orderByIdentifier = orderByNode.SetArgs(
+                    new ColumnIdentifier().SetArgs(
+                        (AstNode) new RelationalTable() {Label = $"{tableName}{tableAliasSuffix}"},
+                        new RelationalColumn() {Label = orderBy.Column}
+                    ));
+                orderByResult.OrderByIdentifier = orderByIdentifier;
+                return orderByResult;
+            }).ToList();
+
+            orderByClause.Args = (orderByClause.Args ?? new List<AstNode>()).Concat(orderByIdentifiers.Select(i => i.OrderByIdentifier)).ToList();
+
+            return new OrderByResultCollection()
+            {
+                OrderByResults = orderByIdentifiers,
+                AdditionalParameters = new Dictionary<string, object>()
+            };
+        }
+
+        internal class OrderByResultCollection
+        {
+            public IEnumerable<OrderByResult> OrderByResults { get; set; }
+            public IDictionary<string, object> AdditionalParameters { get; set; }
+        }
+
+        internal class OrderByResult
+        {
+            public OrderByIdentifier OrderByIdentifier { get; set; }
+            public TableRelations TableRelations { get; set; }
+            public IColumnDefinition ColumnDefinition { get; set; }
+            //public string TableAliasName { get; set; }
+        }
+
+        internal TableRelations ResolveTableAliasNameForViaRelationOrderBy(
             IArgument parameterArgument, 
             string viaRelationPath,
             string viaRelationColumnName,
@@ -1057,15 +1138,14 @@ namespace SigQL
 
             } while (currTableRelations != null);
 
-            var aliasRelation = resolveTableRelationsAliasFunc(tableRelationPaths);
+            //var aliasRelation = resolveTableRelationsAliasFunc(tableRelationPaths);
 
-            return new TableAliasResult(aliasRelation.TableName, aliasRelation.Alias, columnName);
+            return tableRelations;
         }
 
         private FromClauseNode BuildFromClause(TableRelations tableRelations)
         {
             var fromClauseNode = new FromClauseNode();
-            var targetTable = tableRelations.TargetTable;
             var tableIdentifier = new TableIdentifier().SetArgs(
                 BuildFromClauseTable(tableRelations));
 
@@ -1373,13 +1453,13 @@ namespace SigQL
         }
     }
 
-    internal struct TableAliasResult
+    internal struct TableRelationResult
     {
         public string TableName { get; }
         public string ColumnName { get; }
         public string TableAliasName { get; }
 
-        public TableAliasResult(string tableName, string tableAliasName, string columnName)
+        public TableRelationResult(string tableName, string tableAliasName, string columnName)
         {
             this.TableName = tableName;
             this.ColumnName = columnName;

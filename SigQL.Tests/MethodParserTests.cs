@@ -972,6 +972,31 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Offset_OrderByManyToOneRelation_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithOrder(1, new List<IOrderBy>() { new OrderBy(nameof(Employee), nameof(Employee.Name))}));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" \"WorkLog\" left outer join \"Employee\" \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) order by \"Employee\".\"Name\" asc offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on ((\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\")) left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) order by \"Employee\".\"Name\" asc", sql);
+        }
+
+        [TestMethod]
+        public void Offset_OrderByOneToManyRelation_ThrowsException()
+        {
+            Exception thrownException = null;
+            try
+            {
+                GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithDynamicOrder(1,
+                    new List<IOrderBy>() {new OrderBy(nameof(Address), nameof(Address.City))}));
+            }
+            catch (Exception ex)
+            {
+                thrownException = ex;
+            }
+            
+            Assert.IsNotNull(thrownException);
+        }
+
+        [TestMethod]
         public void Offset_DynamicOrderBy_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithDynamicOrder(1, new List<IOrderBy>() { new OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate)) }));
