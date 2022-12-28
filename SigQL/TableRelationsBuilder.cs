@@ -98,34 +98,7 @@ namespace SigQL
 
             if (source == TableRelationsColumnSource.ReturnType)
             {
-                if (tableDefinition.PrimaryKey.Columns.Any())
-                {
-                    var existingProjectedKeyColumns = columns.Where(c =>
-                        tableDefinition.PrimaryKey.Columns.Any(cl => ColumnEqualityComparer.Default.Equals(c, cl))).ToList();
-                    var missingProjectedKeyColumns = tableDefinition.PrimaryKey.Columns.Where(c =>
-                        !columns.Any(cl => ColumnEqualityComparer.Default.Equals(c, cl))).ToList();
-
-                    var additionalProjectedKeyColumns = missingProjectedKeyColumns.Select(c =>
-                        new TableRelationColumnIdentifierDefinition(c.Name, tableDefinition, new ColumnArgument(c, argument), source, c.IsIdentity)).ToList();
-                    columns.AddRange(additionalProjectedKeyColumns);
-
-                    primaryKey = existingProjectedKeyColumns.Concat(additionalProjectedKeyColumns).ToList();
-                }
-                else
-                {
-                    var columnName = "RowNumber";
-                    // on the chance that the RowNumber is already a projected column name in this table, 
-                    // keep appending _SigQL until the column name is unique
-                    while (columns.Any(c => c.Name.Equals(columnName, StringComparison.InvariantCultureIgnoreCase)))
-                    {
-                        columnName += "_SigQL";
-                    }
-
-                    var rowNumberColumn = new TableRelationColumnRowNumberFunctionDefinition(columnName, tableDefinition, source, false);
-                    rowNumberColumn.Arguments.AddArgument(argument, source);
-                    //columns.Insert(0, rowNumberColumn);
-                    primaryKey = new[] {rowNumberColumn};
-                }
+                primaryKey = BuildPrimaryKey(tableDefinition, argument, source, columns);
             }
             
             var tableRelations = new TableRelations()
@@ -205,6 +178,44 @@ namespace SigQL
             return result;
         }
 
+        private static IEnumerable<TableRelationColumnIdentifierDefinition> BuildPrimaryKey(ITableDefinition tableDefinition, IArgument argument,
+            TableRelationsColumnSource source, List<TableRelationColumnIdentifierDefinition> columns)
+        {
+            IEnumerable<TableRelationColumnIdentifierDefinition> primaryKey;
+            if (tableDefinition.PrimaryKey.Columns.Any())
+            {
+                var existingProjectedKeyColumns = columns.Where(c =>
+                    tableDefinition.PrimaryKey.Columns.Any(cl => ColumnEqualityComparer.Default.Equals(c, cl))).ToList();
+                var missingProjectedKeyColumns = tableDefinition.PrimaryKey.Columns.Where(c =>
+                    !columns.Any(cl => ColumnEqualityComparer.Default.Equals(c, cl))).ToList();
+
+                var additionalProjectedKeyColumns = missingProjectedKeyColumns.Select(c =>
+                    new TableRelationColumnIdentifierDefinition(c.Name, tableDefinition, new ColumnArgument(c, argument),
+                        source, c.IsIdentity)).ToList();
+                columns.AddRange(additionalProjectedKeyColumns);
+
+                primaryKey = existingProjectedKeyColumns.Concat(additionalProjectedKeyColumns).ToList();
+            }
+            else
+            {
+                var columnName = "RowNumber";
+                // on the chance that the RowNumber is already a projected column name in this table, 
+                // keep appending _SigQL until the column name is unique
+                while (columns.Any(c => c.Name.Equals(columnName, StringComparison.InvariantCultureIgnoreCase)))
+                {
+                    columnName += "_SigQL";
+                }
+
+                var rowNumberColumn =
+                    new TableRelationColumnRowNumberFunctionDefinition(columnName, tableDefinition, source, false);
+                rowNumberColumn.Arguments.AddArgument(argument, source);
+                //columns.Insert(0, rowNumberColumn);
+                primaryKey = new[] {rowNumberColumn};
+            }
+
+            return primaryKey;
+        }
+
         private class ViaRelationColumns
         {
             public ViaRelationColumns()
@@ -254,7 +265,8 @@ namespace SigQL
                     Argument = argument,
                     TargetTable = targetTable,
                     ProjectedColumns = new List<TableRelationColumnDefinition>(),
-                    NavigationTables = new List<TableRelations>()
+                    NavigationTables = new List<TableRelations>(),
+                    PrimaryKey = new List<TableRelationColumnIdentifierDefinition>()
                 };
                 var relationColumns = new ViaRelationColumns()
                 {

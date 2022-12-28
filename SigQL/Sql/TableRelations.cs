@@ -160,6 +160,24 @@ namespace SigQL.Sql
             return null;
         }
 
+        public TableRelations FindByAlias(string tableAlias)
+        {
+            if (Alias == tableAlias)
+            {
+                return this;
+            }
+
+            foreach (var navigationTable in this.NavigationTables)
+            {
+                if (navigationTable.Alias == tableAlias)
+                {
+                    return navigationTable;
+                }
+            }
+
+            return null;
+        }
+
         public TableRelations GetSingularEndpoint()
         {
             if (!this.NavigationTables.Any())
@@ -228,10 +246,11 @@ namespace SigQL.Sql
             {
                 Argument = this.Argument,
                 ForeignKeyToParent = this.ForeignKeyToParent,
-                ProjectedColumns = tableRelations.ProjectedColumns.ToList(),
+                ProjectedColumns = this.ProjectedColumns.ToList(),
                 TargetTable = this.TargetTable,
                 PrimaryKey = this.PrimaryKey,
-                FunctionParameters = this.FunctionParameters
+                FunctionParameters = this.FunctionParameters,
+                MasterRelations = this
             };
             var matchingNavigationTables = this.NavigationTables.Where(t => t.Alias == tableRelations.Alias || t.NavigationTables.SelectManyRecursive(t => t.NavigationTables).Any(t => t.Alias == tableRelations.Alias)).ToList();
             filteredTableRelations.NavigationTables = matchingNavigationTables.ToList();

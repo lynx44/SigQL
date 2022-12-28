@@ -127,7 +127,7 @@ namespace SigQL
             orderBySpecs = orderBySpecs.OrderBy(o => o.Ordinal).ToList();
             if (orderBySpecs.Any())
             {
-                statement.OrderByClause = BuildOrderByClause(allTableRelations, orderBySpecs, tokens, null, null);
+                statement.OrderByClause = BuildOrderByClause(allTableRelations, orderBySpecs, tokens, null);
             }
 
             // offset functionality
@@ -139,11 +139,22 @@ namespace SigQL
                 if ((allTableRelations.NavigationTables != null && allTableRelations.NavigationTables.Any()))
                 {
                     var primaryTableAlias = allTableRelations.Alias;
+                    var tableIdentifier = new TableIdentifier().SetArgs(
+                        new RelationalTable() { Label = primaryTable.Name });
                     var offsetFromClause =
-                        new FromClauseNode().SetArgs(
-                            new Alias() { Label = primaryTableAlias }.SetArgs(
-                                new TableIdentifier().SetArgs(
-                                    new RelationalTable() { Label = primaryTable.Name })));
+                        new FromClauseNode();
+
+                    if (primaryTable.Name == primaryTableAlias)
+                    {
+                        offsetFromClause
+                            .SetArgs(tableIdentifier);
+                    } else 
+                    {
+                        offsetFromClause
+                            .SetArgs(
+                                new Alias() {Label = primaryTableAlias}.SetArgs(
+                                    tableIdentifier));
+                    }
 
                     var primaryKey = primaryTable.PrimaryKey;
                     var primaryKeyColumnNodes = primaryKey.Columns.Select(column =>
@@ -151,7 +162,7 @@ namespace SigQL
                             .SetArgs(
                                 new Alias()
                                 {
-                                    Label = primaryTableAlias
+                                    Label = allTableRelations.Alias
                                 },
                                 new RelationalColumn()
                                 {
@@ -167,7 +178,16 @@ namespace SigQL
                     }
 
                     TableRelations dynamicTableRelations = null;
-                    OrderByClause offsetOrderByClause = BuildOrderByWithOffsetClause(statement, allTableRelations, orderBySpecs, tokens, offsetParameter, parameterPaths, fetchParameter,
+                    var orderByResults = new List<OrderByResult>();
+
+                    var offsetSubquery = new Select()
+                    {
+                        SelectClause = new SelectClause().SetArgs(primaryKeyColumnNodes),
+                        FromClause = new FromClause().SetArgs(offsetFromClause),
+                        WhereClause = offsetWhereClause
+                    };
+                    OrderByClause offsetOrderByClause = null;
+                    offsetOrderByClause = BuildOrderByWithOffsetClause(statement, allTableRelations, orderBySpecs, tokens, offsetParameter, parameterPaths, fetchParameter,
                         orderByResult =>
                         {
                             if (dynamicTableRelations == null)
@@ -179,29 +199,41 @@ namespace SigQL
                                 dynamicTableRelations = databaseResolver.MergeTableRelations(dynamicTableRelations,
                                     orderByResult.TableRelations);
                             }
-                            //var tableRelationsPath = orderByResult.TableRelations.CollectPath(orderByResult.TableRelations.).ToList();
+                            orderByResults.Add(orderByResult);
                             var buildFromClause = BuildFromClause(dynamicTableRelations);
                             offsetFromClause.Args = buildFromClause.Args;
+                            
+                            var primaryKeyColumnNodes = primaryKey.Columns.Select(column =>
+                                new ColumnIdentifier()
+                                    .SetArgs(
+                                        new Alias()
+                                        {
+                                            Label = dynamicTableRelations.Alias
+                                        },
+                                        new RelationalColumn()
+                                        {
+                                            Label = column.Name
+                                        }
+                                    )
+                            ).ToArray();
+                            offsetSubquery.SelectClause = new SelectClause().SetArgs(primaryKeyColumnNodes);
 
-                            //for (var i = 0; i < tableRelationsPath.Count; i++)
-                            //{
-                            //    if (i + 1 < tableRelationsPath.Count - 1)
-                            //    {
-                            //        var leftTableRelations = tableRelationsPath[i];
-                            //        var rightTableRelations = tableRelationsPath[i + 1];
-
-                            //        var leftOuterJoin = BuildLeftOuterJoin(leftTableRelations, rightTableRelations);
-                            //        offsetFromClause.Args = offsetFromClause.Args.AppendOne(leftOuterJoin);
-                            //    }
-                            //}
+                            offsetSubquery.OrderByClause = new OrderByClause() { Offset = offsetOrderByClause.Offset }.SetArgs(
+                                orderByResults.Select(r =>
+                                    new OrderByIdentifier() { Direction = r.Direction == OrderByDirection.Ascending ? "asc" : "desc" }.SetArgs(
+                                        new ColumnIdentifier().SetArgs(
+                                            new RelationalTable()
+                                            {
+                                                Label = dynamicTableRelations.FindEquivalentBranch(r.TableRelations.GetSingularEndpoint()).Alias
+                                            },
+                                            new RelationalColumn() {Label = r.ColumnDefinition.Name}
+                                        )
+                                    )
+                                )
+                            );
                         });
-                    var offsetSubquery = new Select()
-                    {
-                        SelectClause = new SelectClause().SetArgs(primaryKeyColumnNodes),
-                        FromClause = new FromClause().SetArgs(offsetFromClause),
-                        WhereClause = offsetWhereClause,
-                        OrderByClause = offsetOrderByClause
-                    };
+
+                    offsetSubquery.OrderByClause = offsetOrderByClause;
 
                     statement.WhereClause = null;
 
@@ -348,7 +380,7 @@ namespace SigQL
             OrderByClause offsetOrderByClause;
             if (statement.OrderByClause != null)
             {
-                offsetOrderByClause = BuildOrderByClause(tableRelations, orderBySpecs, tokens, "0", orderByResultAction);
+                offsetOrderByClause = BuildOrderByClause(tableRelations, orderBySpecs, tokens, orderByResultAction);
             }
             else
             {
@@ -435,9 +467,10 @@ namespace SigQL
                         var viaRelationColumn = viaRelationAttribute.Column;
                         var result = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
                             viaRelationColumn, fromTableRelations.FindByTablePaths);
-                        columnName = result.GetSingularEndpoint().ProjectedColumns.Single().Name;
-                        tableName = result.TableName;
-                        tableAliasName = result.Alias;
+                        var orderByTableRelations = result.GetSingularEndpoint();
+                        columnName = orderByTableRelations.ProjectedColumns.Single().Name;
+                        tableName = orderByTableRelations.TableName;
+                        tableAliasName = orderByTableRelations.Alias;
                     }
                     else
                     {
@@ -941,7 +974,7 @@ namespace SigQL
             }
         }
 
-        private OrderByClause BuildOrderByClause(TableRelations tableRelations, IEnumerable<OrderBySpec> parameters, List<TokenPath> tokens, string tableAliasSuffix, Action<OrderByResult> orderByResultAction)
+        private OrderByClause BuildOrderByClause(TableRelations tableRelations, IEnumerable<OrderBySpec> parameters, List<TokenPath> tokens, Action<OrderByResult> orderByResultAction)
         {
             var orderByClause = new OrderByClause();
             orderByClause.SetArgs(
@@ -952,6 +985,21 @@ namespace SigQL
                         var tokenName = $"{p.ParameterPath.GenerateSuggestedSqlIdentifierName()}_OrderByDirection";
 
                         var orderByNode = new OrderByIdentifier() { Direction = $"{{{tokenName}}}" };
+                        var orderByIdentifier = orderByNode.SetArgs(
+                            new ColumnIdentifier().SetArgs(
+                                (AstNode)new RelationalTable() { Label = p.TableName },
+                                new RelationalColumn() { Label = p.ColumnName }
+                            )
+                        );
+                        var pathToRelations = tableRelations.FindByAlias(p.TableName) ?? tableRelations.Find(p.TableName);
+                        var orderByRelations = tableRelations.Segment(pathToRelations);
+                        var orderByResult = new OrderByResult()
+                        {
+                            OrderByIdentifier = orderByIdentifier,
+                            TableRelations = orderByRelations,
+                            ColumnDefinition = pathToRelations.TargetTable.Columns.FindByName(p.ColumnName)
+                        };
+
                         tokens.Add(new TokenPath(p.ParameterPath.Argument)
                         {
                             UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
@@ -960,32 +1008,20 @@ namespace SigQL
                                 if (parameterValue is OrderByDirection direction)
                                 {
                                     directionString = direction == OrderByDirection.Ascending ? "asc" : "desc";
+                                    orderByResult.Direction = direction;
+                                    orderByResultAction?.Invoke(orderByResult);
                                 }
-                               
-                                orderByNode.Direction = directionString;
 
+                                orderByNode.Direction = directionString;
+                                
                                 return new Dictionary<string, object>();
                             }
                         });
-                        var orderByIdentifier = orderByNode.SetArgs(
-                            new ColumnIdentifier().SetArgs(
-                                (AstNode)new RelationalTable() { Label = tableRelations.Alias ?? p.TableName },
-                                new RelationalColumn() { Label = p.ColumnName }
-                            )
-                        );
-                        var table = databaseConfiguration.Tables.FindByName(p.TableName);
-                        var orderByResult = new OrderByResult()
-                        {
-                            OrderByIdentifier = orderByIdentifier,
-                            TableRelations = tableRelations,
-                            ColumnDefinition = table.Columns.FindByName(p.ColumnName)
-                        };
-                        orderByResultAction?.Invoke(orderByResult);
                         return orderByIdentifier.AsEnumerable();
                     }
                     else
                     {
-                        return BuildDynamicOrderByIdentifier(tableRelations, orderByClause, tokens, p, tableAliasSuffix, orderByResultAction).AsEnumerable();
+                        return BuildDynamicOrderByIdentifier(tableRelations, orderByClause, tokens, p, orderByResultAction).AsEnumerable();
                     }
                     
                 }).ToList()
@@ -995,7 +1031,7 @@ namespace SigQL
 
         private IEnumerable<OrderByIdentifier> BuildDynamicOrderByIdentifier(TableRelations tableRelations,
             OrderByClause orderByClause,
-            List<TokenPath> tokens, OrderBySpec p, string tableAliasSuffix, Action<OrderByResult> orderByResultAction)
+            List<TokenPath> tokens, OrderBySpec p, Action<OrderByResult> orderByResultAction)
         {
             var tokenName = $"{p.ParameterPath.GenerateSuggestedSqlIdentifierName()}_OrderBy";
 
@@ -1004,7 +1040,7 @@ namespace SigQL
             {
                 UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                 {
-                    var orderByResultCollection = ResolveOrderBySpec(tableRelations, orderByClause, p, tableAliasSuffix, parameterValue, tokenName);
+                    var orderByResultCollection = ResolveOrderBySpec(tableRelations, orderByClause, p, parameterValue, tokenName);
                     foreach (var orderByResult in orderByResultCollection.OrderByResults)
                     {
                         orderByResultAction?.Invoke(orderByResult);
@@ -1016,7 +1052,7 @@ namespace SigQL
         }
 
         private OrderByResultCollection ResolveOrderBySpec(TableRelations primaryTableRelations, OrderByClause orderByClause,
-            OrderBySpec p, string tableAliasSuffix,
+            OrderBySpec p,
             object parameterValue, string tokenName)
         {
             var orderBys = p.IsCollection
@@ -1043,12 +1079,15 @@ namespace SigQL
                     var tableRelations = ResolveTableAliasNameForViaRelationOrderBy(parameterArgument, viaRelationPath,
                         viaRelationColumn, p.ResolveTableRelations);
 
-                    orderByRelation.Table = tableRelations.Alias;
-                    orderByRelation.Column = tableRelations.GetSingularEndpoint().ProjectedColumns.Single().Name;
-                    tableName = tableRelations.Alias;
+                    var endpointTableRelations = tableRelations.GetSingularEndpoint();
+                    var mergedEndpointTableRelations = primaryTableRelations.FindEquivalentBranch(endpointTableRelations);
+                    orderByRelation.Table = mergedEndpointTableRelations.Alias;
+                    var orderByColumn = endpointTableRelations.ProjectedColumns.Single();
+                    orderByRelation.Column = orderByColumn.Name;
+                    tableName = mergedEndpointTableRelations.Alias;
 
                     orderByResult.TableRelations = tableRelations;
-                    orderByResult.ColumnDefinition = tableRelations.GetSingularEndpoint().ProjectedColumns.Single();
+                    orderByResult.ColumnDefinition = orderByColumn;
                 }
                 else
                 {
@@ -1082,10 +1121,11 @@ namespace SigQL
 
                 var orderByIdentifier = orderByNode.SetArgs(
                     new ColumnIdentifier().SetArgs(
-                        (AstNode) new RelationalTable() {Label = $"{tableName}{tableAliasSuffix}"},
+                        (AstNode) new RelationalTable() {Label = tableName},
                         new RelationalColumn() {Label = orderBy.Column}
                     ));
                 orderByResult.OrderByIdentifier = orderByIdentifier;
+                orderByResult.Direction = orderBy.Direction;
                 return orderByResult;
             }).ToList();
 
@@ -1109,6 +1149,7 @@ namespace SigQL
             public OrderByIdentifier OrderByIdentifier { get; set; }
             public TableRelations TableRelations { get; set; }
             public IColumnDefinition ColumnDefinition { get; set; }
+            public OrderByDirection Direction { get; set; }
             //public string TableAliasName { get; set; }
         }
 
