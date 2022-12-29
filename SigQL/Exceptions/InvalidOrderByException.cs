@@ -4,8 +4,7 @@ namespace SigQL.Exceptions
 {
     public class InvalidOrderByException : Exception
     {
-        public InvalidOrderByException(string message) : base(
-            )
+        public InvalidOrderByException(string message) : base(message)
         {            
         }
     }

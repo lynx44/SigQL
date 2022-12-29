@@ -190,6 +190,15 @@ namespace SigQL
                     offsetOrderByClause = BuildOrderByWithOffsetClause(statement, allTableRelations, orderBySpecs, tokens, offsetParameter, parameterPaths, fetchParameter,
                         orderByResult =>
                         {
+                            var nonManyToOneRelations = orderByResult.TableRelations.NavigationTables
+                                .SelectManyRecursive(t => t.NavigationTables)
+                                .Where(nt => TableEqualityComparer.Default.Equals(nt.ForeignKeyToParent.PrimaryKeyTable,
+                                    nt.Parent.TargetTable));
+                            if (nonManyToOneRelations.Any())
+                            {
+                                throw new InvalidOrderByException(
+                                    $"Unable to order by {orderByResult.TableRelations.GetSingularEndpoint().TableName}.{orderByResult.ColumnDefinition.Name} when using OFFSET/FETCH, since it is not a many-to-one or one-to-one relationship with {orderByResult.TableRelations.TableName}. Relationship to table{(nonManyToOneRelations.Count() > 1 ? "s" : "")} {string.Join(", ", nonManyToOneRelations.Select(t => t.TableName))} causes one-to-many or many-to-many cardinality.");
+                            }
                             if (dynamicTableRelations == null)
                             {
                                 dynamicTableRelations = orderByResult.TableRelations;

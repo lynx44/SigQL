@@ -383,7 +383,8 @@ namespace SigQL
         
         internal TableRelations MergeTableRelations(params TableRelations[] tableRelationsCollection)
         {
-            return new TableRelations()
+            var merged = 
+            new TableRelations()
             {
                 Argument = tableRelationsCollection.Where(t => t.Argument != null).Select(t => t.Argument).First(),
                 TargetTable = tableRelationsCollection.First().TargetTable,
@@ -391,10 +392,22 @@ namespace SigQL
                 NavigationTables = tableRelationsCollection.SelectMany(t => t.NavigationTables).GroupBy(nt => nt.TargetTable, nt => nt, TableEqualityComparer.Default).Select(nt => MergeTableRelations(nt.ToArray())).ToList(),
                 ProjectedColumns = tableRelationsCollection.SelectMany(t => t.ProjectedColumns).ToList(),
                 ForeignKeyToParent = tableRelationsCollection.Where(t => t.ForeignKeyToParent != null).Select(t => t.ForeignKeyToParent).Distinct(ForeignKeyDefinitionEqualityComparer.Default).FirstOrDefault(),
-                Parent = tableRelationsCollection.Select(p => p.Parent).FirstOrDefault(parent => parent != null),
                 FunctionParameters = tableRelationsCollection.SelectMany(t => t.FunctionParameters).GroupBy(k => k.SqlParameterName).Select(k => k.First()).ToList(),
                 MasterRelations = tableRelationsCollection.Select(t => t.MasterRelations).Any(tr => tr != null) ? MergeTableRelations(tableRelationsCollection.Select(t => t.MasterRelations).Where(tr => tr != null).ToArray()) : null
             };
+            SetParents(merged);
+            return merged;
+        }
+
+        private void SetParents(TableRelations tableRelations)
+        {
+            tableRelations.Traverse(tr =>
+            {
+                foreach (var navigationTable in tr.NavigationTables)
+                {
+                    navigationTable.Parent = tr;
+                }
+            });
         }
 
     }

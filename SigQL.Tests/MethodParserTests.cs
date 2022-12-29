@@ -996,12 +996,13 @@ namespace SigQL.Tests
                 GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithDynamicOrder(1,
                     new List<IOrderBy>() {new OrderBy(nameof(Address), nameof(Address.City))}));
             }
-            catch (Exception ex)
+            catch (InvalidOrderByException ex)
             {
                 thrownException = ex;
             }
             
             Assert.IsNotNull(thrownException);
+            Assert.AreEqual("Unable to order by Address.City when using OFFSET/FETCH, since it is not a many-to-one or one-to-one relationship with WorkLog. Relationship to table EmployeeAddress causes one-to-many or many-to-many cardinality.", thrownException.Message);
         }
 
         [TestMethod]

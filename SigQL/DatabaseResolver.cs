@@ -212,8 +212,13 @@ namespace SigQL
                 ForeignKeyToParent = foreignKeyDefinition
             };
             navigationTables.Add(manyToManyTableRelations);
+            foreach (var navigationTable in manyToManyTableRelations.NavigationTables)
+            {
+                navigationTable.Parent = manyToManyTableRelations;
+            }
 
             tableRelations.NavigationTables = navigationTables;
+            
         }
         
         public class PropertyPath

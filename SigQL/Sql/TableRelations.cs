@@ -286,14 +286,10 @@ namespace SigQL.Sql
             {
                 relations.Parent = relations.Parent.Copy(relations.Parent?.Parent);
                 relations.Parent.NavigationTables = new List<TableRelations>() { relations };
-
-                if (relations.Parent?.Parent != null)
-                {
-                    return relations.Parent.Parent.PickBranch(relations.Parent);
-                }
+                return PickBranchRecursive(relations.Parent);
             }
 
-            return relations.Parent != null ? PickBranchRecursive(relations.Parent) : relations;
+            return relations;
         }
 
         public TableRelations Copy(TableRelations parent = null)
@@ -306,7 +302,7 @@ namespace SigQL.Sql
                 MasterRelations = this,
                 Parent = parent,
                 ProjectedColumns = this.ProjectedColumns.ToList(),
-                PrimaryKey = this.PrimaryKey.ToList(),
+                PrimaryKey = this.PrimaryKey?.ToList() ?? new List<TableRelationColumnIdentifierDefinition>(),
                 TargetTable = this.TargetTable
             };
             copy.NavigationTables = this.NavigationTables.Select(t => t.Copy(copy)).ToList();
