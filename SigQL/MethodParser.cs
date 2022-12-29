@@ -992,7 +992,7 @@ namespace SigQL
                             )
                         );
                         var pathToRelations = tableRelations.FindByAlias(p.TableName) ?? tableRelations.Find(p.TableName);
-                        var orderByRelations = tableRelations.Segment(pathToRelations);
+                        var orderByRelations = tableRelations.PickBranch(pathToRelations);
                         var orderByResult = new OrderByResult()
                         {
                             OrderByIdentifier = orderByIdentifier,
@@ -1105,7 +1105,8 @@ namespace SigQL
                     }
 
                     var tableRelations = primaryTableRelations.Find(orderBy.Table);
-                    var relations = primaryTableRelations.Segment(tableRelations);
+                    
+                    var relations = primaryTableRelations.PickBranch(tableRelations);
                     tableName = p.ResolveTableAlias(tableIdentifier.Name);
                     orderByResult.TableRelations = relations;
                     orderByResult.ColumnDefinition = tableRelations.TargetTable.Columns.FindByName(orderBy.Column);

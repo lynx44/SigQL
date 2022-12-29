@@ -240,22 +240,77 @@ namespace SigQL.Sql
             return depth;
         }
 
-        public TableRelations Segment(TableRelations tableRelations)
+        //public TableRelations Segment(TableRelations tableRelations)
+        //{
+        //    var filteredTableRelations = new TableRelations()
+        //    {
+        //        Argument = this.Argument,
+        //        ForeignKeyToParent = this.ForeignKeyToParent,
+        //        ProjectedColumns = this.ProjectedColumns.ToList(),
+        //        TargetTable = this.TargetTable,
+        //        PrimaryKey = this.PrimaryKey,
+        //        FunctionParameters = this.FunctionParameters,
+        //        MasterRelations = this
+        //    };
+        //    var matchingNavigationTables = this.NavigationTables.Where(t => t.Alias == tableRelations.Alias || t.NavigationTables.SelectManyRecursive(t => t.NavigationTables).Any(t => t.Alias == tableRelations.Alias)).ToList();
+        //    filteredTableRelations.NavigationTables = matchingNavigationTables.ToList();
+
+        //    return filteredTableRelations;
+        //}
+
+        public TableRelations PickBranch(TableRelations tableRelations)
         {
-            var filteredTableRelations = new TableRelations()
+            var relations = tableRelations.Copy(tableRelations.Parent);
+            relations.NavigationTables = new List<TableRelations>();
+            return PickBranchRecursive(relations);
+            //return relations;
+
+            //var path = tableRelations.SelectRecursive(t => t.Parent).ToList();
+
+            //var copy = this.Copy();
+
+            //var foreignKeys = path.Select(p => p.ForeignKeyToParent).Skip(1).ToList();
+
+            //foreach (var foreignKey in foreignKeys)
+            //{
+            //    copy.NavigationTables = copy.NavigationTables.Where(nt =>
+            //        ForeignKeyDefinitionEqualityComparer.Default.Equals(nt.ForeignKeyToParent, foreignKey)).ToList();
+            //}
+
+            //return copy;
+        }
+
+        private TableRelations PickBranchRecursive(TableRelations relations)
+        {
+            if (relations.Parent != null)
+            {
+                relations.Parent = relations.Parent.Copy(relations.Parent?.Parent);
+                relations.Parent.NavigationTables = new List<TableRelations>() { relations };
+
+                if (relations.Parent?.Parent != null)
+                {
+                    return relations.Parent.Parent.PickBranch(relations.Parent);
+                }
+            }
+
+            return relations.Parent != null ? PickBranchRecursive(relations.Parent) : relations;
+        }
+
+        public TableRelations Copy(TableRelations parent = null)
+        {
+            var copy = new TableRelations()
             {
                 Argument = this.Argument,
                 ForeignKeyToParent = this.ForeignKeyToParent,
+                FunctionParameters = this.FunctionParameters.ToList(),
+                MasterRelations = this,
+                Parent = parent,
                 ProjectedColumns = this.ProjectedColumns.ToList(),
-                TargetTable = this.TargetTable,
-                PrimaryKey = this.PrimaryKey,
-                FunctionParameters = this.FunctionParameters,
-                MasterRelations = this
+                PrimaryKey = this.PrimaryKey.ToList(),
+                TargetTable = this.TargetTable
             };
-            var matchingNavigationTables = this.NavigationTables.Where(t => t.Alias == tableRelations.Alias || t.NavigationTables.SelectManyRecursive(t => t.NavigationTables).Any(t => t.Alias == tableRelations.Alias)).ToList();
-            filteredTableRelations.NavigationTables = matchingNavigationTables.ToList();
-
-            return filteredTableRelations;
+            copy.NavigationTables = this.NavigationTables.Select(t => t.Copy(copy)).ToList();
+            return copy;
         }
     }
 
