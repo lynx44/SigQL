@@ -1539,6 +1539,69 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void InParameter_ViaNestedRelation_NullCollection_ReturnsExpectedSql()
+        {
+            var seattleAddress = new EFAddress() { City = "Seattle" };
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Seattle"}}}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "San Francisco"}}}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Dallas"}}}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Seattle" } }}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { seattleAddress }}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Dallas" } }}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { seattleAddress }}}
+            );
+            this.laborDbContext.SaveChanges();
+            
+            var actual = this.monolithicRepository.GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelationEF(new WorkLog.GetEmployeeNamesAndAddressCitiesViaRelationEF()
+                { EmployeeNames = null, AddressCities = new List<string>() { "Seattle" } }).Select(wl => wl.Id);
+        
+            Assert.AreEqual(4, actual.Count());
+        }
+
+        [TestMethod]
+        public void InParameter_ViaNestedRelation_EmptyCollection_ReturnsExpectedSql()
+        {
+            var seattleAddress = new EFAddress() { City = "Seattle" };
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Seattle"}}}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "San Francisco"}}}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Dallas"}}}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Seattle" } }}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { seattleAddress }}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Dallas" } }}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { seattleAddress }}}
+            );
+            this.laborDbContext.SaveChanges();
+            
+            var actual = this.monolithicRepository.GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelationEF(new WorkLog.GetEmployeeNamesAndAddressCitiesViaRelationEF()
+                { EmployeeNames = new List<string>(), AddressCities = new List<string>() { "Seattle" } }).Select(wl => wl.Id);
+        
+            Assert.AreEqual(4, actual.Count());
+        }
+
+        [TestMethod]
+        public void InParameter_ViaNestedRelation_BothCollectionsPopulated_ReturnsExpectedSql()
+        {
+            var seattleAddress = new EFAddress() { City = "Seattle" };
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Bob" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Seattle"}}}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Bob" , Addresses = new List<EFAddress>() { new EFAddress() { City = "San Francisco"}}}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Bob" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Dallas"}}}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Seattle" } }}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Bob" , Addresses = new List<EFAddress>() { seattleAddress }}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { new EFAddress() { City = "Dallas" } }}},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" , Addresses = new List<EFAddress>() { seattleAddress }}}
+            );
+            this.laborDbContext.SaveChanges();
+            
+            var actual = this.monolithicRepository.GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelationEF(new WorkLog.GetEmployeeNamesAndAddressCitiesViaRelationEF()
+                { EmployeeNames = new List<string>() { "Bob" }, AddressCities = new List<string>() { "Seattle" } }).Select(wl => wl.Id);
+        
+            Assert.AreEqual(2, actual.Count());
+        }
+
+        [TestMethod]
         public void GreaterThanParameter()
         {
             this.laborDbContext.WorkLog.AddRange(
@@ -1995,6 +2058,23 @@ namespace SigQL.SqlServer.Tests
             var actual = this.monolithicRepository.GetNextWorkLogsWithOrder(2).Select(wl => wl.Id).ToList();
 
             AreSame(expected, actual);
+        }
+
+        [TestMethod]
+        public void Offset_ManyToOneOrdering()
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                var workLog = new EFWorkLog() { StartDate = new DateTime(2021, 1, 1).AddDays(new Random(i).Next(0, 20))};
+                var employee = new EFEmployee() { Name = $"Bob{(i % 2 == 0 ? i : i + 10)}"};
+                workLog.Employee = employee;
+                
+                this.laborDbContext.WorkLog.Add(workLog);
+            }
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetNextWorkLogsWithOrder(1, new List<IOrderBy>() { new OrderBy(nameof(Employee), nameof(Employee.Name)) }).Select(w => w.Id).ToList();
+
+            AreSame(new []{ 2, 4, 3, 5 }, actual);
         }
 
         [TestMethod]
