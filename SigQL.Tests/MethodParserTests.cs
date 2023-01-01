@@ -712,13 +712,33 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
-        public void Where_In_ViaNestedRelation_EmptyCollection_ReturnsExpectedSql()
+        public void Where_In_ViaNestedAdjacentRelations_NullCollection_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() =>
-                monolithicRepository.GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelation(new WorkLog.GetEmployeeNamesAndAddressCitiesViaRelation()
-                    {EmployeeNames = new List<string>(), AddressCities = new List<string>() { "City1" } }));
+                monolithicRepository.GetWorkLogsByEmployeeNamesAndEmployeeIdsViaRelation(new WorkLog.GetEmployeeNamesAndEmployeeIdsViaRelation()
+                    {EmployeeNames = null, EmployeeIds = new List<int>() { 1 } }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (1 = 1) and (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress00\" where ((\"EmployeeAddress00\".\"EmployeeId\" = \"Employee0\".\"Id\") and (exists (select 1 from \"Address\" \"Address000\" where ((\"Address000\".\"Id\" = \"EmployeeAddress00\".\"AddressId\") and (\"Address000\".\"City\" in (@Address000City0))))))))))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (1 = 1) and (\"Employee0\".\"Id\" in (@Employee0Id0))))))", sql);
+        }
+
+        [TestMethod]
+        public void Where_In_ViaNestedAdjacentRelations_EmptyCollection_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByEmployeeNamesAndEmployeeIdsViaRelation(new WorkLog.GetEmployeeNamesAndEmployeeIdsViaRelation()
+                    {EmployeeNames = new List<string>(), EmployeeIds = new List<int>() { 1 } }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (1 = 1) and (\"Employee0\".\"Id\" in (@Employee0Id0))))))", sql);
+        }
+
+        [TestMethod]
+        public void Where_In_ViaNestedAdjacentRelations_PopulatedCollections_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByEmployeeNamesAndEmployeeIdsViaRelation(new WorkLog.GetEmployeeNamesAndEmployeeIdsViaRelation()
+                    {EmployeeNames = new List<string>() { "bob" }, EmployeeIds = new List<int>() { 1 } }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" in (@Employee0Name0)) and (\"Employee0\".\"Id\" in (@Employee0Id0))))))", sql);
         }
 
         [TestMethod]

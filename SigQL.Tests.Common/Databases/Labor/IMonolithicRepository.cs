@@ -94,6 +94,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesViaRelation(WorkLog.GetEmployeeNamesViaRelation filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelation(WorkLog.GetEmployeeNamesAndAddressCitiesViaRelation filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelationEF(WorkLog.GetEmployeeNamesAndAddressCitiesViaRelationEF filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesAndEmployeeIdsViaRelation(WorkLog.GetEmployeeNamesAndEmployeeIdsViaRelation filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsGreaterThanStartDate([GreaterThan] DateTime startDate);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsGreaterThanOrEqualToStartDate([GreaterThanOrEqual] DateTime startDate);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsGreaterThanStartDateClassFilter(WorkLog.StartDateGreaterThanFilter filter);

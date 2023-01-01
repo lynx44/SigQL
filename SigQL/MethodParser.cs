@@ -661,7 +661,7 @@ namespace SigQL
                                         t.UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                                         {
                                             var argumentTree = new ArgumentTree(this.databaseResolver, allParameterArgs);
-                                            var tableRelationParameterArguments = c.TableRelations.NavigationTables.SelectManyRecursive(t => t.NavigationTables).SelectMany(t => t.ProjectedColumns.SelectMany(c => c.Arguments.GetArguments(TableRelationsColumnSource.Parameters))).ToList();
+                                            var tableRelationParameterArguments = c.TableRelations.ProjectedColumns.SelectMany(c => c.Arguments.GetArguments(TableRelationsColumnSource.Parameters)).Concat(c.TableRelations.NavigationTables.SelectManyRecursive(t => t.NavigationTables).SelectMany(t => t.ProjectedColumns.SelectMany(c => c.Arguments.GetArguments(TableRelationsColumnSource.Parameters)))).ToList();
                                             var childTreeNodes = argumentTree.FindTreeNodes(tableRelationParameterArguments);
                                             if (((parameterValue == null && (comparisonSpec.IgnoreIfNull || comparisonSpec.IgnoreIfNullOrEmpty)) ||
                                                 (parameterValue.IsEmpty() && comparisonSpec.IgnoreIfNullOrEmpty)) &&
