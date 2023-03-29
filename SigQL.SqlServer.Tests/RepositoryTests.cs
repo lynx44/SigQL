@@ -1602,6 +1602,64 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void InParameter_CompositeKey_ReturnsExpected()
+        {
+            this.laborDbContext.Address.AddRange(
+                new EFAddress()
+                {
+                    City = "Seattle",
+                    State = "WA"
+                },
+                new EFAddress()
+                {
+                    City = "Tacoma",
+                    State = "WA"
+                },
+                new EFAddress()
+                {
+                    City = "Los Angeles",
+                    State = "CA"
+                },
+                new EFAddress()
+                {
+                    City = "Concord",
+                    State = "MA"
+                },
+                new EFAddress()
+                {
+                    City = "Concord",
+                    State = "WV"
+                });
+            this.laborDbContext.SaveChanges();
+            var expected = this.laborDbContext.Address.Where(a =>
+                a.City == "Seattle" && a.State == "WA" ||
+                a.City == "Concord" && a.State == "MA" ||
+                a.City == "San Diego" && a.State == "CA").ToList();
+
+            var actual = this.monolithicRepository.GetInWithCompositeKeys(new List<Address.CityAndState>()
+            {
+                new Address.CityAndState()
+                {
+                    City = "Seattle",
+                    State = "WA"
+                },
+                new Address.CityAndState()
+                {
+                    City = "Concord",
+                    State = "MA"
+                },
+                new Address.CityAndState()
+                {
+                    City = "San Diego",
+                    State = "CA"
+                }
+            });
+
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(expected.Select(e => e.Id), actual.Select(a => a.Id));
+        }
+
+        [TestMethod]
         public void GreaterThanParameter()
         {
             this.laborDbContext.WorkLog.AddRange(

@@ -542,6 +542,31 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void InParameter_CompositeKey()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetInWithCompositeKeys(new List<Address.CityAndState>()
+            {
+                new Address.CityAndState()
+                {
+                    City = "Seattle",
+                    State = "WA"
+                },
+                new Address.CityAndState()
+                {
+                    City = "Concord",
+                    State = "MA"
+                },
+                new Address.CityAndState()
+                {
+                    City = "San Diego",
+                    State = "CA"
+                }
+            }));
+            
+            AssertSqlEqual("select \"Address\".\"Id\" \"Id\", \"Address\".\"StreetAddress\" \"StreetAddress\" from \"Address\" where ((((\"Address\".\"City\" = @City0) and (\"Address\".\"State\" = @State0)) or ((\"Address\".\"City\" = @City1) and (\"Address\".\"State\" = @State1)) or ((\"Address\".\"City\" = @City2) and (\"Address\".\"State\" = @State2))))", sql);
+        }
+
+        [TestMethod]
         public void Where_NotIn_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyIdNotIn(new List<int?>() { 1 }));

@@ -46,6 +46,12 @@ namespace SigQL.Tests.Common.Databases.Labor
             AddressClassification Classification { get; }
         }
 
+        public class CityAndState
+        {
+            public string City { get; set; }
+            public string State { get; set; }
+        }
+
         public class StreetAddressFilter
         {
             public string StreetAddress { get; set; }

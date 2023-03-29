@@ -569,24 +569,74 @@ namespace SigQL
 
         private WhereClause BuildWhereClauseFromTargetTablePerspective(AstNode primaryTableReference, TableRelations whereClauseTableRelations, List<ParameterPath> parameterPaths, List<TokenPath> tokens)
         {
-            var andOperator = new AndOperator().SetArgs(whereClauseTableRelations.ProjectedColumns.SelectMany(column =>
+            var andOperator = new AndOperator().SetArgs(whereClauseTableRelations.ProjectedColumns.GroupBy(c => c.Arguments.GetArguments(TableRelationsColumnSource.Parameters).First().Parent).SelectMany(parent =>
                 {
-                    return column.Arguments.GetArguments(TableRelationsColumnSource.Parameters).SelectMany(arg =>
+                    if (parent.Key == null || !parent.Key.Type.IsCollectionType())
                     {
-                        var argument = arg.GetEndpoint();
-                        var parameterName = argument.Name;
-                        var dbColumn = GetColumnForParameterName(whereClauseTableRelations.TargetTable, parameterName);
-
-
-                        var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
-                            .SetArgs(primaryTableReference,
-                                new RelationalColumn()
+                        return parent.SelectMany(column =>
+                        {
+                            return column.Arguments.GetArguments(TableRelationsColumnSource.Parameters).SelectMany(
+                                arg =>
                                 {
-                                    Label = column.Name
-                                }), parameterName, argument, parameterPaths, tokens);
-                        return comparisonNode.AsEnumerable().ToList();
-                    });
+                                    var argument = arg.GetEndpoint();
+                                    var parameterName = argument.Name;
+                                    var dbColumn = GetColumnForParameterName(whereClauseTableRelations.TargetTable,
+                                        parameterName);
 
+
+                                    var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
+                                        .SetArgs(primaryTableReference,
+                                            new RelationalColumn()
+                                            {
+                                                Label = column.Name
+                                            }), parameterName, argument, parameterPaths, tokens);
+                                    return comparisonNode.AsEnumerable().ToList();
+                                });
+                        });
+                    }
+                    else
+                    {
+                        var placeholder = new Placeholder();
+                        var token = new TokenPath(parent.Key)
+                        {
+                            UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
+                            {
+                                var collection = parameterValue.AsEnumerable();
+
+                                var newParameters = new Dictionary<string, object>();
+                                placeholder.SetArgs(new OrOperator().SetArgs(
+                                    collection.Select((c, i) =>
+                                    {
+                                        return new AndOperator().SetArgs(parent.Key.ClassProperties.SelectMany(arg =>
+                                        {
+                                            var argument = arg.GetEndpoint();
+                                            var parameterName = argument.Name + i;
+                                            var dbColumn = GetColumnForParameterName(
+                                                whereClauseTableRelations.TargetTable,
+                                                argument.Name);
+
+                                            var dbColumnName = dbColumn.Name;
+                                            var propertyValue = MethodSqlStatement.GetValueForParameterPath(c,
+                                                arg.GetPropertyInfo().AsEnumerable());
+                                            newParameters[parameterName] = propertyValue;
+                                            var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
+                                                .SetArgs(primaryTableReference,
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = dbColumnName
+                                                    }), parameterName, argument, new List<ParameterPath>(), tokens);
+                                            return comparisonNode.AsEnumerable().ToList();
+                                        }));
+
+                                    })
+                                ));
+
+                                return newParameters;
+                            }
+                        };
+                        tokens.Add(token);
+                        return placeholder.AsEnumerable();
+                    }
                 }
             ));
 

@@ -91,6 +91,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyIdIgnoreIfNullOrEmpty([IgnoreIfNullOrEmpty] IEnumerable<int> id);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyIdPlural(IEnumerable<int> ids);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesWithIn(WorkLog.GetEmployeeNamesInFilter filter);
+        IEnumerable<Address.IAddressFields> GetInWithCompositeKeys(IEnumerable<Address.CityAndState> values);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesViaRelation(WorkLog.GetEmployeeNamesViaRelation filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelation(WorkLog.GetEmployeeNamesAndAddressCitiesViaRelation filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelationEF(WorkLog.GetEmployeeNamesAndAddressCitiesViaRelationEF filter);
