@@ -1698,6 +1698,48 @@ merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""Emplo
 select ""WorkLog<WorkLog>"".""Id"" ""Id"", ""WorkLog<WorkLog>"".""StartDate"" ""StartDate"", ""WorkLog<WorkLog>"".""EndDate"" ""EndDate"", ""WorkLog<WorkLog>"".""EmployeeId"" ""EmployeeId"", ""WorkLog<WorkLog>"".""LocationId"" ""LocationId"", ""Employee<WorkLog.Employee>"".""Id"" ""Employee.Id"", ""Employee<WorkLog.Employee>"".""Name"" ""Employee.Name"", ""Address<WorkLog.Employee.Addresses>"".""Id"" ""Employee.Addresses.Id"", ""Address<WorkLog.Employee.Addresses>"".""StreetAddress"" ""Employee.Addresses.StreetAddress"", ""Address<WorkLog.Employee.Addresses>"".""City"" ""Employee.Addresses.City"", ""Address<WorkLog.Employee.Addresses>"".""State"" ""Employee.Addresses.State"", ""Address<WorkLog.Employee.Addresses>"".""Classification"" ""Employee.Addresses.Classification"", ""Location<WorkLog.Employee.Addresses.Locations>"".""Id"" ""Employee.Addresses.Locations.Id"", ""Location<WorkLog.Employee.Addresses.Locations>"".""Name"" ""Employee.Addresses.Locations.Name"", ""Location<WorkLog.Employee.Addresses.Locations>"".""AddressId"" ""Employee.Addresses.Locations.AddressId"", ""Location<WorkLog.Location>"".""Id"" ""Location.Id"", ""Location<WorkLog.Location>"".""Name"" ""Location.Name"", ""Location<WorkLog.Location>"".""AddressId"" ""Location.AddressId"", ""Address<WorkLog.Location.Address>"".""Id"" ""Location.Address.Id"", ""Address<WorkLog.Location.Address>"".""StreetAddress"" ""Location.Address.StreetAddress"", ""Address<WorkLog.Location.Address>"".""City"" ""Location.Address.City"", ""Address<WorkLog.Location.Address>"".""State"" ""Location.Address.State"", ""Address<WorkLog.Location.Address>"".""Classification"" ""Location.Address.Classification"", ""Employee<WorkLog.Location.Address.Employees>"".""Id"" ""Location.Address.Employees.Id"", ""Employee<WorkLog.Location.Address.Employees>"".""Name"" ""Location.Address.Employees.Name"" from ""WorkLog"" ""WorkLog<WorkLog>"" left outer join ""Employee"" ""Employee<WorkLog.Employee>"" on ((""WorkLog<WorkLog>"".""EmployeeId"" = ""Employee<WorkLog.Employee>"".""Id"")) left outer join ""EmployeeAddress"" ""EmployeeAddress<WorkLog.Employee>"" on ((""EmployeeAddress<WorkLog.Employee>"".""EmployeeId"" = ""Employee<WorkLog.Employee>"".""Id"")) left outer join ""Address"" ""Address<WorkLog.Employee.Addresses>"" on ((""EmployeeAddress<WorkLog.Employee>"".""AddressId"" = ""Address<WorkLog.Employee.Addresses>"".""Id"")) left outer join ""Location"" ""Location<WorkLog.Employee.Addresses.Locations>"" on ((""Location<WorkLog.Employee.Addresses.Locations>"".""AddressId"" = ""Address<WorkLog.Employee.Addresses>"".""Id"")) left outer join ""Location"" ""Location<WorkLog.Location>"" on ((""WorkLog<WorkLog>"".""LocationId"" = ""Location<WorkLog.Location>"".""Id"")) left outer join ""Address"" ""Address<WorkLog.Location.Address>"" on ((""Location<WorkLog.Location>"".""AddressId"" = ""Address<WorkLog.Location.Address>"".""Id"")) left outer join ""EmployeeAddress"" ""EmployeeAddress<WorkLog.Location.Address>"" on ((""EmployeeAddress<WorkLog.Location.Address>"".""AddressId"" = ""Address<WorkLog.Location.Address>"".""Id"")) left outer join ""Employee"" ""Employee<WorkLog.Location.Address.Employees>"" on ((""EmployeeAddress<WorkLog.Location.Address>"".""EmployeeId"" = ""Employee<WorkLog.Location.Address.Employees>"".""Id"")) inner join @WorkLogLookup ""WorkLogLookup"" on ((""WorkLog<WorkLog>"".""Id"" = ""WorkLogLookup"".""Id"")) order by ""WorkLogLookup"".""_index""", sql);
         }
 
+        [TestMethod]
+        public void InsertRepeatedChildren_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.InsertSingleEmployeeWithAddresses(
+                new Employee.InsertEmployeeTwice()
+                {
+                    Name = "John",
+                    WorkLog = new WorkLog.InsertFieldsWithEmployee()
+                    {
+                        StartDate = DateTime.Today,
+                        Employee = new Employee.InsertFields()
+                        {
+                            Name = "Joe"
+                        }
+                    }
+                }
+
+            ));
+
+            AssertSqlEqual(@"declare @insertedWorkLog$employees$WorkLog$ table(""Id"" int, ""_index"" int)
+declare @insertedEmployee$employees$WorkLog$Employee$ table(""Id"" int, ""_index"" int)
+declare @insertedEmployee$Employee$ table(""Id"" int, ""_index"" int)
+declare @Employee$Employee$Lookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @Employee$Employee$Lookup(""Name"", ""_index"") values(@employeesName0, 0)
+merge ""Employee"" using (select ""Name"", ""_index"" from @Employee$Employee$Lookup ""Employee$Employee$Lookup"") as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee$Employee$(""Id"", ""_index"");
+update ""Employee$Employee$Lookup"" set ""Id"" = ""insertedEmployee$Employee$"".""Id"" from @Employee$Employee$Lookup ""Employee$Employee$Lookup"" inner join @insertedEmployee$Employee$ ""insertedEmployee$Employee$"" on (""Employee$Employee$Lookup"".""_index"" = ""insertedEmployee$Employee$"".""_index"");
+declare @Employee$employees$WorkLog$Employee$Lookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @Employee$employees$WorkLog$Employee$Lookup(""Name"", ""_index"") values(@employeesWorkLog_Employee_Name0, 0)
+merge ""Employee"" using (select ""Name"", ""_index"" from @Employee$employees$WorkLog$Employee$Lookup ""Employee$employees$WorkLog$Employee$Lookup"") as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee$employees$WorkLog$Employee$(""Id"", ""_index"");
+update ""Employee$employees$WorkLog$Employee$Lookup"" set ""Id"" = ""insertedEmployee$employees$WorkLog$Employee$"".""Id"" from @Employee$employees$WorkLog$Employee$Lookup ""Employee$employees$WorkLog$Employee$Lookup"" inner join @insertedEmployee$employees$WorkLog$Employee$ ""insertedEmployee$employees$WorkLog$Employee$"" on (""Employee$employees$WorkLog$Employee$Lookup"".""_index"" = ""insertedEmployee$employees$WorkLog$Employee$"".""_index"");
+declare @WorkLog$employees$WorkLog$Lookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int, ""EmployeeId_index"" int)
+insert @WorkLog$employees$WorkLog$Lookup(""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""EmployeeId_index"") values(@employeesWorkLog_StartDate0, @employeesWorkLog_EndDate0, 0, 0, 0, 0, 0)
+merge ""WorkLog"" using (select ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""EmployeeId_index"" from @WorkLog$employees$WorkLog$Lookup ""WorkLog$employees$WorkLog$Lookup"") as i (""StartDate"",""EndDate"",""_index"",""EmployeeId_index"",""EmployeeId_index"") on (1 = 0)
+ when not matched then
+ insert (""StartDate"", ""EndDate"", ""EmployeeId"", ""EmployeeId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @Employee$employees$WorkLog$Employee$Lookup ""Employee$employees$WorkLog$Employee$Lookup"" where (""Employee$employees$WorkLog$Employee$Lookup"".""_index"" = ""i"".""EmployeeId_index"")), (select ""Id"" from @Employee$Employee$Lookup ""Employee$Employee$Lookup"" where (""Employee$Employee$Lookup"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog$employees$WorkLog$(""Id"", ""_index"");
+update ""WorkLog$employees$WorkLog$Lookup"" set ""Id"" = ""insertedWorkLog$employees$WorkLog$"".""Id"" from @WorkLog$employees$WorkLog$Lookup ""WorkLog$employees$WorkLog$Lookup"" inner join @insertedWorkLog$employees$WorkLog$ ""insertedWorkLog$employees$WorkLog$"" on (""WorkLog$employees$WorkLog$Lookup"".""_index"" = ""insertedWorkLog$employees$WorkLog$"".""_index"");", sql);
+        }
+
         // [TestMethod]
         // public void InsertSingle_Void_ValuesByUnknownClass_ViaAttribute_ReturnsExpectedSql()
         // {

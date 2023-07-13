@@ -1112,12 +1112,12 @@ namespace SigQL
 
         private static string GetLookupTableName(TableRelations tableRelations)
         {
-            return tableRelations.Alias.Replace("<", "$").Replace(">", "$") + "Lookup";
+            return tableRelations.Alias.Replace("<", "$").Replace(">", "$").Replace(".", "$") + "Lookup";
         }
 
         private static string GetInsertedTableName(TableRelations tableRelations)
         {
-            return "inserted" + tableRelations.Alias.Replace("<", "$").Replace(">", "$");
+            return "inserted" + tableRelations.Alias.Replace("<", "$").Replace(">", "$").Replace(".", "$");
         }
 
         private class ForeignTableColumn

@@ -22,7 +22,7 @@ namespace SigQL.Sql
         public IEnumerable<TableRelationColumnIdentifierDefinition> ProjectedColumns { get; set; }
         public IEnumerable<ParameterPath> FunctionParameters { get; set; }
         public IForeignKeyDefinition ForeignKeyToParent { get; set; }
-        public string Alias => $"{TargetTable.Name}" + ((this.MasterRelations ?? this).RelationTreeHasAnyTableDefinedMultipleTimes() ? $"<{(Argument.Type != typeof(void) ? Argument.FullyQualifiedName() : Argument.Parent.FullyQualifiedName())}>" : null);
+        public string Alias => $"{TargetTable.Name}" + (((this.MasterRelations ?? this).RelationTreeHasAnyTableDefinedMultipleTimes()) ? $"<{(Argument.GetCallsiteTypeName() == "table" || Argument.Type != typeof(void) ? Argument.FullyQualifiedName() : Argument.Parent.FullyQualifiedName())}>" : null);
         public string TableName => TargetTable.Name;
         public TableRelations Parent { get; set; }
         public IEnumerable<TableRelationColumnIdentifierDefinition> PrimaryKey { get; set; }

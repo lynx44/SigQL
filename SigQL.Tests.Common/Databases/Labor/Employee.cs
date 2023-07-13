@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using SigQL.Types;
 using SigQL.Types.Attributes;
 
@@ -175,6 +176,12 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             IEnumerable<MyWorkLog> WorkLogs { get; }
         }
+        
+        public class InsertEmployeeTwice
+        {
+            public string Name { get; set; }
+            public WorkLog.InsertFieldsWithEmployee WorkLog { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(Employee))]
@@ -204,4 +211,28 @@ namespace SigQL.Tests.Common.Databases.Labor
     // {
     //     public string Name { get; set; }
     // }
+}
+
+namespace SigQL.Tests.Common.Databases.Labor.Alt
+{
+    public class WorkLog
+    {
+        public int Id { get; set; }
+        public Employee Employee { get; set; }
+    }
+
+    public class Employee
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public IEnumerable<Address> Addresses { get; set; }
+    }
+
+    public class Address
+    {
+        public int Id { get; set; }
+        public string StreetAddress { get; set; }
+        public string City { get; set; }
+        public string State { get; set; }
+    }
 }

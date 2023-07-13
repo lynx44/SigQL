@@ -209,6 +209,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         [Insert]
         void InsertMultipleEmployeesWithWorkLogs(IEnumerable<Employee.InsertFieldsWithWorkLogs> employees);
         [Insert]
+        void InsertSingleEmployeeWithAddresses(Employee.InsertEmployeeTwice employees);
+        [Insert]
         void InsertMultipleWorkLogsWithEmployees(IEnumerable<WorkLog.InsertFieldsWithEmployee> worklogs);
         [Insert]
         void InsertMultipleWorkLogsWithAdjacentAndNestedRelations(IEnumerable<WorkLog.InsertFieldsWithEmployeeAndLocation> employees);
