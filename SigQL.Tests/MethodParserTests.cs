@@ -167,6 +167,13 @@ namespace SigQL.Tests
 
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
         }
+        
+        [TestMethod]
+        public void Get_WithParentSqlIdentifierAttribute()
+        {
+            var sql = GetSqlForCall(() => monolithicRepository.GetWithParentSqlIdentifierAttribute());
+            AssertSqlEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\"", sql);
+        }
 
         [TestMethod]
         public void GetSingleWithWhere_ReturnsExpectedSql()
@@ -2132,6 +2139,44 @@ update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDat
                 catch (InvalidIdentifierException ex)
                 {
                     Assert.AreEqual("Unable to identify matching database table for property IInvalidNestedColumn.NonExistingTable of type System.Collections.Generic.IEnumerable`1[SigQL.Tests.Common.Databases.Labor.NonExistingTable+IId]. Table NonExistingTable does not exist.",
+                        ex.Message);
+                    throw;
+                }
+            });
+        }
+
+        [TestMethod]
+        public void WhenParentAttributeNestedOutputTableNotExists_ThrowsMeaningfulException()
+        {
+            Assert.ThrowsException<InvalidIdentifierException>(() =>
+            {
+                var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_NonExistingParentAttributeNestedTableName));
+                try
+                {
+                    GetSqlFor(methodInfo);
+                }
+                catch (InvalidIdentifierException ex)
+                {
+                    Assert.AreEqual("Unable to identify matching database table for type UnknownSqlIdentifierTable.NestedWithId. Table UnknownSqlIdentifierTable does not exist.",
+                        ex.Message);
+                    throw;
+                }
+            });
+        }
+
+        [TestMethod]
+        public void WhenParentOutputTableNotExists_ThrowsMeaningfulException()
+        {
+            Assert.ThrowsException<InvalidIdentifierException>(() =>
+            {
+                var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_NonExistingParentTableName));
+                try
+                {
+                    GetSqlFor(methodInfo);
+                }
+                catch (InvalidIdentifierException ex)
+                {
+                    Assert.AreEqual("Unable to identify matching database table for type UnknownTable.NestedWithId. Table UnknownTable does not exist.",
                         ex.Message);
                     throw;
                 }

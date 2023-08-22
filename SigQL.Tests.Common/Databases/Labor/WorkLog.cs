@@ -446,4 +446,30 @@ namespace SigQL.Tests.Common.Databases.Labor
         public int Id  { get; set; }
         public MyEmployee Employee { get; set; }
     }
+
+    [SqlIdentifier(nameof(WorkLog))]
+    public class WorkLogTable
+    {
+        public class NestedWithId
+        {
+            public int Id { get; set; }
+        }
+    }
+
+    [SqlIdentifier("UnknownTableName")]
+    public class UnknownSqlIdentifierTable
+    {
+        public class NestedWithId
+        {
+            public int Id { get; set; }
+        }
+    }
+
+    public class UnknownTable
+    {
+        public class NestedWithId
+        {
+            public int Id { get; set; }
+        }
+    }
 }

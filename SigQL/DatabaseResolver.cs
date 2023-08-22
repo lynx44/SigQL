@@ -98,21 +98,16 @@ namespace SigQL
         
         public ITableDefinition DetectTable(Type t)
         {
-            var type = UnwrapCollectionTargetType(t);
-            var sqlIdentifier = type.GetCustomAttribute<SqlIdentifierAttribute>();
-            if (sqlIdentifier != null)
-            {
-                return this.databaseConfiguration.Tables.FindByName(sqlIdentifier.Name);
-            }
             Type detectedType = null;
-            if (this.TryDetectTargetTable(type, ref detectedType))
+            var tableName = DetectTableName(t, ref detectedType);
+            ITableDefinition table = null;
+            if (tableName != null)
             {
-                var tableName = this.pluralizationHelper.AllCandidates(detectedType.Name).First(tableName =>
-                    this.databaseConfiguration.Tables.FindByName(tableName) != null);
-                return this.databaseConfiguration.Tables.FindByName(tableName);
+                table = this.databaseConfiguration.Tables.FindByName(tableName);
             }
             
-            throw new InvalidIdentifierException($"Unable to identify matching database table for type {GetParentTableClassQualifiedNameForType(t)}. Table {GetExpectedTableNameForType(t)} does not exist.");
+            return table ?? 
+                   throw new InvalidIdentifierException($"Unable to identify matching database table for type {GetParentTableClassQualifiedNameForType(t)}. Table {GetExpectedTableNameForType(t)} does not exist.");
         }
 
         private static string GetExpectedTableNameForType(Type t)
@@ -127,21 +122,53 @@ namespace SigQL
 
         public bool TryDetectTargetTable(Type columnOutputType, ref Type detectedType)
         {
+            return DetectTableName(columnOutputType, ref detectedType) != null;
+            //var type = UnwrapCollectionTargetType(columnOutputType);
+            //var sqlIdentifier = type.GetCustomAttribute<SqlIdentifierAttribute>();
+            //string tableName;
+            //if (sqlIdentifier != null)
+            //{
+            //    tableName = this.databaseConfiguration.Tables.FindByName(sqlIdentifier.Name).Name;
+            //}
+            //else
+            //{
+            //    tableName = this.pluralizationHelper.AllCandidates(type.Name).FirstOrDefault(tableName =>
+            //        this.databaseConfiguration.Tables.FindByName(tableName) != null);
+            //}
+
+            //if (tableName != null)
+            //{
+            //    detectedType = type;
+            //    return true;
+            //}
+
+            //return type.DeclaringType != null && type.DeclaringType.IsClass && TryDetectTargetTable(type.DeclaringType, ref detectedType);
+        }
+
+        public string DetectTableName(Type columnOutputType, ref Type detectedType)
+        {
             var type = UnwrapCollectionTargetType(columnOutputType);
             var sqlIdentifier = type.GetCustomAttribute<SqlIdentifierAttribute>();
+            string tableName;
             if (sqlIdentifier != null)
             {
-                return this.databaseConfiguration.Tables.FindByName(sqlIdentifier.Name) != null;
+                tableName = this.databaseConfiguration.Tables.FindByName(sqlIdentifier.Name)?.Name;
             }
-            var tableName = this.pluralizationHelper.AllCandidates(type.Name).FirstOrDefault(tableName =>
-                this.databaseConfiguration.Tables.FindByName(tableName) != null);
+            else
+            {
+                tableName = this.pluralizationHelper.AllCandidates(type.Name).FirstOrDefault(tableName =>
+                    this.databaseConfiguration.Tables.FindByName(tableName) != null);
+            }
+            
             if (tableName != null)
             {
                 detectedType = type;
-                return true;
+                return tableName;
             }
 
-            return type.DeclaringType != null && type.DeclaringType.IsClass && TryDetectTargetTable(type.DeclaringType, ref detectedType);
+            return type.DeclaringType != null && type.DeclaringType.IsClass ? 
+                DetectTableName(type.DeclaringType, ref detectedType) : 
+                null;
         }
 
         public bool IsTableOrTableProjection(Type columnOutputType)

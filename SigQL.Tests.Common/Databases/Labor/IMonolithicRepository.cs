@@ -13,6 +13,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         WorkLog.IAliasedWorkLogId GetWithAliasedColumnName(int id);
         MyWorkLog GetWithSqlIdentifierAttribute();
         MyWorkLogWithEmployee GetNavigationPropertyWithSqlIdentifierAttribute();
+        IEnumerable<WorkLogTable.NestedWithId> GetWithParentSqlIdentifierAttribute();
         Employee.IEmployeeFields GetByName(string name);
         Employee.IEmployeeFields GetByFilter(Employee.IdFilter filter);
         Employee.IEmployeeFields GetByFilterWithSqlIdentifierAttribute(MyEmployeeIdFilter filter);
@@ -124,6 +125,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Labor.WorkLog.IInvalidColumn> INVALID_NonExistingColumnName();
         IEnumerable<Labor.NonExistingTable.IId> INVALID_NonExistingTableName();
         IEnumerable<Labor.WorkLog.IInvalidNestedColumn> INVALID_NonExistingNestedTableName();
+        IEnumerable<Labor.UnknownSqlIdentifierTable.NestedWithId> INVALID_NonExistingParentAttributeNestedTableName();
+        IEnumerable<Labor.UnknownTable.NestedWithId> INVALID_NonExistingParentTableName();
         IEnumerable<WorkLog.IWorkLogId> INVALID_NonExistingParameterColumnName(int nonExistent);
         IEnumerable<WorkLog.IWorkLogId> INVALID_NonExistingParameterColumnNameWithAlias([Column("nonExistent")] int id);
         IEnumerable<WorkLog.IWorkLogId> INVALID_NonExistingPropertyColumnName(WorkLog.IInvalidColumn args);
