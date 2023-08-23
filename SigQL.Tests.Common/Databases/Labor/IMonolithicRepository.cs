@@ -124,6 +124,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         //IEnumerable<WorkLog.IWorkLogId> ILLEGAL_GetOrderedWorkLogs(OrderBy<WorkLog.ILocationIdAndEmployeeId> direction);
         IEnumerable<Labor.WorkLog.IInvalidColumn> INVALID_NonExistingColumnName();
         IEnumerable<Labor.NonExistingTable.IId> INVALID_NonExistingTableName();
+        IEnumerable<Labor.WorkLog.INVALID_MismatchingColumnType> INVALID_MismatchingColumnType();
         IEnumerable<Labor.WorkLog.IInvalidNestedColumn> INVALID_NonExistingNestedTableName();
         IEnumerable<Labor.UnknownSqlIdentifierTable.NestedWithId> INVALID_NonExistingParentAttributeNestedTableName();
         IEnumerable<Labor.UnknownTable.NestedWithId> INVALID_NonExistingParentTableName();

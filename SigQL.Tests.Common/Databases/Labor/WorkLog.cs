@@ -431,6 +431,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             Employee.IEmployeeID_MismatchingCase Employee { get; }
         }
+
+        public class INVALID_MismatchingColumnType
+        {
+            public string Id { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

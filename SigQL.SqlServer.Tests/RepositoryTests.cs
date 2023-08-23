@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using SigQL.Exceptions;
 using SigQL.SqlServer.Tests.Data;
 using SigQL.SqlServer.Tests.Infrastructure;
 using SigQL.Tests.Common.Databases.Labor;
@@ -346,6 +347,23 @@ namespace SigQL.SqlServer.Tests
             this.laborDbContext.Employee.AddRange(allEmployees);
             this.laborDbContext.SaveChanges();
             Assert.ThrowsException<InvalidOperationException>(() => this.monolithicRepository.GetByName("Name"));
+        }
+
+        [TestMethod]
+        public void MismatchingColumnType_ThrowsException()
+        {
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = DateTime.Today });
+            this.laborDbContext.SaveChanges();
+            try
+            {
+                this.monolithicRepository.INVALID_MismatchingColumnType();
+            }
+            catch (InvalidTypeException ex)
+            {
+                Assert.AreEqual("Unable to convert INVALID_MismatchingColumnType.Id. Object of type 'System.Int32' cannot be converted to type 'System.String'.", ex.Message);
+                Assert.IsNotNull(ex.InnerException);
+                Assert.AreEqual(typeof(ArgumentException), ex.InnerException.GetType());
+            }
         }
 
         [TestMethod]

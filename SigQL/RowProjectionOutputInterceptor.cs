@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Castle.DynamicProxy;
+using SigQL.Exceptions;
 using SigQL.Extensions;
 
 namespace SigQL
@@ -34,7 +35,15 @@ namespace SigQL
                     var memberResolutionResult = memberResolver.ResolveProperty(property);
                     if (memberResolutionResult.ReturnValueSet)
                     {
-                        property.SetValue(pocoInstance, memberResolutionResult.ReturnValue);
+                        try
+                        {
+                            property.SetValue(pocoInstance, memberResolutionResult.ReturnValue);
+                        }
+                        catch (ArgumentException ex)
+                        {
+                            throw new InvalidTypeException($"Unable to convert {property.DeclaringType.Name}.{property.Name}. {ex.Message}", ex);
+                        }
+                        
                     }
                 }
             }
