@@ -116,6 +116,9 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddressViaClassFilter(Employee.StreetAddressFilterViaRelation filter);
         IEnumerable<Employee.IEmployeeId> EF_GetEmployeeIdsForStreetAddressViaClassFilter(Employee.EFStreetAddressFilterViaRelation filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameWithDifferingParameterNameViaClassFilter(WorkLog.EmployeeNameFilterWithAliasViaRelation filter);
+        
+        // or
+        WorkLog.IWorkLogId OrGroupByTwoColumnsOfSameTable([OrGroup] DateTime startDate, [OrGroup] DateTime endDate);
 
         /// <summary>
         /// This is illegal. The interface T specified in the OrderBy<T> definition must only contain one column,

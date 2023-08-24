@@ -569,7 +569,23 @@ namespace SigQL
 
         private WhereClause BuildWhereClauseFromTargetTablePerspective(AstNode primaryTableReference, TableRelations whereClauseTableRelations, List<ParameterPath> parameterPaths, List<TokenPath> tokens)
         {
-            var andOperator = new AndOperator().SetArgs(whereClauseTableRelations.ProjectedColumns.GroupBy(c => c.Arguments.GetArguments(TableRelationsColumnSource.Parameters).First().Parent).SelectMany(parent =>
+            var conditionalGroups = whereClauseTableRelations.ProjectedColumns.GroupBy(
+                c =>
+                    c.Arguments.All.Where(c => c.GetCustomAttribute<OrGroupAttribute>() != null).Select(c => c.GetCustomAttribute<OrGroupAttribute>().Group).FirstOrDefault()).ToList();
+
+            AstNode whereClauseConditionals = new AndOperator();
+            
+            var conditionals = new List<AstNode>();
+            whereClauseConditionals.Args = conditionals;
+            foreach (var conditionalGroup in conditionalGroups)
+            {
+                AstNode conditional = new AndOperator();
+                if (conditionalGroup.Key != null)
+                {
+                    conditional = new OrOperator();
+                }
+                conditionals.Add(conditional);
+                conditional.SetArgs(conditionalGroup.GroupBy(c => c.Arguments.GetArguments(TableRelationsColumnSource.Parameters).First().Parent).SelectMany(parent =>
                 {
                     if (parent.Key == null || !parent.Key.Type.IsCollectionType())
                     {
@@ -639,13 +655,15 @@ namespace SigQL
                     }
                 }
             ));
+            }
+            
 
-            andOperator.Args = andOperator.Args.Concat(
+            whereClauseConditionals.Args = whereClauseConditionals.Args.Concat(
             whereClauseTableRelations.NavigationTables.Select(nt =>
                 BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths, tokens))).ToList();
             
-            var whereClause = new WhereClause().SetArgs(andOperator);
-            return andOperator.Args.Any() ? whereClause : null;
+            var whereClause = new WhereClause().SetArgs(whereClauseConditionals);
+            return whereClauseConditionals.Args.Any() ? whereClause : null;
         }
         
         private AstNode BuildWhereClauseForPerspective(

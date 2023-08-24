@@ -774,6 +774,15 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Where_OrGroupByTwoColumnsOfSameTable()
+        {
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.OrGroupByTwoColumnsOfSameTable(DateTime.Today, DateTime.Today));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (((\"WorkLog\".\"StartDate\" = @startDate) or (\"WorkLog\".\"EndDate\" = @endDate)))", sql);
+        }
+
+        [TestMethod]
         public void OrderByAttribute_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsAttribute(OrderByDirection.Ascending));
