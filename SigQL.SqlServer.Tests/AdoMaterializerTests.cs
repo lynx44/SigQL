@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Linq;
@@ -217,6 +218,99 @@ namespace SigQL.SqlServer.Tests
             var typedResult = result as IReadOnlyCollection<WorkLog.IWorkLogId>;
             Assert.AreEqual(5, typedResult.Count());
             CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, typedResult.Select(wl => wl.Id).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_DictionaryArgument_ConvertNullToDbNull()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize(typeof(IEnumerable<WorkLog.IWorkLogId>), new PreparedSqlStatement()
+            {
+                CommandText = "select Id from WorkLog where StartDate is null or StartDate=@startDate",
+                Parameters = new Dictionary<string, object>()
+                {
+                    {"startDate", null}
+                }
+            });
+
+            Assert.IsTrue(result is IEnumerable<WorkLog.IWorkLogId>);
+            var typedResult = result as IEnumerable<WorkLog.IWorkLogId>;
+            Assert.AreEqual(5, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, typedResult.Select(wl => wl.Id).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_DynamicArgument_ConvertNullToDbNull()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
+                "select Id from WorkLog where StartDate is null or StartDate=@startDate",
+                new
+                {
+                    startDate = (DateTime?) null
+                });
+
+            Assert.IsTrue(result is IEnumerable<WorkLog.IWorkLogId>);
+            var typedResult = result;
+            Assert.AreEqual(5, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, typedResult.Select(wl => wl.Id).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_NoParameters()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize(typeof(IEnumerable<WorkLog.IWorkLogId>),
+                "select Id from WorkLog");
+
+            Assert.IsTrue(result is IEnumerable<WorkLog.IWorkLogId>);
+            var typedResult = result as IEnumerable<WorkLog.IWorkLogId>;
+            Assert.AreEqual(5, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, typedResult.Select(wl => wl.Id).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_GenericType_NoParameters()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
+                "select Id from WorkLog");
+
+            Assert.IsTrue(result is IEnumerable<WorkLog.IWorkLogId>);
+            var typedResult = result;
+            Assert.AreEqual(5, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, typedResult.Select(wl => wl.Id).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_GenericType_DictionaryArgument()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
+                "select Id from WorkLog where Id = @id", new Dictionary<string, object>()
+                {
+                    {"id", 2}
+                });
+
+            Assert.IsTrue(result is IEnumerable<WorkLog.IWorkLogId>);
+            var typedResult = result;
+            Assert.AreEqual(1, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 2 }, typedResult.Select(wl => wl.Id).ToArray());
         }
     }
 }

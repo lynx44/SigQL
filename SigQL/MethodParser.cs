@@ -1403,10 +1403,14 @@ namespace SigQL
         {
         }
 
-        public PreparedSqlStatement(string commandText, object parameters)
+        public PreparedSqlStatement(string commandText, IDictionary<string, object> parameters)
         {
             this.CommandText = commandText;
-            this.Parameters = ((object) parameters).ToDictionary();
+            this.Parameters = parameters;
+        }
+
+        public PreparedSqlStatement(string commandText, object parameters) : this(commandText, parameters?.ToDictionary())
+        {
         }
 
         public string CommandText { get; set; }
