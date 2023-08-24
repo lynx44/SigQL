@@ -792,6 +792,15 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Where_OrGroupByTwoColumnsOfDifferentTables()
+        {
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.OrGroupByTwoColumnsOfDifferentTables(DateTime.Today, "joe", "new york"));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (((\"WorkLog\".\"StartDate\" = @startDate) or (\"WorkLog\".\"EndDate\" = @endDate)) and ((\"WorkLog\".\"Id\" = @id) or (\"WorkLog\".\"EmployeeId\" = @employeeId)))", sql);
+        }
+
+        [TestMethod]
         public void OrderByAttribute_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsAttribute(OrderByDirection.Ascending));

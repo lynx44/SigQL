@@ -120,6 +120,10 @@ namespace SigQL.Tests.Common.Databases.Labor
         // or
         WorkLog.IWorkLogId OrGroupByTwoColumnsOfSameTable([OrGroup] DateTime startDate, [OrGroup] DateTime endDate);
         WorkLog.IWorkLogId OrGroupByTwoGroupsForColumnsOfSameTable([OrGroup("dates")] DateTime startDate, [OrGroup("dates")] DateTime endDate, [OrGroup("ids")] int id, [OrGroup("ids")] int employeeId);
+        WorkLog.IWorkLogId OrGroupByTwoColumnsOfDifferentTables(
+            [OrGroup] DateTime startDate, 
+            [OrGroup, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))] string employeeName, 
+            [OrGroup, ViaRelation(nameof(WorkLog) + "->" + nameof(Location), nameof(Location.Name))] string locationName);
 
         /// <summary>
         /// This is illegal. The interface T specified in the OrderBy<T> definition must only contain one column,

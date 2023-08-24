@@ -681,7 +681,7 @@ namespace SigQL
                 new Alias() { Label = navigationTableAlias }.SetArgs(
                     new TableIdentifier().SetArgs(
                         new RelationalTable() { Label = navigationTableRelations.TargetTable.Name })));
-
+            
             selectStatement.WhereClause = new WhereClause().SetArgs(
                 new AndOperator().SetArgs(
 
