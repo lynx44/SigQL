@@ -1403,18 +1403,101 @@ namespace SigQL
         {
         }
 
-        public PreparedSqlStatement(string commandText, IDictionary<string, object> parameters)
+        public PreparedSqlStatement(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeyColumns)
         {
             this.CommandText = commandText;
             this.Parameters = parameters;
+            this.PrimaryKeyColumns = primaryKeyColumns;
         }
 
-        public PreparedSqlStatement(string commandText, object parameters) : this(commandText, parameters?.ToDictionary())
+        public PreparedSqlStatement(string commandText, object parameters) : this(commandText, parameters?.ToDictionary(), null)
         {
         }
 
         public string CommandText { get; set; }
         public IDictionary<string, object> Parameters { get; set; }
+
+        /// <summary>
+        /// A list of qualified column names in the select list that are primary keys. This will deduplicate
+        /// the query results for their respective Collection Properties
+        /// </summary>
+        /// <example>
+        /// For SQL Query:
+        ///  select Address.Id Id, Location.Id [Locations.Id], Location.Name [Locations.Name]
+        ///  from Address
+        ///  inner join Location on Location.Id = Address.Id
+        ///
+        /// then setting:
+        /// 
+        /// PrimaryKeyColumns = ["Id", "Location.Id"]
+        ///
+        /// will deduplicate the "Locations" property by the column key "Locations.Id". Note that the
+        /// name of the alias is important. The first part must match the property name and the second part
+        /// must match the property of the class</example>
+        public PrimaryKeyQuerySpecifierCollection PrimaryKeyColumns { get; set; }
+    }
+
+    public class PrimaryKeyQuerySpecifier
+    {
+        internal string Path { get; }
+        internal string Name { get; }
+
+        public PrimaryKeyQuerySpecifier(string path, string name)
+        {
+            Path = path;
+            Name = name;
+        }
+
+        public static implicit operator PrimaryKeyQuerySpecifier(string qualifiedPath)
+        {
+            var lastDotIndex = qualifiedPath.LastIndexOf(".");
+            if (lastDotIndex == -1)
+            {
+                return new PrimaryKeyQuerySpecifier(string.Empty, qualifiedPath);
+            }
+
+            var path = qualifiedPath.Substring(0, lastDotIndex);
+            var name = qualifiedPath.Substring(lastDotIndex + 1, qualifiedPath.Length - (lastDotIndex + 1));
+
+            return new PrimaryKeyQuerySpecifier(path, name);
+        }
+
+
+        public override string ToString()
+        {
+            return !string.IsNullOrEmpty(this.Path) ? $"{this.Path}.{this.Name}" : this.Name;
+        }
+    }
+
+    public class PrimaryKeyQuerySpecifierCollection
+    {
+        private readonly List<PrimaryKeyQuerySpecifier> items;
+
+        public PrimaryKeyQuerySpecifierCollection(IEnumerable<PrimaryKeyQuerySpecifier> items)
+        {
+            this.items = items.ToList();
+        }
+        //internal List<PrimaryKeyQuerySpecifier> Get()
+        //{
+        //    return items;
+        //}
+
+        internal IDictionary<string, IEnumerable<string>> ToGroup()
+        {
+            return 
+                items.GroupBy(i => i.Path)
+                    .ToDictionary(g => g.Key, g => g.Select(p => p.Name));
+        }
+
+        public static implicit operator PrimaryKeyQuerySpecifierCollection(string[] paths)
+        {
+            return new PrimaryKeyQuerySpecifierCollection(paths.Select(p => (PrimaryKeyQuerySpecifier) p));
+        }
+
+        public static implicit operator PrimaryKeyQuerySpecifierCollection(List<string> paths)
+        {
+            return new PrimaryKeyQuerySpecifierCollection(paths.Select(p => (PrimaryKeyQuerySpecifier)p));
+        }
     }
 
     public class SqlMethodInvocation

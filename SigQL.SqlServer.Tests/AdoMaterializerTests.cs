@@ -312,5 +312,77 @@ namespace SigQL.SqlServer.Tests
             Assert.AreEqual(1, typedResult.Count());
             CollectionAssert.AreEqual(new[] { 2 }, typedResult.Select(wl => wl.Id).ToArray());
         }
+
+        [TestMethod]
+        public void Materialize_PreparedSqlStatement_SpecifyPrimaryKeys()
+        {
+
+            var addresses = Enumerable.Range(1, 3).Select(i => new EFAddress() { StreetAddress = "123 fake st" }).ToList();
+            var employees = Enumerable.Range(1, 3).Select(i => new EFEmployee() { Name = "empname", Addresses = addresses }).ToList();
+
+            this.laborDbContext.Employee.AddRange(employees);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize<IEnumerable<Employee.IEmployeeWithAddresses>>(new PreparedSqlStatement()
+            {
+                CommandText = @"select Employee.Id, Address.Id ""Addresses.Id"", Address.StreetAddress ""Addresses.StreetAddress"" from Employee 
+                              inner join EFAddressEFEmployee on EFAddressEFEmployee.EmployeesId=Employee.Id
+                              inner join Address on EFAddressEFEmployee.AddressesId=Address.Id",
+                PrimaryKeyColumns = new [] { "Id", "Addresses.Id" }
+            });
+            
+            var typedResult = result;
+            Assert.AreEqual(3, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3 }, typedResult.Select(e => e.Id).ToArray());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 1, 2, 3, 1, 2, 3 }, typedResult.SelectMany(a => a.Addresses.Select(a => a.Id)).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_QueryWithEmptyDynamicParameters_SpecifyPrimaryKeys()
+        {
+
+            var addresses = Enumerable.Range(1, 3).Select(i => new EFAddress() { StreetAddress = "123 fake st" }).ToList();
+            var employees = Enumerable.Range(1, 3).Select(i => new EFEmployee() { Name = "empname", Addresses = addresses }).ToList();
+
+            this.laborDbContext.Employee.AddRange(employees);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize<IEnumerable<Employee.IEmployeeWithAddresses>>(
+                @"select Employee.Id, Address.Id ""Addresses.Id"", Address.StreetAddress ""Addresses.StreetAddress"" from Employee 
+                              inner join EFAddressEFEmployee on EFAddressEFEmployee.EmployeesId=Employee.Id
+                              inner join Address on EFAddressEFEmployee.AddressesId=Address.Id",
+                new {},
+                new [] { "Id", "Addresses.Id" }
+            );
+            
+            var typedResult = result;
+            Assert.AreEqual(3, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3 }, typedResult.Select(e => e.Id).ToArray());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 1, 2, 3, 1, 2, 3 }, typedResult.SelectMany(a => a.Addresses.Select(a => a.Id)).ToArray());
+        }
+
+        [TestMethod]
+        public void Materialize_QueryWithEmptyDictionaryParameters_SpecifyPrimaryKeys()
+        {
+
+            var addresses = Enumerable.Range(1, 3).Select(i => new EFAddress() { StreetAddress = "123 fake st" }).ToList();
+            var employees = Enumerable.Range(1, 3).Select(i => new EFEmployee() { Name = "empname", Addresses = addresses }).ToList();
+
+            this.laborDbContext.Employee.AddRange(employees);
+            this.laborDbContext.SaveChanges();
+
+            var result = materializer.Materialize<IEnumerable<Employee.IEmployeeWithAddresses>>(
+                @"select Employee.Id, Address.Id ""Addresses.Id"", Address.StreetAddress ""Addresses.StreetAddress"" from Employee 
+                              inner join EFAddressEFEmployee on EFAddressEFEmployee.EmployeesId=Employee.Id
+                              inner join Address on EFAddressEFEmployee.AddressesId=Address.Id",
+                new Dictionary<string, object>(),
+                new [] { "Id", "Addresses.Id" }
+            );
+            
+            var typedResult = result;
+            Assert.AreEqual(3, typedResult.Count());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3 }, typedResult.Select(e => e.Id).ToArray());
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 1, 2, 3, 1, 2, 3 }, typedResult.SelectMany(a => a.Addresses.Select(a => a.Id)).ToArray());
+        }
     }
 }

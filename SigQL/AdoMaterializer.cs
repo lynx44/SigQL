@@ -18,9 +18,9 @@ namespace SigQL
 
         object Materialize(Type outputType, string commandText);
         T Materialize<T>(PreparedSqlStatement sqlStatement);
-        T Materialize<T>(string commandText, IDictionary<string, object> parameters);
-        T Materialize<T>(string commandText, object parameters);
         T Materialize<T>(string commandText);
+        T Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
+        T Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
     }
 
     public class AdoMaterializer : IQueryMaterializer
@@ -48,7 +48,7 @@ namespace SigQL
         
         public object Materialize(Type outputType, PreparedSqlStatement sqlStatement)
         {
-            return Materialize(sqlStatement, new EmptyTableKeyDefinition(), new ConcurrentDictionary<string, IEnumerable<string>>(), outputType);
+            return Materialize(sqlStatement, new EmptyTableKeyDefinition(), sqlStatement.PrimaryKeyColumns?.ToGroup() ?? new ConcurrentDictionary<string, IEnumerable<string>>(), outputType);
         }
 
         public object Materialize(Type outputType, string commandText)
@@ -61,15 +61,15 @@ namespace SigQL
             return (T) Materialize(typeof(T), sqlStatement);
         }
 
-        public T Materialize<T>(string commandText, IDictionary<string, object> parameters)
+        public T Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
         {
-            var preparedSqlStatement = new PreparedSqlStatement(commandText, parameters);
+            var preparedSqlStatement = new PreparedSqlStatement(commandText, parameters.ToDictionary(), primaryKeys);
             return Materialize<T>(preparedSqlStatement);
         }
 
-        public T Materialize<T>(string commandText, object parameters)
+        public T Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
         {
-            var preparedSqlStatement = new PreparedSqlStatement(commandText, parameters);
+            var preparedSqlStatement = new PreparedSqlStatement(commandText, parameters, primaryKeys);
             return Materialize<T>(preparedSqlStatement);
         }
 
