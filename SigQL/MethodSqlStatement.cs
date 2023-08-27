@@ -32,7 +32,7 @@ namespace SigQL
             {
                 CommandText = string.Join("\r\n", this.CommandAst.Select(this.SqlBuilder.Build)),
                 Parameters = allParameters,
-                PrimaryKeyColumns = new PrimaryKeyQuerySpecifierCollection(this.TablePrimaryKeyDefinitions.SelectMany(pk => pk.Value.Select(c => new PrimaryKeyQuerySpecifier(pk.Key, c)).ToList()).ToList())
+                PrimaryKeyColumns = new PrimaryKeyQuerySpecifierCollection((this.TablePrimaryKeyDefinitions?.SelectMany(pk => pk.Value.Select(c => new PrimaryKeyQuerySpecifier(pk.Key, c)).ToList()) ?? new List<PrimaryKeyQuerySpecifier>()).ToList())
             };
         }
         internal IEnumerable<AstNode> CommandAst { get; set; }
