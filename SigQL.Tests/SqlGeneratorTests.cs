@@ -21,17 +21,17 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
-        public void CreateWrappedQuery_GeneratesExpectedSql()
+        public void CreateSelectQuery_GeneratesExpectedSql()
         {
-            var query = sqlGenerator.CreateWithOuterQuery(typeof(WorkLog.IWorkLogWithEmployee));
+            var query = sqlGenerator.CreateSelectQuery(typeof(WorkLog.IWorkLogWithEmployee));
             Assert.AreEqual("select * from (select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))) __generatedouterquery ",
                 query.CommandText);
         }
 
         [TestMethod]
-        public void CreateWrappedQuery_GeneratesExpectedPrimaryKeyCollection()
+        public void CreateSelectQuery_GeneratesExpectedPrimaryKeyCollection()
         {
-            var query = sqlGenerator.CreateWithOuterQuery(typeof(WorkLog.IWorkLogWithEmployee));
+            var query = sqlGenerator.CreateSelectQuery(typeof(WorkLog.IWorkLogWithEmployee));
             Assert.AreEqual(2,
                 query.PrimaryKeyColumns.ToGroup().Count);
             Assert.AreEqual("Id",

@@ -7,7 +7,12 @@ using System.Text;
 
 namespace SigQL
 {
-    public class SqlGenerator
+    public interface ISqlGenerator
+    {
+        PreparedSqlStatement CreateSelectQuery(Type type);
+    }
+
+    public class SqlGenerator : ISqlGenerator
     {
         private IDatabaseConfiguration databaseConfiguration;
         private IPluralizationHelper pluralizationHelper;
@@ -25,7 +30,7 @@ namespace SigQL
         {
         }
 
-        public PreparedSqlStatement CreateWithOuterQuery(Type type)
+        public PreparedSqlStatement CreateSelectQuery(Type type)
         {
             var methodSqlStatement = this.methodParser.SqlFor(new SqlGeneratorMethodInfo(type));
             var preparedSqlStatement = methodSqlStatement.GetPreparedStatement(new List<ParameterArg>());
