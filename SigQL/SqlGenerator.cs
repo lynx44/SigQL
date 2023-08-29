@@ -41,10 +41,10 @@ namespace SigQL
             return preparedSqlStatement;
         }
 
-        public Func<Expression<Func<T, object>>, string> GetColumnNameResolver<T>()
+        public Func<Expression<Func<T, object>>, string> GetQuotedQualifiedColumnNameResolver<T>()
         {
             return new ColumnNameResolver<T>(new DatabaseResolver(this.databaseConfiguration, this.pluralizationHelper))
-                .ResolveQualifiedColumnName;
+                .ResolveQuotedQualifiedColumnName;
         }
     }
 
@@ -79,6 +79,11 @@ namespace SigQL
             }
 
             throw new ArgumentException("A property must be specified");
+        }
+
+        public string ResolveQuotedQualifiedColumnName(Expression<Func<T, object>> accessor)
+        {
+            return $"\"{ResolveQualifiedColumnName(accessor)}\"";
         }
 
         private void ResolvePropertyPath(MemberExpression expression, List<PropertyInfo> propertyList)
