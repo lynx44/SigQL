@@ -12,7 +12,7 @@ namespace SigQL.Tests
     [TestClass]
     public class SqlGeneratorTests
     {
-        private SqlGenerator sqlGenerator;
+        private ISqlGenerator sqlGenerator;
 
         [TestInitialize]
         public void Setup()
@@ -46,6 +46,13 @@ namespace SigQL.Tests
         {
             var nameFor = sqlGenerator.GetColumnNameResolver<WorkLog.IWorkLogWithEmployee>();
             Assert.AreEqual("\"Employee\"", nameFor(p => p.Employee));
+        }
+
+        [TestMethod]
+        public void ColumnNameResolver_QuotedQualified_WhenNonString_GeneratesExpectedQualifiedName()
+        {
+            var nameFor = sqlGenerator.GetColumnNameResolver<WorkLog.IWorkLogWithEmployee>();
+            Assert.AreEqual("\"Id\"", nameFor(p => p.Id));
         }
 
         [TestMethod]

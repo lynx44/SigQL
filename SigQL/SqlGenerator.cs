@@ -67,7 +67,7 @@ namespace SigQL
         public string ResolveQualifiedColumnName(Expression<Func<T, object>> accessor)
         {
             var propertyList = new List<PropertyInfo>();
-            ResolvePropertyPath(accessor.Body as MemberExpression, propertyList);
+            ResolvePropertyPath(accessor.Body as MemberExpression ?? ((accessor.Body as UnaryExpression)?.Operand as MemberExpression), propertyList);
 
             if (propertyList.Any())
             {
