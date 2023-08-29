@@ -44,22 +44,29 @@ namespace SigQL.Tests
         [TestMethod]
         public void ColumnNameResolver_QuotedQualified_WhenDepthOfOne_GeneratesExpectedQualifiedName()
         {
-            var nameFor = sqlGenerator.GetQuotedQualifiedColumnNameResolver<WorkLog.IWorkLogWithEmployee>();
+            var nameFor = sqlGenerator.GetColumnNameResolver<WorkLog.IWorkLogWithEmployee>();
             Assert.AreEqual("\"Employee\"", nameFor(p => p.Employee));
         }
 
         [TestMethod]
         public void ColumnNameResolver_QuotedQualified_WhenDepthOfTwo_GeneratesExpectedQualifiedName()
         {
-            var nameFor = sqlGenerator.GetQuotedQualifiedColumnNameResolver<WorkLog.IWorkLogWithEmployee>();
+            var nameFor = sqlGenerator.GetColumnNameResolver<WorkLog.IWorkLogWithEmployee>();
             Assert.AreEqual("\"Employee.Name\"", nameFor(p => p.Employee.Name));
         }
 
         [TestMethod]
         public void ColumnNameResolver_QuotedQualified_WithCollectionUsingFirst_GeneratesExpectedQualifiedName()
         {
-            var nameFor = sqlGenerator.GetQuotedQualifiedColumnNameResolver<WorkLog.IWorkLogWithEmployeeWithAddress>();
+            var nameFor = sqlGenerator.GetColumnNameResolver<WorkLog.IWorkLogWithEmployeeWithAddress>();
             Assert.AreEqual("\"Employee.Addresses.StreetAddress\"", nameFor(p => p.Employee.Addresses.First().StreetAddress));
+        }
+
+        [TestMethod]
+        public void ColumnNameResolver_NonQuotedQualified_WithCollectionUsingFirst_GeneratesExpectedQualifiedName()
+        {
+            var nameFor = sqlGenerator.GetColumnNameResolver<WorkLog.IWorkLogWithEmployeeWithAddress>(false);
+            Assert.AreEqual("Employee.Addresses.StreetAddress", nameFor(p => p.Employee.Addresses.First().StreetAddress));
         }
 
         // NOT IMPLEMENTED

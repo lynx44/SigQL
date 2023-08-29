@@ -13,6 +13,7 @@ namespace SigQL
     public interface ISqlGenerator
     {
         PreparedSqlStatement CreateSelectQuery(Type type);
+        Func<Expression<Func<T, object>>, string> GetColumnNameResolver<T>(bool quoted = true);
     }
 
     public class SqlGenerator : ISqlGenerator
@@ -41,10 +42,16 @@ namespace SigQL
             return preparedSqlStatement;
         }
 
-        public Func<Expression<Func<T, object>>, string> GetQuotedQualifiedColumnNameResolver<T>()
+        public Func<Expression<Func<T, object>>, string> GetColumnNameResolver<T>(bool quoted = true)
         {
-            return new ColumnNameResolver<T>(new DatabaseResolver(this.databaseConfiguration, this.pluralizationHelper))
-                .ResolveQuotedQualifiedColumnName;
+            var resolver = new ColumnNameResolver<T>(new DatabaseResolver(this.databaseConfiguration, this.pluralizationHelper));
+            if (quoted)
+            {
+                return resolver
+                    .ResolveQuotedQualifiedColumnName;
+            }
+
+            return resolver.ResolveQualifiedColumnName;
         }
     }
 
