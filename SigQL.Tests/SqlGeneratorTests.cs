@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SigQL.Tests.Common.Databases.Labor;
@@ -39,5 +40,35 @@ namespace SigQL.Tests
             Assert.AreEqual("Id",
                 query.PrimaryKeyColumns.ToGroup()["Employee"].Single());
         }
+
+        [TestMethod]
+        public void ColumnNameResolver_WhenDepthOfOne_GeneratesExpectedQualifiedName()
+        {
+            var nameFor = sqlGenerator.GetColumnNameResolver<WorkLog.IWorkLogWithEmployee>();
+            Assert.AreEqual("Employee", nameFor(p => p.Employee));
+        }
+
+        [TestMethod]
+        public void ColumnNameResolver_WhenDepthOfTwo_GeneratesExpectedQualifiedName()
+        {
+            var nameFor = sqlGenerator.GetColumnNameResolver<WorkLog.IWorkLogWithEmployee>();
+            Assert.AreEqual("Employee.Name", nameFor(p => p.Employee.Name));
+        }
+
+        [TestMethod]
+        public void ColumnNameResolver_WithCollectionUsingFirst_GeneratesExpectedQualifiedName()
+        {
+            var nameFor = sqlGenerator.GetColumnNameResolver<WorkLog.IWorkLogWithEmployeeWithAddress>();
+            Assert.AreEqual("Employee.Addresses.StreetAddress", nameFor(p => p.Employee.Addresses.First().StreetAddress));
+        }
+
+        // NOT IMPLEMENTED
+        // this would allow the ability to call .Select
+        //[TestMethod]
+        //public void ColumnNameResolver_WithCollectionUsingSelect_GeneratesExpectedQualifiedName()
+        //{
+        //    var nameFor = sqlGenerator.GetColumnNameResolver<WorkLog.IWorkLogWithEmployeeWithAddress>();
+        //    Assert.AreEqual("Employee.Addresses.StreetAddress", nameFor(p => p.Employee.Addresses.Select(a => a.StreetAddress)));
+        //}
     }
 }

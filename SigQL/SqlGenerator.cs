@@ -2,8 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using SigQL.Extensions;
 
 namespace SigQL
 {
@@ -36,6 +39,80 @@ namespace SigQL
             var preparedSqlStatement = methodSqlStatement.GetPreparedStatement(new List<ParameterArg>());
             preparedSqlStatement.CommandText = $"select * from ({preparedSqlStatement.CommandText}) __generatedouterquery ";
             return preparedSqlStatement;
+        }
+
+        public Func<Expression<Func<T, object>>, string> GetColumnNameResolver<T>()
+        {
+            return new ColumnNameResolver<T>(new DatabaseResolver(this.databaseConfiguration, this.pluralizationHelper))
+                .ResolveQualifiedColumnName;
+        }
+    }
+
+    internal class ColumnNameResolver<T>
+    {
+        private readonly DatabaseResolver databaseResolver;
+
+        public ColumnNameResolver(DatabaseResolver databaseResolver)
+        {
+            this.databaseResolver = databaseResolver;
+        }
+
+        public string ResolveQualifiedColumnName(Expression<Func<T, object>> accessor)
+        {
+            var propertyList = new List<PropertyInfo>();
+            ResolvePropertyPath(accessor.Body as MemberExpression, propertyList);
+
+            if (propertyList.Any())
+            {
+                var propertyArguments = new List<PropertyArgument>();
+                propertyList.Reverse();
+                for (var index = 0; index < propertyList.Count; index++)
+                {
+                    var propertyInfo = propertyList[index];
+                    var parentArgument = propertyArguments.Any() ? propertyArguments[index - 1] : null;
+                    var propertyArgument = new PropertyArgument(propertyInfo, parentArgument, databaseResolver);
+
+                    propertyArguments.Add(propertyArgument);
+                }
+
+                return propertyArguments.Last().FullyQualifiedName();
+            }
+
+            throw new ArgumentException("A property must be specified");
+        }
+
+        private void ResolvePropertyPath(MemberExpression expression, List<PropertyInfo> propertyList)
+        {
+            if (expression != null)
+            {
+                var property = expression.Member as PropertyInfo;
+                if (property != null)
+                {
+                    propertyList.Add(property);
+                }
+
+                var parentMemberExpression = expression.Expression as MemberExpression;
+                
+                if (parentMemberExpression != null)
+                    ResolvePropertyPath(parentMemberExpression, propertyList);
+                else
+                {
+                    var parentMethodExpression = expression.Expression as MethodCallExpression;
+                    var callerExpression = parentMethodExpression?.Arguments?.ElementAt(0) as MemberExpression;
+                    
+                    if (parentMethodExpression != null && callerExpression != null)
+                    {
+                        var parentPropertyInfo = callerExpression.Member as PropertyInfo;
+                        if (parentPropertyInfo.PropertyType.IsCollectionType() &&
+                            parentMethodExpression.Method.ReturnType ==
+                            parentPropertyInfo.PropertyType.GetGenericArguments()[0])
+                        {
+                            ResolvePropertyPath(callerExpression, propertyList);
+                        }
+                    }
+                    
+                }
+            }
         }
     }
 
