@@ -15,8 +15,12 @@ namespace SigQL
         object Materialize(SqlMethodInvocation methodInvocation,
             IEnumerable<ParameterArg> methodArgs);
         object Materialize(Type outputType, PreparedSqlStatement sqlStatement);
+
+        object Materialize(Type outputType, string commandText);
         T Materialize<T>(PreparedSqlStatement sqlStatement);
-        T Materialize<T>(string commandText, object parameters);
+        T Materialize<T>(string commandText);
+        T Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
+        T Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
     }
 
     public class AdoMaterializer : IQueryMaterializer
@@ -44,18 +48,34 @@ namespace SigQL
         
         public object Materialize(Type outputType, PreparedSqlStatement sqlStatement)
         {
-            return Materialize(sqlStatement, new EmptyTableKeyDefinition(), new ConcurrentDictionary<string, IEnumerable<string>>(), outputType);
+            return Materialize(sqlStatement, new EmptyTableKeyDefinition(), sqlStatement.PrimaryKeyColumns?.ToGroup() ?? new ConcurrentDictionary<string, IEnumerable<string>>(), outputType);
         }
-        
+
+        public object Materialize(Type outputType, string commandText)
+        {
+            return Materialize(outputType, new PreparedSqlStatement() {CommandText = commandText, Parameters = new Dictionary<string, object>() });
+        }
+
         public T Materialize<T>(PreparedSqlStatement sqlStatement)
         {
             return (T) Materialize(typeof(T), sqlStatement);
         }
-        
-        public T Materialize<T>(string commandText, object parameters)
+
+        public T Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
         {
-            var preparedSqlStatement = new PreparedSqlStatement(commandText, parameters);
+            var preparedSqlStatement = new PreparedSqlStatement(commandText, parameters.ToDictionary(), primaryKeys);
             return Materialize<T>(preparedSqlStatement);
+        }
+
+        public T Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
+        {
+            var preparedSqlStatement = new PreparedSqlStatement(commandText, parameters, primaryKeys);
+            return Materialize<T>(preparedSqlStatement);
+        }
+
+        public T Materialize<T>(string commandText)
+        {
+            return Materialize<T>(commandText, new { });
         }
 
         private class EmptyTableKeyDefinition : ITableKeyDefinition
@@ -74,6 +94,19 @@ namespace SigQL
             RowValueCollection rowValueCollection;
             var outputInvocations = new List<object>();
             this.sqlLogger?.Invoke(statement);
+
+            if (statement.Parameters != null)
+            {
+                // convert null parameters to DBNull
+                foreach (var parameter in statement.Parameters.Where(p => p.Value == null).ToList())
+                {
+                    if (parameter.Value == null)
+                    {
+                        statement.Parameters[parameter.Key] = DBNull.Value;
+                    }
+                }
+            }
+            
 
             using (var reader = queryExecutor.ExecuteReader(statement.CommandText, statement.Parameters))
             {
