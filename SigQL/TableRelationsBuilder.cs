@@ -28,6 +28,16 @@ namespace SigQL
                 Type = p.Type,
                 Argument = p
             }).ToList();
+            var scope = Guid.NewGuid().ToString();
+            columnFields.ForEach(c =>
+            {
+                var orGroupAttribute = c.Argument.GetCustomAttribute<OrGroupAttribute>();
+                if (orGroupAttribute != null)
+                {
+                    
+                    orGroupAttribute.Scope = scope;
+                }
+            });
             var columnsWithTables =
                 columnFields.Select(p => new { Column = p, IsTable = this.IsTableOrTableProjection(p.Type) });
             var viaRelationColumns = columnsWithTables.Where(c => ColumnFilters.ViaRelation.IsMatch(c.Column.Argument, c.IsTable)).ToList();
