@@ -567,29 +567,39 @@ namespace SigQL
             return (methodInfo.GetCustomAttributes(typeof(UpsertAttribute), false)?.Any()).GetValueOrDefault(false);
         }
 
+        private enum LogicalOperand
+        {
+            And,
+            Or
+        }
+
         private WhereClause BuildWhereClauseFromTargetTablePerspective(AstNode primaryTableReference, TableRelations whereClauseTableRelations, List<ParameterPath> parameterPaths, List<TokenPath> tokens)
         {
             var allTableRelations = new List<TableRelations>();
             whereClauseTableRelations.Traverse(t => allTableRelations.Add(t.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause)));
             var conditionalGroups = allTableRelations.SelectMany(t => 
                 t.ProjectedColumns
-                .Where(c => c.Arguments.All.Any(a => a.GetCustomAttribute<ViaRelationAttribute>() == null))
+                //.Where(c => 
+                //    c.Arguments.All.Any(a => a.GetCustomAttribute<ViaRelationAttribute>() == null))
                 .Select(c => new
                 {
-                    Scope = c.Arguments.All.First().GetCustomAttribute<OrGroupAttribute>().Scope + "." + c.Arguments.All.First().GetCustomAttribute<OrGroupAttribute>().Group, 
+                    LogicalOperand = c.Arguments.All.First().GetCustomAttribute<OrGroupAttribute>() != null ? LogicalOperand.Or : LogicalOperand.And,
+                    Scope = c.Arguments.All.First().Parent?.FullyQualifiedName() + c.Arguments.All.First().GetCustomAttribute<OrGroupAttribute>()?.Group.Map(a => $".{a}"), 
                     Column = c, 
                     TableRelations = (TableRelations) null
                 }));
 
             var navigationConditionalGroups = allTableRelations.SelectMany(t => 
-                t.NavigationTables.Select(t => 
-                    new { 
-                        Scope = t.Argument.GetCustomAttribute<OrGroupAttribute>()?.Scope + "." + t.Argument.GetCustomAttribute<OrGroupAttribute>()?.Group, 
+                t.NavigationTables
+                    .Select(t => 
+                    new {
+                        LogicalOperand = t.Argument.GetCustomAttribute<OrGroupAttribute>() != null ? LogicalOperand.Or : LogicalOperand.And,
+                        Scope = t.Argument.Parent?.FullyQualifiedName() + t.Argument.GetCustomAttribute<OrGroupAttribute>()?.Group.Map(a => $".{a}"), 
                         Column = (TableRelationColumnIdentifierDefinition) null, 
                         TableRelations = t 
                     }));
 
-            var allConditionalGroups = conditionalGroups.Concat(navigationConditionalGroups).GroupBy(c => c.Scope);
+            var allConditionalGroups = conditionalGroups.Concat(navigationConditionalGroups).GroupBy(c => new { c.Scope, c.LogicalOperand } );
 
             AstNode whereClauseConditionals = new AndOperator();
             
@@ -598,7 +608,7 @@ namespace SigQL
             foreach (var conditionalGroup in allConditionalGroups)
             {
                 AstNode conditional = new AndOperator();
-                if (conditionalGroup.Key != null)
+                if (conditionalGroup.Key.LogicalOperand == LogicalOperand.Or)
                 {
                     conditional = new OrOperator();
                 }
