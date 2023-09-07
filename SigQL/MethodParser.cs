@@ -575,11 +575,10 @@ namespace SigQL
 
         private WhereClause BuildWhereClauseFromTargetTablePerspective(AstNode primaryTableReference, TableRelations whereClauseTableRelations, List<ParameterPath> parameterPaths, List<TokenPath> tokens)
         {
-            var allTableRelations = new List<TableRelations>();
-            whereClauseTableRelations.Traverse(t => allTableRelations.Add(t.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause)));
-            var conditionalGroups = allTableRelations.SelectMany(t => 
-                t.ProjectedColumns
-                //.Where(c => 
+            //var allTableRelations = new List<TableRelations>();
+            //whereClauseTableRelations.Traverse(t => allTableRelations.Add(t.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause)));
+            var conditionalGroups = whereClauseTableRelations.ProjectedColumns
+                //.Where(c =>
                 //    c.Arguments.All.Any(a => a.GetCustomAttribute<ViaRelationAttribute>() == null))
                 .Select(c => new
                 {
@@ -587,17 +586,16 @@ namespace SigQL
                     Scope = c.Arguments.All.First().Parent?.FullyQualifiedName() + c.Arguments.All.First().GetCustomAttribute<OrGroupAttribute>()?.Group.Map(a => $".{a}"), 
                     Column = c, 
                     TableRelations = (TableRelations) null
-                }));
+                });
 
-            var navigationConditionalGroups = allTableRelations.SelectMany(t => 
-                t.NavigationTables
+            var navigationConditionalGroups = whereClauseTableRelations.NavigationTables
                     .Select(t => 
                     new {
                         LogicalOperand = t.Argument.GetCustomAttribute<OrGroupAttribute>() != null ? LogicalOperand.Or : LogicalOperand.And,
                         Scope = t.Argument.Parent?.FullyQualifiedName() + t.Argument.GetCustomAttribute<OrGroupAttribute>()?.Group.Map(a => $".{a}"), 
                         Column = (TableRelationColumnIdentifierDefinition) null, 
                         TableRelations = t 
-                    }));
+                    });
 
             var allConditionalGroups = conditionalGroups.Concat(navigationConditionalGroups).GroupBy(c => new { c.Scope, c.LogicalOperand } );
 
@@ -804,13 +802,13 @@ namespace SigQL
 
                             }).ToList()
                         )
-                        //.Concat(
-                        //    navigationTableRelations.NavigationTables.Select((nt, i) =>
-                        //    {
-                        //        return BuildWhereClauseForPerspective(new Alias() { Label = navigationTableAlias }, nt,
-                        //                $"{navigationTableAliasPostfix}{i}", parameterPaths, tokens);
-                        //    }).ToList()
-                        //)
+                        .Concat(
+                            navigationTableRelations.NavigationTables.Select((nt, i) =>
+                            {
+                                return BuildWhereClauseForPerspective(new Alias() { Label = navigationTableAlias }, nt,
+                                        $"{navigationTableAliasPostfix}{i}", parameterPaths, tokens);
+                            }).ToList()
+                        )
                     ));
 
 
