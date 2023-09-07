@@ -118,12 +118,17 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameWithDifferingParameterNameViaClassFilter(WorkLog.EmployeeNameFilterWithAliasViaRelation filter);
         
         // or
-        WorkLog.IWorkLogId OrGroupByTwoColumnsOfSameTable([OrGroup] DateTime startDate, [OrGroup] DateTime endDate);
-        WorkLog.IWorkLogId OrGroupByTwoGroupsForColumnsOfSameTable([OrGroup("dates")] DateTime startDate, [OrGroup("dates")] DateTime endDate, [OrGroup("ids")] int id, [OrGroup("ids")] int employeeId);
-        WorkLog.IWorkLogId OrGroupByTwoColumnsOfDifferentTables(
+        IEnumerable<WorkLog.IWorkLogId> OrGroupByTwoColumnsOfSameTable([OrGroup] DateTime startDate, [OrGroup] DateTime endDate);
+        IEnumerable<WorkLog.IWorkLogId> OrGroupByTwoGroupsForColumnsOfSameTable([OrGroup("dates")] DateTime startDate, [OrGroup("dates")] DateTime endDate, [OrGroup("ids")] int id, [OrGroup("ids")] int employeeId);
+        IEnumerable<WorkLog.IWorkLogId> OrGroupByTwoColumnsOfAdjacentTablesViaRelation(
             [OrGroup] DateTime startDate, 
             [OrGroup, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))] string employeeName, 
             [OrGroup, ViaRelation(nameof(WorkLog) + "->" + nameof(Location), nameof(Location.Name))] string locationName);
+        IEnumerable<WorkLog.IWorkLogId> MultipleOrGroupByWithAdjacentTablesViaRelation(
+            [OrGroup("1")] DateTime startDate, 
+            [OrGroup("1"), ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))] string employeeName, 
+            [OrGroup("2"), ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Id))] int employeeId, 
+            [OrGroup("2"), ViaRelation(nameof(WorkLog) + "->" + nameof(Location), nameof(Location.Name))] string locationName);
 
         /// <summary>
         /// This is illegal. The interface T specified in the OrderBy<T> definition must only contain one column,

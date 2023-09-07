@@ -1678,6 +1678,298 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Where_OrGroupByTwoColumnsOfSameTable_WhenTwoParameterValuesMatch()
+        {
+            var expected1 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2)
+            };
+            var expected2 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 3, 3),
+                EndDate = new DateTime(2000, 1, 1)
+            };
+            var expected3 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 1, 1)
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                expected1,
+                expected2,
+                expected3,
+                new EFWorkLog()
+                {
+                    StartDate = new DateTime(2000, 3, 3),
+                    EndDate = new DateTime(2000, 3, 3)
+                }
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupByTwoColumnsOfSameTable(new DateTime(2000, 1, 1), new DateTime(2000, 1, 1));
+
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(new[] { expected1, expected2, expected3 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
+        }
+
+        [TestMethod]
+        public void Where_OrGroupByTwoColumnsOfSameTable_WhenTwoParameterValuesDiffer()
+        {
+            var expected1 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2)
+            };
+            var expected2 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 3, 3)
+            };
+            var expected3 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 3, 3),
+                EndDate = new DateTime(2000, 2, 2)
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                expected1,
+                new EFWorkLog()
+                {
+                    StartDate = new DateTime(2000, 2, 2),
+                    EndDate = new DateTime(2000, 1, 1)
+                },
+                new EFWorkLog()
+                {
+                    StartDate = new DateTime(2000, 2, 2),
+                    EndDate = new DateTime(2000, 3, 3)
+                },
+                new EFWorkLog()
+                {
+                    StartDate = new DateTime(2000, 3, 3),
+                    EndDate = new DateTime(2000, 1, 1)
+                },
+                expected2,
+                expected3
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupByTwoColumnsOfSameTable(new DateTime(2000, 1, 1), new DateTime(2000, 2, 2));
+
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(new [] { expected1, expected2, expected3 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
+        }
+
+        [TestMethod]
+        public void Where_OrGroupByTwoGroupsForColumnsOfSameTable()
+        {
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob"
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe"
+            };
+            var workLog1 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee1
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 3, 3),
+                EndDate = new DateTime(2000, 1, 1),
+                Employee = employee2
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 1, 1),
+                Employee = employee1
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 3, 3),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee2
+            };
+            var workLog5 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 3, 3),
+                EndDate = new DateTime(2000, 3, 3),
+                Employee = employee1
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                workLog1,
+                workLog2,
+                workLog3,
+                workLog4,
+                workLog5
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupByTwoGroupsForColumnsOfSameTable(
+                new DateTime(2000, 1, 1), 
+                new DateTime(2000, 2, 2),
+                workLog4.Id,
+                employee1.Id);
+
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(new[] { workLog1, workLog3, workLog4 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
+        }
+
+        [TestMethod]
+        public void Where_OrGroupByTwoColumnsOfAdjacentTablesViaRelation()
+        {
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob"
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe"
+            };
+            var location1 = new EFLocation()
+            {
+                Name = "seattle"
+            };
+            var location2 = new EFLocation()
+            {
+                Name = "new york"
+            };
+            var workLog1 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee1,
+                Location = location1
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 3, 3),
+                EndDate = new DateTime(2000, 1, 1),
+                Employee = employee2,
+                Location = location1
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 1, 1),
+                Employee = employee1,
+                Location = location2
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 3, 3),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee2,
+                Location = location2
+            };
+            var workLog5 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 3, 3),
+                EndDate = new DateTime(2000, 3, 3),
+                Employee = employee1,
+                Location = location1
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                workLog1,
+                workLog2,
+                workLog3,
+                workLog4,
+                workLog5
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupByTwoColumnsOfAdjacentTablesViaRelation(new DateTime(2000, 1, 1), "joe", "new york");
+            Assert.AreEqual(4, actual.Count());
+            AreEquivalent(new[] { workLog1, workLog2, workLog3, workLog4 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
+        }
+
+        [TestMethod]
+        public void Where_MultipleOrGroupByWithAdjacentTablesViaRelation()
+        {
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob"
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe"
+            };
+            var location1 = new EFLocation()
+            {
+                Name = "seattle"
+            };
+            var location2 = new EFLocation()
+            {
+                Name = "new york"
+            };
+            var workLog1 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee1,
+                Location = location1
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 3, 3),
+                EndDate = new DateTime(2000, 1, 1),
+                Employee = employee2,
+                Location = location1
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 1, 1),
+                Employee = employee1,
+                Location = location2
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 3, 3),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee2,
+                Location = location2
+            };
+            var workLog5 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 3, 3),
+                EndDate = new DateTime(2000, 3, 3),
+                Employee = employee1,
+                Location = location1
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                workLog1,
+                workLog2,
+                workLog3,
+                workLog4,
+                workLog5
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.MultipleOrGroupByWithAdjacentTablesViaRelation(
+                new DateTime(2000, 1, 1), 
+                "joe", 
+                employee1.Id,
+                "new york");
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(new[] { workLog1, workLog3, workLog4 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
+        }
+
+        [TestMethod]
         public void GreaterThanParameter()
         {
             this.laborDbContext.WorkLog.AddRange(
