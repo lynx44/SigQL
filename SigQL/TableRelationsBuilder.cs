@@ -406,6 +406,9 @@ namespace SigQL
                 foreach (var navigationTable in tr.NavigationTables)
                 {
                     navigationTable.Parent = tr;
+                    var projectedColumns = navigationTable.ProjectedColumns.ToList();
+                    projectedColumns.ForEach(c => c.TableRelations = navigationTable);
+                    navigationTable.ProjectedColumns = projectedColumns;
                 }
             });
         }
