@@ -700,102 +700,13 @@ namespace SigQL
                         return columnNodes;
                     }
                 );
-                //var columnArgs = conditionalGroup.Where(c => !c.TableRelations.NavigationTables.Any()).GroupBy(c => c.Column?.Arguments.GetArguments(TableRelationsColumnSource.Parameters).First().Parent).SelectMany(parent =>
-                //    {
-                //        if (parent.Key == null || !parent.Key.Type.IsCollectionType())
-                //        {
-                //            return parent.SelectMany(column =>
-                //            {
-                //                return column?.Column.Arguments.GetArguments(TableRelationsColumnSource.Parameters).SelectMany(
-                //                    arg =>
-                //                    {
-                //                        var argument = arg.GetEndpoint();
-                //                        var parameterName = argument.Name;
-                //                        var dbColumn = GetColumnForParameterName(whereClauseTableRelations.TargetTable,
-                //                            parameterName);
-
-
-                //                        var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
-                //                            .SetArgs(primaryTableReference,
-                //                                new RelationalColumn()
-                //                                {
-                //                                    Label = column.Column.Name
-                //                                }), parameterName, argument, parameterPaths, tokens);
-                //                        return comparisonNode.AsEnumerable().ToList();
-                //                    });
-                //            });
-                //        }
-                //        else
-                //        {
-                //            var placeholder = new Placeholder();
-                //            var token = new TokenPath(parent.Key)
-                //            {
-                //                UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
-                //                {
-                //                    var collection = parameterValue.AsEnumerable();
-
-                //                    var newParameters = new Dictionary<string, object>();
-                //                    placeholder.SetArgs(new OrOperator().SetArgs(
-                //                        collection.Select((c, i) =>
-                //                        {
-                //                            return new AndOperator().SetArgs(parent.Key.ClassProperties.SelectMany(arg =>
-                //                            {
-                //                                var argument = arg.GetEndpoint();
-                //                                var parameterName = argument.Name + i;
-                //                                var dbColumn = GetColumnForParameterName(
-                //                                    whereClauseTableRelations.TargetTable,
-                //                                    argument.Name);
-
-                //                                var dbColumnName = dbColumn.Name;
-                //                                var propertyValue = MethodSqlStatement.GetValueForParameterPath(c,
-                //                                    arg.GetPropertyInfo().AsEnumerable());
-                //                                newParameters[parameterName] = propertyValue;
-                //                                var comparisonNode = BuildComparisonNode(new ColumnIdentifier()
-                //                                    .SetArgs(primaryTableReference,
-                //                                        new RelationalColumn()
-                //                                        {
-                //                                            Label = dbColumnName
-                //                                        }), parameterName, argument, new List<ParameterPath>(), tokens);
-                //                                return comparisonNode.AsEnumerable().ToList();
-                //                            }));
-
-                //                        })
-                //                    ));
-
-                //                    return newParameters;
-                //                }
-                //            };
-                //            tokens.Add(token);
-                //            return placeholder.AsEnumerable();
-                //        }
-                //    }
-                //);
                 var childRelations = conditionalGroup.Where(nt => nt.NavigationTables.Any());
                 var tableNodes = childRelations.SelectMany(nt =>
                         nt.NavigationTables.Select(ntc => BuildWhereClauseForPerspective(primaryTableReference, ntc, "0", parameterPaths,
                         tokens))).ToList();
                 conditional.SetArgs(columnArgs.Concat(tableNodes).ToList());
-                //whereClauseConditionals.Args = whereClauseConditionals.Args.Concat(
-                //    operatorNode.SetArgs(
-                //        navigationConditionalGroup.Select(nt =>
-                //            BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths, tokens)).ToList()).AsEnumerable()
-                //);
             }
-            
-            //foreach (var navigationConditionalGroup in navigationConditionalGroups)
-            //{
-            //    var operatorNode = !string.IsNullOrEmpty(navigationConditionalGroup.Key) ? (AstNode) new OrOperator() : new AndOperator();
-            //    whereClauseConditionals.Args = whereClauseConditionals.Args.Concat(
-            //        operatorNode.SetArgs(
-            //            navigationConditionalGroup.Select(nt =>
-            //            BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths, tokens)).ToList()).AsEnumerable()
-            //    );
-            //}
-            
-            //whereClauseConditionals.Args = whereClauseConditionals.Args.Concat(
-            //whereClauseTableRelations.NavigationTables.Select(nt =>
-            //    BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths, tokens))).ToList();
-            
+
             var whereClause = new WhereClause().SetArgs(whereClauseConditionals);
             return whereClauseConditionals.Args.Any() ? whereClause : null;
         }
