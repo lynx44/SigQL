@@ -129,6 +129,10 @@ namespace SigQL.Tests.Common.Databases.Labor
             [OrGroup("1"), ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))] string employeeName, 
             [OrGroup("2"), ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Id))] int employeeId, 
             [OrGroup("2"), ViaRelation(nameof(WorkLog) + "->" + nameof(Location), nameof(Location.Name))] string locationName);
+        IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+            [OrGroup] WorkLog.BetweenDates dates, 
+            [OrGroup] int employeeId);
+        
 
         /// <summary>
         /// This is illegal. The interface T specified in the OrderBy<T> definition must only contain one column,

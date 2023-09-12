@@ -1970,6 +1970,69 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Where_OrGroupWithClassFilter()
+        {
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob"
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe"
+            };
+            var workLog1 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee1
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2010, 1, 1),
+                EndDate = new DateTime(2010, 2, 1),
+                Employee = employee2
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2010, 1, 1),
+                EndDate = new DateTime(2010, 2, 1),
+                Employee = employee1
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee2
+            };
+            var workLog5 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2010, 1, 1),
+                EndDate = new DateTime(2010, 3, 3),
+                Employee = employee1
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                workLog1,
+                workLog2,
+                workLog3,
+                workLog4,
+                workLog5
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupWithClassFilter(
+                new WorkLog.BetweenDates()
+                {
+                    StartDate = new DateTime(2000, 1, 1),
+                    EndDate = new DateTime(2001, 1, 1)
+                },
+                employee2.Id);
+            Assert.AreEqual(1, actual.Count());
+            AreEquivalent(new[] { workLog1, workLog2, workLog3, workLog4 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
+        }
+
+        [TestMethod]
         public void GreaterThanParameter()
         {
             this.laborDbContext.WorkLog.AddRange(

@@ -436,6 +436,14 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             public string Id { get; set; }
         }
+
+        public class BetweenDates
+        {
+            [GreaterThanOrEqual]
+            public DateTime StartDate { get; set; }
+            [LessThanOrEqual]
+            public DateTime EndDate { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]
