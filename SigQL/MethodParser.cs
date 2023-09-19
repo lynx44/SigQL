@@ -111,7 +111,7 @@ namespace SigQL
             var parameterPaths = new List<ParameterPath>();
             var tokens = new List<TokenPath>();
             
-            var allJoinRelations = this.databaseResolver.MergeTableRelations(selectTableRelations, orderbyTableRelations);
+            var allJoinRelations = orderbyTableRelations != null ? this.databaseResolver.MergeTableRelations(selectTableRelations, orderbyTableRelations) : selectTableRelations;
             allJoinRelations.MasterRelations = allTableRelations;
 
             allJoinRelations.Traverse(tr => parameterPaths.AddRange(tr.FunctionParameters));

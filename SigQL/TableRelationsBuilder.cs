@@ -30,8 +30,8 @@ namespace SigQL
             }).ToList();
             
             if (argument is ParameterArgument
-                && argument.Type.IsPrimitive
-                && tableDefinition.Columns.Any(c => c.Name.Equals(this.GetColumnName(argument), StringComparison.InvariantCultureIgnoreCase)))
+                && !ColumnAttributes.IsDecoratedNonColumn(argument)
+                && FindColumnByName(tableDefinition, argument.Name) != null)
             {
                 columnFields.Add(new ColumnField()
                 {
@@ -44,6 +44,19 @@ namespace SigQL
             var columnsWithTables =
                 columnFields.Select(p => new { Column = p, IsTable = this.IsTableOrTableProjection(p.Type) });
             var viaRelationColumns = columnsWithTables.Where(c => ColumnFilters.ViaRelation.IsMatch(c.Column.Argument, c.IsTable)).ToList();
+            
+            if (argument is ParameterArgument
+                && !ColumnAttributes.IsDecoratedNonColumn(argument)
+                && ColumnFilters.ViaRelation.IsMatch(argument, false))
+            {
+                viaRelationColumns.Add(
+                    new { Column = new ColumnField()
+                {
+                    Argument = argument,
+                    Name = this.GetColumnName(argument),
+                    Type = argument.Type
+                }, IsTable = false });
+            }
 
             columnsWithTables = columnsWithTables.Except(viaRelationColumns).ToList();
             var columnDescriptions = columnsWithTables.ToList();
@@ -77,9 +90,7 @@ namespace SigQL
                     var tableColumn = tableDefinition.Columns.FindByName(columnName);
                     if (tableColumn == null)
                     {
-                        var pluralCandidates = pluralizationHelper.AllCandidates(columnName).ToList();
-                        var pluralName = pluralCandidates.FirstOrDefault(c => tableDefinition.Columns.FindByName(c) != null);
-                        tableColumn = tableDefinition.Columns.FindByName(pluralName);
+                        tableColumn = FindColumnByName(tableDefinition, columnName);
                     }
 
                     if (tableColumn == null)
@@ -100,7 +111,11 @@ namespace SigQL
                         tableColumn.IsIdentity);
 
                 }).ToList<TableRelationColumnIdentifierDefinition>();
-            var functionParameterColumns = argument.ClassProperties.Where(a => ColumnAttributes.IsFunctionParameter(a));
+            var functionParameterColumns = argument.ClassProperties.Where(a => ColumnAttributes.IsFunctionParameter(a)).ToList();
+            if (ColumnAttributes.IsFunctionParameter(argument))
+            {
+                functionParameterColumns.Add(argument);
+            }
             var functionParameterPaths = functionParameterColumns.Select(a =>
             {
                 var parameterPath = a.ToParameterPath();
@@ -189,6 +204,15 @@ namespace SigQL
 
             var result = MergeTableRelations(viaTableRelations.AppendOne(tableRelations).ToArray());
             return result;
+        }
+
+        private IColumnDefinition FindColumnByName(ITableDefinition tableDefinition, string columnName)
+        {
+            IColumnDefinition tableColumn;
+            var pluralCandidates = pluralizationHelper.AllCandidates(columnName).ToList();
+            var pluralName = pluralCandidates.FirstOrDefault(c => tableDefinition.Columns.FindByName(c) != null);
+            tableColumn = tableDefinition.Columns.FindByName(pluralName);
+            return tableColumn;
         }
 
         private static IEnumerable<TableRelationColumnIdentifierDefinition> BuildPrimaryKey(ITableDefinition tableDefinition, IArgument argument,
@@ -396,6 +420,11 @@ namespace SigQL
         
         internal TableRelations MergeTableRelations(params TableRelations[] tableRelationsCollection)
         {
+            if (!tableRelationsCollection.Any())
+            {
+                return null;
+            }
+
             var merged = 
             new TableRelations()
             {

@@ -439,9 +439,9 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         public class BetweenDates
         {
-            [GreaterThanOrEqual]
-            public DateTime StartDate { get; set; }
             [LessThanOrEqual]
+            public DateTime StartDate { get; set; }
+            [GreaterThanOrEqual]
             public DateTime EndDate { get; set; }
         }
     }
