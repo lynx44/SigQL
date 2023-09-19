@@ -215,6 +215,19 @@ namespace SigQL
             return string.Join(".", rootToPath.Take(rootToPath.Count() - 1).Select(a => a.Type?.Name ?? a.Name).AppendOne(argument.Name));
         }
 
+        public static int CalculateDepth(this IArgument argument)
+        {
+            int depth = 0;
+            var parent = argument.Parent;
+            while (parent != null)
+            {
+                depth++;
+                parent = parent.Parent;
+            }
+            return depth;
+        }
+
+
         public static ParameterPath ToParameterPath(this IArgument argument)
         {
             var rootToPath = argument.RootToPath();

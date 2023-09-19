@@ -5,7 +5,6 @@ namespace SigQL.Types.Attributes
     public class OrGroupAttribute : Attribute
     {
         public string Group { get; set; }
-        internal string Scope { get; set; }
 
         public OrGroupAttribute(string group = "default")
         {

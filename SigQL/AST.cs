@@ -226,9 +226,22 @@ namespace SigQL
             node.Args = args;
             return node;
         }
+        public static T AppendArgs<T>(this T node, params AstNode[] args) where T : AstNode
+        {
+            return node.AppendArgs((IEnumerable<AstNode>)args);
+        }
         public static T SetArgs<T>(this T node, IEnumerable<AstNode> args) where T : AstNode
         {
             node.Args = args.ToList();
+            return node;
+        }
+        public static T AppendArgs<T>(this T node, IEnumerable<AstNode> args) where T : AstNode
+        {
+            if (node.Args == null)
+            {
+                return node.SetArgs(args);
+            }
+            node.Args = node.Args.Concat(args).ToList();
             return node;
         }
     }

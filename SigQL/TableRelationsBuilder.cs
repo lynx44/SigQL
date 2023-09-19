@@ -28,6 +28,19 @@ namespace SigQL
                 Type = p.Type,
                 Argument = p
             }).ToList();
+            
+            if (argument is ParameterArgument
+                && argument.Type.IsPrimitive
+                && tableDefinition.Columns.Any(c => c.Name.Equals(this.GetColumnName(argument), StringComparison.InvariantCultureIgnoreCase)))
+            {
+                columnFields.Add(new ColumnField()
+                {
+                    Argument = argument,
+                    Name = this.GetColumnName(argument),
+                    Type = argument.Type
+                });
+            }
+
             var columnsWithTables =
                 columnFields.Select(p => new { Column = p, IsTable = this.IsTableOrTableProjection(p.Type) });
             var viaRelationColumns = columnsWithTables.Where(c => ColumnFilters.ViaRelation.IsMatch(c.Column.Argument, c.IsTable)).ToList();

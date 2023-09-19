@@ -21,7 +21,7 @@ namespace SigQL
             var tableRelations = this.databaseResolver.BuildTableRelations(deleteSpec.Table, new TableArgument(deleteSpec.Table, deleteSpec.RootMethodInfo.GetParameters().AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>());
             var primaryTable = tableRelations.TargetTable;
             var whereClause = BuildWhereClauseFromTargetTablePerspective(
-                new RelationalTable() { Label = primaryTable.Name }, tableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause), parameterPaths,
+                new RelationalTable() { Label = primaryTable.Name }, tableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause).AsEnumerable(), parameterPaths,
                 tokens);
 
             var statement = new Delete()
