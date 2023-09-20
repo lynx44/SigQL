@@ -2004,19 +2004,12 @@ namespace SigQL.SqlServer.Tests
                 EndDate = new DateTime(2000, 2, 2),
                 Employee = employee2
             };
-            var workLog5 = new EFWorkLog()
-            {
-                StartDate = new DateTime(2010, 1, 1),
-                EndDate = new DateTime(2010, 3, 3),
-                Employee = employee1
-            };
             var efWorkLogs = new List<EFWorkLog>()
             {
                 workLog1,
                 workLog2,
                 workLog3,
-                workLog4,
-                workLog5
+                workLog4
             };
             this.laborDbContext.WorkLog.AddRange(efWorkLogs);
             this.laborDbContext.SaveChanges();
@@ -2028,8 +2021,8 @@ namespace SigQL.SqlServer.Tests
                     EndDate = new DateTime(2001, 1, 1)
                 },
                 employee2.Id);
-            Assert.AreEqual(1, actual.Count());
-            AreEquivalent(new[] { workLog1, workLog2, workLog3, workLog4 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(new[] { workLog1, workLog2, workLog4 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
         }
 
         [TestMethod]
