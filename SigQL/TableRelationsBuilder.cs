@@ -31,7 +31,7 @@ namespace SigQL
             
             if (argument is ParameterArgument
                 && !ColumnAttributes.IsDecoratedNonColumn(argument)
-                && FindColumnByName(tableDefinition, argument.Name) != null)
+                && FindColumnByName(tableDefinition, argument.GetCustomAttribute<ColumnAttribute>()?.ColumnName ?? argument.Name) != null)
             {
                 columnFields.Add(new ColumnField()
                 {

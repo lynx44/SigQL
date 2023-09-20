@@ -44,7 +44,8 @@ namespace SigQL
 
         public TAttribute GetCustomAttribute<TAttribute>() where TAttribute : Attribute
         {
-            throw new InvalidOperationException("Argument is a table, not a CLR type");
+            return null;
+            //throw new InvalidOperationException("Argument is a table, not a CLR type");
         }
 
         public IEnumerable<IArgument> ClassProperties => this.arguments;
