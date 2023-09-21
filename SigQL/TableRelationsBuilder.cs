@@ -435,7 +435,8 @@ namespace SigQL
                 ProjectedColumns = tableRelationsCollection.SelectMany(t => t.ProjectedColumns).ToList(),
                 ForeignKeyToParent = tableRelationsCollection.Where(t => t.ForeignKeyToParent != null).Select(t => t.ForeignKeyToParent).Distinct(ForeignKeyDefinitionEqualityComparer.Default).FirstOrDefault(),
                 FunctionParameters = tableRelationsCollection.SelectMany(t => t.FunctionParameters).GroupBy(k => k.SqlParameterName).Select(k => k.First()).ToList(),
-                MasterRelations = tableRelationsCollection.Select(t => t.MasterRelations).Any(tr => tr != null) ? MergeTableRelations(tableRelationsCollection.Select(t => t.MasterRelations).Where(tr => tr != null).ToArray()) : null
+                MasterRelations = tableRelationsCollection.Select(t => t.MasterRelations).Any(tr => tr != null) ? MergeTableRelations(tableRelationsCollection.Select(t => t.MasterRelations).Where(tr => tr != null).ToArray()) : null,
+                IsManyToMany = tableRelationsCollection.Any(r => r.IsManyToMany)
             };
             SetParents(merged);
             return merged;

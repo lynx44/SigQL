@@ -725,7 +725,10 @@ namespace SigQL
                         .GetCustomAttribute<OrGroupAttribute>()?.Group)
                 .ToList();
             AstNode columnOperator = new AndOperator();
-            
+
+            var conditionalLookup = new Dictionary<string, AstNode>();
+            var tableRelationsGroups = navigationTableRelations.NavigationTables
+                .GroupBy(g => !g.IsManyToMany ? g.Argument.GetCustomAttribute<OrGroupAttribute>()?.Group : g.NavigationTables.First().Argument.GetCustomAttribute<OrGroupAttribute>()?.Group).ToList();
             foreach (var columnGroup in columnGroups)
             {
                 AstNode columnConditional = new AndOperator();
@@ -734,93 +737,117 @@ namespace SigQL
                     columnConditional = new OrOperator();
                 }
 
-                columnOperator.AppendArgs(
+                conditionalLookup[columnGroup.Key ?? ""] = columnConditional;
+                columnOperator.AppendArgs(columnConditional);
+                
                 columnConditional.SetArgs(
-                columnGroup.SelectMany(c =>
-                 {
-                     var sqlParameterName = $"{navigationTableAlias}{c.Name}";
-                     var parameterArguments = c.Arguments.GetArguments(TableRelationsColumnSource.Parameters).ToList();
-
-                     var astNodes = parameterArguments.Select(arg =>
-                         BuildComparisonNode(
-                             new ColumnIdentifier().SetArgs(new Alias() { Label = navigationTableAlias },
-                                 new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Name })),
-                             sqlParameterName, arg, parameterPaths, tokens)).ToList();
-
-                     var parameterTokens = tokens.Where(t => parameterArguments.Contains(t.Argument)).ToList();
-                     var notNullTokenCountForTable = parameterTokens.Count;
-                     parameterTokens.ForEach(t =>
+                    columnGroup.SelectMany(c =>
                      {
-                         var existingFunc = t.UpdateNodeFunc;
-                         var comparisonSpec = this.databaseResolver.GetColumnSpec(t.Argument);
-                         if (comparisonSpec.IgnoreIfNull ||
-                             comparisonSpec.IgnoreIfNullOrEmpty)
+                         var sqlParameterName = $"{navigationTableAlias}{c.Name}";
+                         var parameterArguments = c.Arguments.GetArguments(TableRelationsColumnSource.Parameters).ToList();
+
+                         var astNodes = parameterArguments.Select(arg =>
+                             BuildComparisonNode(
+                                 new ColumnIdentifier().SetArgs(new Alias() { Label = navigationTableAlias },
+                                     new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Name })),
+                                 sqlParameterName, arg, parameterPaths, tokens)).ToList();
+
+                         var parameterTokens = tokens.Where(t => parameterArguments.Contains(t.Argument)).ToList();
+                         var notNullTokenCountForTable = parameterTokens.Count;
+                         parameterTokens.ForEach(t =>
                          {
-                             t.UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
+                             var existingFunc = t.UpdateNodeFunc;
+                             var comparisonSpec = this.databaseResolver.GetColumnSpec(t.Argument);
+                             if (comparisonSpec.IgnoreIfNull ||
+                                 comparisonSpec.IgnoreIfNullOrEmpty)
                              {
-                                 var argumentTree = new ArgumentTree(this.databaseResolver, allParameterArgs);
-                                 var tableRelationParameterArguments = c.TableRelations.ProjectedColumns.SelectMany(c => c.Arguments.GetArguments(TableRelationsColumnSource.Parameters)).Concat(c.TableRelations.NavigationTables.SelectManyRecursive(t => t.NavigationTables).SelectMany(t => t.ProjectedColumns.SelectMany(c => c.Arguments.GetArguments(TableRelationsColumnSource.Parameters)))).ToList();
-                                 var childTreeNodes = argumentTree.FindTreeNodes(tableRelationParameterArguments);
-                                 if (((parameterValue == null && (comparisonSpec.IgnoreIfNull || comparisonSpec.IgnoreIfNullOrEmpty)) ||
-                                     (parameterValue.IsEmpty() && comparisonSpec.IgnoreIfNullOrEmpty)) &&
-                                     childTreeNodes.All(a => (a.Value == null && (a.Argument.GetCustomAttribute<IgnoreIfNullAttribute>() != null || a.Argument.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null)) ||
-                                                             (a.Value.IsEmpty() && (a.Argument.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null))))
+                                 t.UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                                  {
-                                     notNullTokenCountForTable--;
-                                     if (notNullTokenCountForTable == 0)
+                                     var argumentTree = new ArgumentTree(this.databaseResolver, allParameterArgs);
+                                     var tableRelationParameterArguments = c.TableRelations.ProjectedColumns.SelectMany(c => c.Arguments.GetArguments(TableRelationsColumnSource.Parameters)).Concat(c.TableRelations.NavigationTables.SelectManyRecursive(t => t.NavigationTables).SelectMany(t => t.ProjectedColumns.SelectMany(c => c.Arguments.GetArguments(TableRelationsColumnSource.Parameters)))).ToList();
+                                     var childTreeNodes = argumentTree.FindTreeNodes(tableRelationParameterArguments);
+                                     if (((parameterValue == null && (comparisonSpec.IgnoreIfNull || comparisonSpec.IgnoreIfNullOrEmpty)) ||
+                                         (parameterValue.IsEmpty() && comparisonSpec.IgnoreIfNullOrEmpty)) &&
+                                         childTreeNodes.All(a => (a.Value == null && (a.Argument.GetCustomAttribute<IgnoreIfNullAttribute>() != null || a.Argument.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null)) ||
+                                                                 (a.Value.IsEmpty() && (a.Argument.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null))))
                                      {
-                                         selectStatement.FromClause = null;
-                                         selectStatement.WhereClause = null;
+                                         notNullTokenCountForTable--;
+                                         if (notNullTokenCountForTable == 0)
+                                         {
+                                             selectStatement.FromClause = null;
+                                             selectStatement.WhereClause = null;
+                                         }
+
+                                         return new Dictionary<string, object>();
                                      }
+                                     else
+                                     {
+                                         return existingFunc(parameterValue, parameterArg, allParameterArgs);
+                                     }
+                                 };
+                             }
 
-                                     return new Dictionary<string, object>();
-                                 }
-                                 else
-                                 {
-                                     return existingFunc(parameterValue, parameterArg, allParameterArgs);
-                                 }
-                             };
-                         }
+                         });
+                         return
+                             astNodes;
 
-                     });
-                     return
-                         astNodes;
+                     }).ToList()
+                );
+            }
 
-                 }).ToList()));
+            foreach (var tableRelationsGroup in tableRelationsGroups)
+            {
+                if (!conditionalLookup.TryGetValue(tableRelationsGroup.Key ?? "", out var columnConditional))
+                {
+                    columnConditional = new AndOperator();
+                    if (!string.IsNullOrEmpty(tableRelationsGroup.Key))
+                    {
+                        columnConditional = new OrOperator();
+                    }
+
+                    conditionalLookup[tableRelationsGroup.Key ?? ""] = columnConditional;
+                    columnOperator.AppendArgs(columnConditional);
+                }
+
+                if (tableRelationsGroup.Any())
+                {
+                    columnConditional.AppendArgs(
+                        tableRelationsGroup.Select((nt, i) =>
+                        {
+                            return BuildWhereClauseForPerspective(new Alias() { Label = navigationTableAlias }, nt,
+                                $"{navigationTableAliasPostfix}{i}", parameterPaths, tokens);
+                        }).ToList());
+                }
+            }
+
+            var whereClauseStatement = navigationTableRelations.ForeignKeyToParent.KeyPairs.Select(kp =>
+                {
+                    IColumnDefinition primaryTableColumn = null;
+                    IColumnDefinition navigationTableColumn = null;
+                    if (TableEqualityComparer.Default.Equals(kp.ForeignTableColumn.Table,
+                            navigationTableRelations.TargetTable))
+                    {
+                        primaryTableColumn = kp.PrimaryTableColumn;
+                        navigationTableColumn = kp.ForeignTableColumn;
+                    }
+                    else
+                    {
+                        primaryTableColumn = kp.ForeignTableColumn;
+                        navigationTableColumn = kp.PrimaryTableColumn;
+                    }
+                    return new EqualsOperator().SetArgs(
+                        new TableIdentifier().SetArgs(new Alias() { Label = navigationTableAlias }, new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = navigationTableColumn.Name })),
+                        new TableIdentifier().SetArgs(primaryTableReference, new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = primaryTableColumn.Name })));
+                }).Cast<AstNode>().ToList();
+            if (columnOperator.Args != null)
+            {
+                whereClauseStatement = whereClauseStatement.AppendOne(columnOperator).ToList();
             }
             selectStatement.WhereClause = new WhereClause().SetArgs(
                 new AndOperator().SetArgs(
 
                         // match foreign keys to parent
-                        navigationTableRelations.ForeignKeyToParent.KeyPairs.Select(kp =>
-                        {
-                            IColumnDefinition primaryTableColumn = null;
-                            IColumnDefinition navigationTableColumn = null;
-                            if (TableEqualityComparer.Default.Equals(kp.ForeignTableColumn.Table,
-                                navigationTableRelations.TargetTable))
-                            {
-                                primaryTableColumn = kp.PrimaryTableColumn;
-                                navigationTableColumn = kp.ForeignTableColumn;
-                            }
-                            else
-                            {
-                                primaryTableColumn = kp.ForeignTableColumn;
-                                navigationTableColumn = kp.PrimaryTableColumn;
-                            }
-                            return new EqualsOperator().SetArgs(
-                                new TableIdentifier().SetArgs(new Alias() { Label = navigationTableAlias }, new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = navigationTableColumn.Name })),
-                                new TableIdentifier().SetArgs(primaryTableReference, new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = primaryTableColumn.Name })));
-                        }).ToList()
-                        .Concat(
-                            columnOperator.AsEnumerable()
-                        )
-                        .Concat(
-                            navigationTableRelations.NavigationTables.Select((nt, i) =>
-                            {
-                                return BuildWhereClauseForPerspective(new Alias() { Label = navigationTableAlias }, nt,
-                                        $"{navigationTableAliasPostfix}{i}", parameterPaths, tokens);
-                            }).ToList()
-                        )
+                        whereClauseStatement
                     ));
 
 

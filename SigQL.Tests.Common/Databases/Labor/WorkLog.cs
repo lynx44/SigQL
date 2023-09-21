@@ -469,6 +469,11 @@ namespace SigQL.Tests.Common.Databases.Labor
             [OrGroup("2")]
             public int EmployeeId { get; set; }
         }
+
+        public class NestedColumnAndNavigationClassFilter
+        {
+            public Employee.ColumnOrNavigationClassFilter Employee { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

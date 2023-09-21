@@ -134,14 +134,34 @@ namespace SigQL.Tests.Common.Databases.Labor
             [OrGroup] int employeeId);
 
         IEnumerable<WorkLog.IWorkLogId> OrGroupInClassFilter(
-            [OrGroup] WorkLog.OrColumns filter);
+            WorkLog.OrColumns filter);
 
         IEnumerable<WorkLog.IWorkLogId> OrGroupNestedNavigationClassFilter(
-            [OrGroup] WorkLog.NestedOrColumns filter);
+            WorkLog.NestedOrColumns filter);
 
         IEnumerable<Employee.IEmployeeId> TwoOrGroupNestedNavigationClassFilter(
-            [OrGroup] Employee.NestedWithTwoOrGroups filter);
+            Employee.NestedWithTwoOrGroups filter);
 
+        IEnumerable<WorkLog.IWorkLogId> OrGroupWithColumnAndNavigationClassFilter(
+            [OrGroup] int id,
+            [OrGroup] WorkLog.GetByEmployeeNameFilter filter);
+
+        IEnumerable<WorkLog.IWorkLogId> OrGroupWithColumnAndNestedNavigationClassFilter(
+            WorkLog.NestedColumnAndNavigationClassFilter filter);
+
+        // TODO
+
+        //IEnumerable<Employee.IEmployeeId> OrGroupForTwoNestedNavigationClassFilters(
+        //    WorkLog.TwoNestedNavigationClassFilters filter);
+
+        //IEnumerable<Employee.IEmployeeId> OrGroupWithManyToMany(
+        //    [OrGroup] int id,
+        //    [OrGroup] Address.StreetAddressFilter address);
+
+        // duplicate above tests and replace with ViaRelations instead of class filters
+
+
+        // NOT REQUIRED - previous ideas. use to double check test cases
         //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
         //    WorkLog.WithOrOnNavigationProperties dates);
         //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
@@ -169,7 +189,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
         //    WorkLog.ColumnsWithNestedNavigationAndViaRelation1Or dates,
         //    WorkLog.ColumnsWithNestedNavigationAndViaRelation2Or dates);
-        
+
 
         /// <summary>
         /// This is illegal. The interface T specified in the OrderBy<T> definition must only contain one column,

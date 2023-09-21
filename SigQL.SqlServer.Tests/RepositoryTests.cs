@@ -2230,6 +2230,166 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Where_OrGroupWithColumnAndNavigationClassFilter()
+        {
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob"
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe"
+            };
+            var employee3 = new EFEmployee()
+            {
+                Name = "bill"
+            };
+            var employee4 = new EFEmployee()
+            {
+                Name = "dave"
+            };
+            var employee5 = new EFEmployee()
+            {
+                Name = "mike"
+            };
+            var workLog1 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 1),
+                Employee = employee1
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2222, 1, 1),
+                EndDate = new DateTime(2222, 2, 1),
+                Employee = employee2
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2222, 1, 1),
+                EndDate = new DateTime(2222, 2, 1),
+                Employee = employee3
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2222, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee4
+            };
+            var workLog5 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2222, 1, 1),
+                EndDate = new DateTime(2222, 2, 2),
+                Employee = employee5
+            };
+            var workLog6 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2222, 2, 2),
+                Employee = employee2
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                workLog1,
+                workLog2,
+                workLog3,
+                workLog4,
+                workLog5,
+                workLog6
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupWithColumnAndNavigationClassFilter(
+                workLog1.Id,
+                new WorkLog.GetByEmployeeNameFilter()
+                {
+                    Employee = new Employee.EmployeeNameFilter()
+                    {
+                        Name = "joe"
+                    }
+                });
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(new[] { workLog1, workLog2, workLog6 }.Select(wl => wl.Id), actual.Select(e => e.Id));
+        }
+
+        [TestMethod]
+        public void Where_OrGroupWithColumnAndNestedNavigationClassFilter()
+        {
+            var address1 = new EFAddress()
+            {
+                StreetAddress = "123 fake st"
+            };
+            var address2 = new EFAddress()
+            {
+                StreetAddress = "234 nonsense ave"
+            };
+            var address3 = new EFAddress()
+            {
+                StreetAddress = "345 blah dr"
+            };
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob",
+                Addresses = new List<EFAddress>()
+                {
+                    address1
+                }
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe",
+                Addresses = new List<EFAddress>()
+                {
+                    address2
+                }
+            };
+            var employee3 = new EFEmployee()
+            {
+                Name = "bill",
+                Addresses = new List<EFAddress>()
+                {
+                    address3
+                }
+            };
+            var workLog1 = new EFWorkLog()
+            {
+                Employee = employee1
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                Employee = employee2
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                Employee = employee3
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                workLog1,
+                workLog2,
+                workLog3
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupWithColumnAndNestedNavigationClassFilter(
+                new WorkLog.NestedColumnAndNavigationClassFilter()
+                {
+                    Employee = new Employee.ColumnOrNavigationClassFilter()
+                    {
+                        Name = "joe",
+                        Address = new Address.AddressStreetAddress()
+                        {
+                            StreetAddress = "123 fake st"
+                        }
+                    }
+                });
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(new[] { workLog1, workLog2 }.Select(wl => wl.Id), actual.Select(e => e.Id));
+        }
+
+        [TestMethod]
         public void GreaterThanParameter()
         {
             this.laborDbContext.WorkLog.AddRange(

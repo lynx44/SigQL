@@ -195,6 +195,14 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             public WorkLog.TwoOrGroups WorkLog { get; set; }
         }
+        
+        public class ColumnOrNavigationClassFilter
+        {
+            [OrGroup]
+            public string Name { get; set; }
+            [OrGroup]
+            public Address.AddressStreetAddress Address { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(Employee))]

@@ -87,6 +87,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             Employee.IEmployeeToWorkLogView Employee { get; }
         }
+
+        public class AddressStreetAddress
+        {
+            public string StreetAddress { get; set; }
+        }
     }
 
     public enum AddressClassification

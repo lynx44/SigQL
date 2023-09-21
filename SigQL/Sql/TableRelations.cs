@@ -27,7 +27,8 @@ namespace SigQL.Sql
         public TableRelations Parent { get; set; }
         public IEnumerable<TableRelationColumnIdentifierDefinition> PrimaryKey { get; set; }
         internal TableRelations MasterRelations { get; set; }
-        
+        public bool IsManyToMany { get; set; }
+
         public TableRelations Mask(TableRelationsColumnSource source, TableRelationsFilter filter, TableRelations masterRelations = null)
         {
             var matchingColumns = this.ProjectedColumns.Where(c => c.Source == source && (!c.Arguments.All.Any() || c.Arguments.All.Any(arg => filter.IsMatch(arg, false)))).ToList();
