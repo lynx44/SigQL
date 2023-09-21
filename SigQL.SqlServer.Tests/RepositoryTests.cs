@@ -2025,6 +2025,210 @@ namespace SigQL.SqlServer.Tests
             AreEquivalent(new[] { workLog1, workLog2, workLog4 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
         }
 
+
+        [TestMethod]
+        public void Where_OrGroupInClassFilter()
+        {
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob"
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe"
+            };
+            var workLog1 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee1
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2010, 1, 1),
+                EndDate = new DateTime(2010, 2, 1),
+                Employee = employee2
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2010, 1, 1),
+                EndDate = new DateTime(2010, 2, 1),
+                Employee = employee1
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee2
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                workLog1,
+                workLog2,
+                workLog3,
+                workLog4
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupInClassFilter(
+                new WorkLog.OrColumns()
+                {
+                    StartDate = new DateTime(2000, 1, 1),
+                    EmployeeId = employee2.Id
+                });
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(new[] { workLog1, workLog2, workLog4 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
+        }
+
+        [TestMethod]
+        public void Where_OrGroupNestedNavigationClassFilter()
+        {
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob"
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe"
+            };
+            var employee3 = new EFEmployee()
+            {
+                Name = "bill"
+            };
+            var workLog1 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee1
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2010, 1, 1),
+                EndDate = new DateTime(2010, 2, 1),
+                Employee = employee2
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2010, 1, 1),
+                EndDate = new DateTime(2010, 2, 1),
+                Employee = employee3
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee1
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                workLog1,
+                workLog2,
+                workLog3,
+                workLog4
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupNestedNavigationClassFilter(
+                new WorkLog.NestedOrColumns()
+                {
+                    Employee = new Employee.OrColumns()
+                    {
+                        Id = employee2.Id,
+                        Name = "bill"
+                    }
+                });
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(new[] { workLog2, workLog3 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
+        }
+
+        [TestMethod]
+        public void Where_TwoOrGroupNestedNavigationClassFilter()
+        {
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob"
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe"
+            };
+            var employee3 = new EFEmployee()
+            {
+                Name = "bill"
+            };
+            var employee4 = new EFEmployee()
+            {
+                Name = "dave"
+            };
+            var employee5 = new EFEmployee()
+            {
+                Name = "mike"
+            };
+            var workLog1 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 1),
+                Employee = employee1
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2222, 1, 1),
+                EndDate = new DateTime(2222, 2, 1),
+                Employee = employee2
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2222, 1, 1),
+                EndDate = new DateTime(2222, 2, 1),
+                Employee = employee3
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2222, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee4
+            };
+            var workLog5 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2222, 1, 1),
+                EndDate = new DateTime(2222, 2, 2),
+                Employee = employee5
+            };
+            var workLog6 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2222, 2, 2),
+                Employee = employee2
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                workLog1,
+                workLog2,
+                workLog3,
+                workLog4,
+                workLog5,
+                workLog6
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.TwoOrGroupNestedNavigationClassFilter(
+                new Employee.NestedWithTwoOrGroups()
+                {
+                    WorkLog = new WorkLog.TwoOrGroups()
+                    {
+                        StartDate = new DateTime(2000, 1, 1),
+                        EndDate = new DateTime(2000, 2, 2),
+                        EmployeeId = employee2.Id,
+                        Id = workLog3.Id
+                    }
+                });
+            Assert.AreEqual(1, actual.Count());
+            AreEquivalent(new[] { employee2 }.Select(e => e.Id), actual.Select(e => e.Id));
+        }
+
         [TestMethod]
         public void GreaterThanParameter()
         {

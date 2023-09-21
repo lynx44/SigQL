@@ -132,6 +132,43 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
             [OrGroup] WorkLog.BetweenDates dates, 
             [OrGroup] int employeeId);
+
+        IEnumerable<WorkLog.IWorkLogId> OrGroupInClassFilter(
+            [OrGroup] WorkLog.OrColumns filter);
+
+        IEnumerable<WorkLog.IWorkLogId> OrGroupNestedNavigationClassFilter(
+            [OrGroup] WorkLog.NestedOrColumns filter);
+
+        IEnumerable<Employee.IEmployeeId> TwoOrGroupNestedNavigationClassFilter(
+            [OrGroup] Employee.NestedWithTwoOrGroups filter);
+
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    WorkLog.WithOrOnNavigationProperties dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    [OrGroup] WorkLog.BetweenDates dates, 
+        //    [ViaRelation, OrGroup] int employeeId);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    [OrGroup] WorkLog.OrColumnsMixedWithOrNavigationTables dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    [OrGroup] WorkLog.ColumnsMixedWithViaRelation dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    [OrGroup] WorkLog.WithTwoNestedNavigationTables dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    WorkLog.WithTwoViaRelations dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    WorkLog.ColumnsWithTwoViaRelationsAndTwoNestedNavigationTables dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    [OrGroup] WorkLog.MultipleColumns1 dates,
+        //    [OrGroup] WorkLog.MultipleColumns2 dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    WorkLog.MultipleColumns1Or dates,
+        //    WorkLog.MultipleColumns2Or dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    [OrGroup] WorkLog.ColumnsWithNestedNavigationAndViaRelation1 dates,
+        //    [OrGroup] WorkLog.ColumnsWithNestedNavigationAndViaRelation2 dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    WorkLog.ColumnsWithNestedNavigationAndViaRelation1Or dates,
+        //    WorkLog.ColumnsWithNestedNavigationAndViaRelation2Or dates);
         
 
         /// <summary>

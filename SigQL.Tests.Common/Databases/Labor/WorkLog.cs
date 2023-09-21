@@ -444,6 +444,31 @@ namespace SigQL.Tests.Common.Databases.Labor
             [LessThanOrEqual]
             public DateTime EndDate { get; set; }
         }
+
+        public class OrColumns
+        {
+            [OrGroup]
+            public int EmployeeId { get; set; }
+            [OrGroup]
+            public DateTime StartDate { get; set; }
+        }
+
+        public class NestedOrColumns
+        {
+            public Employee.OrColumns Employee { get; set; }
+        }
+
+        public class TwoOrGroups
+        {
+            [OrGroup("1")]
+            public DateTime StartDate { get; set; }
+            [OrGroup("1")]
+            public DateTime EndDate { get; set; }
+            [OrGroup("2")]
+            public int Id { get; set; }
+            [OrGroup("2")]
+            public int EmployeeId { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

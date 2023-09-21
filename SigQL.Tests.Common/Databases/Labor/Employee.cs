@@ -182,6 +182,19 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string Name { get; set; }
             public WorkLog.InsertFieldsWithEmployee WorkLog { get; set; }
         }
+
+        public class OrColumns
+        {
+            [OrGroup]
+            public int Id { get; set; }
+            [OrGroup]
+            public string Name { get; set; }
+        }
+
+        public class NestedWithTwoOrGroups
+        {
+            public WorkLog.TwoOrGroups WorkLog { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(Employee))]
