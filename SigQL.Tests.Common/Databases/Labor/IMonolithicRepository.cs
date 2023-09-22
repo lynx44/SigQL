@@ -151,9 +151,15 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         // TODO
 
+        // Update this one to use a class filter. use params as properties
+        IEnumerable<WorkLog.IWorkLogId> OrGroupClassWithColumnAndNavigationClass(
+            WorkLog.OrGroupClassWithColumnAndNavigationClass filter);
+
         //IEnumerable<Employee.IEmployeeId> OrGroupForTwoNestedNavigationClassFilters(
         //    WorkLog.TwoNestedNavigationClassFilters filter);
 
+        // use OrGroupWithColumnAndNestedNavigationClassFilter, but pull it up a level so it 
+        // returns Address filter on level 1
         //IEnumerable<Employee.IEmployeeId> OrGroupWithManyToMany(
         //    [OrGroup] int id,
         //    [OrGroup] Address.StreetAddressFilter address);

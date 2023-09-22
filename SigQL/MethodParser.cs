@@ -575,12 +575,6 @@ namespace SigQL
             return (methodInfo.GetCustomAttributes(typeof(UpsertAttribute), false)?.Any()).GetValueOrDefault(false);
         }
 
-        private enum LogicalOperand
-        {
-            And,
-            Or
-        }
-
         private WhereClause BuildWhereClauseFromTargetTablePerspective(AstNode primaryTableReference, IEnumerable<TableRelations> whereClauseTableRelations, List<ParameterPath> parameterPaths, List<TokenPath> tokens)
         {
             var allTableRelationsGroups = 
@@ -605,6 +599,7 @@ namespace SigQL
                         .SelectMany(c => c.ProjectedColumns)
                         .ToList();
 
+                var conditionalLookup = new Dictionary<string, AstNode>();
                 //private AstNode GenerateColumnAst(projectedColumns)...
                 //{
                 var columnGroups = projectedColumns
@@ -614,11 +609,8 @@ namespace SigQL
                     .ToList();
                 foreach (var columnGroup in columnGroups)
                 {
-                    AstNode columnConditional = new AndOperator();
-                    if (!string.IsNullOrEmpty(columnGroup.Key))
-                    {
-                        columnConditional = new OrOperator();
-                    }
+                    
+                    var columnConditional = AppendGetConditionalOperand(conditionalLookup, columnGroup.Key, tableRelationsConditional);
 
                     // columns
                     columnConditional.SetArgs(
@@ -686,13 +678,26 @@ namespace SigQL
                             }
                         }).ToList()
                     );
-                    tableRelationsConditional.AppendArgs(columnConditional);
                 }
 
-                var tableNodes = tableRelationsGroup.SelectMany(nt =>
-                    nt.NavigationTables.Select(ntc => BuildWhereClauseForPerspective(primaryTableReference, ntc, "0", parameterPaths,
-                        tokens))).ToList();
-                tableRelationsConditional.AppendArgs(tableNodes);
+                var navigationTablesGroup = tableRelationsGroup.SelectMany(tr => tr.NavigationTables)
+                    .GroupBy(tr => tr.Argument?.GetCustomAttribute<OrGroupAttribute>()?.Group).ToList();
+
+                foreach (var navigationTables in navigationTablesGroup)
+                {
+                    var columnConditional = AppendGetConditionalOperand(conditionalLookup, navigationTables.Key, tableRelationsConditional);
+                    columnConditional.AppendArgs(
+                        navigationTables.Select(nt =>
+                            BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths,
+                                tokens)).ToList()
+                    );
+                }
+
+                //var tableNodes = tableRelationsGroup.SelectMany(nt =>
+                //    nt.NavigationTables.Select(ntc => BuildWhereClauseForPerspective(primaryTableReference, ntc, "0", parameterPaths,
+                //        tokens))).ToList();
+                
+                //tableRelationsConditional.AppendArgs(tableNodes);
                 //}
                 //}
 
@@ -731,15 +736,8 @@ namespace SigQL
                 .GroupBy(g => !g.IsManyToMany ? g.Argument.GetCustomAttribute<OrGroupAttribute>()?.Group : g.NavigationTables.First().Argument.GetCustomAttribute<OrGroupAttribute>()?.Group).ToList();
             foreach (var columnGroup in columnGroups)
             {
-                AstNode columnConditional = new AndOperator();
-                if (!string.IsNullOrEmpty(columnGroup.Key))
-                {
-                    columnConditional = new OrOperator();
-                }
+                var columnConditional = AppendGetConditionalOperand(conditionalLookup, columnGroup.Key, columnOperator);
 
-                conditionalLookup[columnGroup.Key ?? ""] = columnConditional;
-                columnOperator.AppendArgs(columnConditional);
-                
                 columnConditional.SetArgs(
                     columnGroup.SelectMany(c =>
                      {
@@ -797,18 +795,8 @@ namespace SigQL
 
             foreach (var tableRelationsGroup in tableRelationsGroups)
             {
-                if (!conditionalLookup.TryGetValue(tableRelationsGroup.Key ?? "", out var columnConditional))
-                {
-                    columnConditional = new AndOperator();
-                    if (!string.IsNullOrEmpty(tableRelationsGroup.Key))
-                    {
-                        columnConditional = new OrOperator();
-                    }
-
-                    conditionalLookup[tableRelationsGroup.Key ?? ""] = columnConditional;
-                    columnOperator.AppendArgs(columnConditional);
-                }
-
+                var columnConditional = AppendGetConditionalOperand(conditionalLookup, tableRelationsGroup.Key, columnOperator);
+                
                 if (tableRelationsGroup.Any())
                 {
                     columnConditional.AppendArgs(
@@ -853,6 +841,23 @@ namespace SigQL
 
             return new AndOperator().SetArgs(
                 new Exists().SetArgs(selectStatement));
+        }
+
+        private AstNode AppendGetConditionalOperand(IDictionary<string, AstNode> conditionalLookup, string groupName, AstNode outerNode)
+        {
+            if (!conditionalLookup.TryGetValue(groupName ?? "", out var columnConditional))
+            {
+                columnConditional = new AndOperator();
+                if (!string.IsNullOrEmpty(groupName))
+                {
+                    columnConditional = new OrOperator();
+                }
+
+                conditionalLookup[groupName ?? ""] = columnConditional;
+                outerNode.AppendArgs(columnConditional);
+            }
+
+            return columnConditional;
         }
         
         private AstNode BuildComparisonNode(AstNode columnNode,
