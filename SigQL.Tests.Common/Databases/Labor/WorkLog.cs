@@ -482,6 +482,14 @@ namespace SigQL.Tests.Common.Databases.Labor
             [OrGroup]
             public Employee.EmployeeNameFilter Employee { get; set; }
         }
+
+        public class TwoNestedNavigationClassFilters
+        {
+            [OrGroup]
+            public Employee.EmployeeNameFilter Employee { get; set; }
+            [OrGroup]
+            public Location.LocationName Location { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

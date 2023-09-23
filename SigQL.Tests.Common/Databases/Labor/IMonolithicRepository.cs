@@ -148,22 +148,19 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         IEnumerable<WorkLog.IWorkLogId> OrGroupWithColumnAndNestedNavigationClassFilter(
             WorkLog.NestedColumnAndNavigationClassFilter filter);
-
-        // TODO
-
-        // Update this one to use a class filter. use params as properties
+        
         IEnumerable<WorkLog.IWorkLogId> OrGroupClassWithColumnAndNavigationClass(
             WorkLog.OrGroupClassWithColumnAndNavigationClass filter);
 
-        //IEnumerable<Employee.IEmployeeId> OrGroupForTwoNestedNavigationClassFilters(
-        //    WorkLog.TwoNestedNavigationClassFilters filter);
+        
+        IEnumerable<WorkLog.IWorkLogId> OrGroupForTwoNestedNavigationClassFilters(
+            WorkLog.TwoNestedNavigationClassFilters filter);
+        
+        IEnumerable<Employee.IEmployeeId> OrGroupWithParameterColumnAndNavigationManyToManyClassFilter(
+            [OrGroup] string name,
+            [OrGroup] Employee.StreetAddressFilter address);
 
-        // use OrGroupWithColumnAndNestedNavigationClassFilter, but pull it up a level so it 
-        // returns Address filter on level 1
-        //IEnumerable<Employee.IEmployeeId> OrGroupWithManyToMany(
-        //    [OrGroup] int id,
-        //    [OrGroup] Address.StreetAddressFilter address);
-
+        // TODO
         // duplicate above tests and replace with ViaRelations instead of class filters
 
 

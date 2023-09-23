@@ -2398,6 +2398,75 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Where_OrGroupForTwoNestedNavigationClassFilters()
+        {
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob"
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe"
+            };
+            var employee3 = new EFEmployee()
+            {
+                Name = "bill"
+            };
+            var location1 = new EFLocation()
+            {
+                Name = "bob's burgers"
+            };
+            var location2 = new EFLocation()
+            {
+                Name = "sally's sandwiches"
+            };
+            var workLog1 = new EFWorkLog()
+            {
+                Employee = employee1,
+                Location = location1
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                Employee = employee2,
+                Location = location2
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                Employee = employee1,
+                Location = location2
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                Employee = employee2,
+                Location = location1
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                workLog1,
+                workLog2,
+                workLog3,
+                workLog4
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupForTwoNestedNavigationClassFilters(
+                new WorkLog.TwoNestedNavigationClassFilters()
+                {
+                    Employee = new Employee.EmployeeNameFilter()
+                    {
+                        Name = "bob"
+                    },
+                    Location = new Location.LocationName()
+                    {
+                        Name = "bob's burgers"
+                    }
+                });
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(new[] { workLog1, workLog3, workLog4 }.Select(wl => wl.Id), actual.Select(e => e.Id));
+        }
+
+        [TestMethod]
         public void Where_OrGroupWithColumnAndNestedNavigationClassFilter()
         {
             var address1 = new EFAddress()
@@ -2471,6 +2540,67 @@ namespace SigQL.SqlServer.Tests
                 });
             Assert.AreEqual(2, actual.Count());
             AreEquivalent(new[] { workLog1, workLog2 }.Select(wl => wl.Id), actual.Select(e => e.Id));
+        }
+
+        [TestMethod]
+        public void Where_OrGroupWithParameterColumnAndNavigationManyToManyClassFilter()
+        {
+            var address1 = new EFAddress()
+            {
+                StreetAddress = "123 fake st"
+            };
+            var address2 = new EFAddress()
+            {
+                StreetAddress = "234 nonsense ave"
+            };
+            var address3 = new EFAddress()
+            {
+                StreetAddress = "345 blah dr"
+            };
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob",
+                Addresses = new List<EFAddress>()
+                {
+                    address1
+                }
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe",
+                Addresses = new List<EFAddress>()
+                {
+                    address2
+                }
+            };
+            var employee3 = new EFEmployee()
+            {
+                Name = "bill",
+                Addresses = new List<EFAddress>()
+                {
+                    address3
+                }
+            };
+            var efEmployees = new List<EFEmployee>()
+            {
+                employee1,
+                employee2,
+                employee3
+            };
+            this.laborDbContext.Employee.AddRange(efEmployees);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupWithParameterColumnAndNavigationManyToManyClassFilter(
+                "joe",
+                new Employee.StreetAddressFilter()
+                {
+                    Address = new Address.StreetAddressFilter()
+                    {
+                        StreetAddress = "123 fake st"
+                    }
+                });
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(new[] { employee1, employee2 }.Select(e => e.Id), actual.Select(e => e.Id));
         }
 
         [TestMethod]

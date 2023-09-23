@@ -36,5 +36,10 @@
             string Name { get; }
             Address.IAddressFields Address { get; set; }
         }
+
+        public class LocationName
+        {
+            public string Name { get; set; }
+        }
     }
 }
