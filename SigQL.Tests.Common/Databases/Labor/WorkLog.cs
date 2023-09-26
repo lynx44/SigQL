@@ -445,6 +445,12 @@ namespace SigQL.Tests.Common.Databases.Labor
             public DateTime EndDate { get; set; }
         }
 
+        public class IdAndEmployeeId
+        {
+            public int Id { get; set; }
+            public int EmployeeId { get; set; }
+        }
+
         public class OrColumns
         {
             [OrGroup]

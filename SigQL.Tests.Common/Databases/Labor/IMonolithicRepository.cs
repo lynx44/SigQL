@@ -136,6 +136,10 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> OrGroupInClassFilter(
             WorkLog.OrColumns filter);
 
+        IEnumerable<WorkLog.IWorkLogId> OrGroupWithTwoClassFilters(
+            [OrGroup] WorkLog.BetweenDates dates,
+            [OrGroup] WorkLog.IdAndEmployeeId filter2);
+
         IEnumerable<WorkLog.IWorkLogId> OrGroupNestedNavigationClassFilter(
             WorkLog.NestedOrColumns filter);
 
@@ -151,7 +155,6 @@ namespace SigQL.Tests.Common.Databases.Labor
         
         IEnumerable<WorkLog.IWorkLogId> OrGroupClassWithColumnAndNavigationClass(
             WorkLog.OrGroupClassWithColumnAndNavigationClass filter);
-
         
         IEnumerable<WorkLog.IWorkLogId> OrGroupForTwoNestedNavigationClassFilters(
             WorkLog.TwoNestedNavigationClassFilters filter);
@@ -166,16 +169,12 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         // NOT REQUIRED - previous ideas. use to double check test cases
         //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
-        //    WorkLog.WithOrOnNavigationProperties dates);
-        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
         //    [OrGroup] WorkLog.BetweenDates dates, 
         //    [ViaRelation, OrGroup] int employeeId);
         //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
         //    [OrGroup] WorkLog.OrColumnsMixedWithOrNavigationTables dates);
         //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
         //    [OrGroup] WorkLog.ColumnsMixedWithViaRelation dates);
-        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
-        //    [OrGroup] WorkLog.WithTwoNestedNavigationTables dates);
         //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
         //    WorkLog.WithTwoViaRelations dates);
         //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(

@@ -2082,6 +2082,66 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Where_OrGroupInTwoClassFilters()
+        {
+            var employee1 = new EFEmployee()
+            {
+                Name = "bob"
+            };
+            var employee2 = new EFEmployee()
+            {
+                Name = "joe"
+            };
+            var workLog1 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee1
+            };
+            var workLog2 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2000, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee2
+            };
+            var workLog3 = new EFWorkLog()
+            {
+                StartDate = new DateTime(1999, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee1
+            };
+            var workLog4 = new EFWorkLog()
+            {
+                StartDate = new DateTime(2222, 1, 1),
+                EndDate = new DateTime(2000, 2, 2),
+                Employee = employee2
+            };
+            var efWorkLogs = new List<EFWorkLog>()
+            {
+                workLog1,
+                workLog2,
+                workLog3,
+                workLog4
+            };
+            this.laborDbContext.WorkLog.AddRange(efWorkLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.OrGroupWithTwoClassFilters(
+                new WorkLog.BetweenDates()
+                {
+                    StartDate = new DateTime(2000, 1, 1),
+                    EndDate = new DateTime(2000, 2, 2)
+                },
+                new WorkLog.IdAndEmployeeId()
+                {
+                    Id = workLog4.Id,
+                    EmployeeId = employee2.Id
+                });
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(new[] { workLog1, workLog2, workLog4 }.Select(wl => wl.Id), actual.Select(wl => wl.Id));
+        }
+
+        [TestMethod]
         public void Where_OrGroupNestedNavigationClassFilter()
         {
             var employee1 = new EFEmployee()
