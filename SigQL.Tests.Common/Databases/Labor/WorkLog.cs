@@ -459,6 +459,14 @@ namespace SigQL.Tests.Common.Databases.Labor
             public DateTime StartDate { get; set; }
         }
 
+        public class OrColumns2
+        {
+            [OrGroup]
+            public int Id { get; set; }
+            [OrGroup]
+            public DateTime EndDate { get; set; }
+        }
+
         public class NestedOrColumns
         {
             public Employee.OrColumns Employee { get; set; }

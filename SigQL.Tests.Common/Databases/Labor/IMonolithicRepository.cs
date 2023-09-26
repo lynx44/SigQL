@@ -163,6 +163,10 @@ namespace SigQL.Tests.Common.Databases.Labor
             [OrGroup] string name,
             [OrGroup] Employee.StreetAddressFilter address);
 
+        IEnumerable<WorkLog.IWorkLogId> OrGroupInTwoClassFilters(
+            WorkLog.OrColumns filter1,
+            WorkLog.OrColumns2 filter2);
+
         // TODO
         // duplicate above tests and replace with ViaRelations instead of class filters
 
@@ -182,9 +186,6 @@ namespace SigQL.Tests.Common.Databases.Labor
         //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
         //    [OrGroup] WorkLog.MultipleColumns1 dates,
         //    [OrGroup] WorkLog.MultipleColumns2 dates);
-        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
-        //    WorkLog.MultipleColumns1Or dates,
-        //    WorkLog.MultipleColumns2Or dates);
         //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
         //    [OrGroup] WorkLog.ColumnsWithNestedNavigationAndViaRelation1 dates,
         //    [OrGroup] WorkLog.ColumnsWithNestedNavigationAndViaRelation2 dates);
