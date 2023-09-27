@@ -31,6 +31,7 @@ namespace SigQL
             
             if (argument is ParameterArgument
                 && !ColumnAttributes.IsDecoratedNonColumn(argument)
+                && !this.IsTableOrTableProjection(argument.Type) 
                 && FindColumnByName(tableDefinition, argument.GetCustomAttribute<ColumnAttribute>()?.ColumnName ?? argument.Name) != null)
             {
                 columnFields.Add(new ColumnField()
@@ -47,6 +48,7 @@ namespace SigQL
             
             if (argument is ParameterArgument
                 && !ColumnAttributes.IsDecoratedNonColumn(argument)
+                && !this.IsTableOrTableProjection(argument.Type)
                 && ColumnFilters.ViaRelation.IsMatch(argument, false))
             {
                 viaRelationColumns.Add(
