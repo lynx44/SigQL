@@ -48,7 +48,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWithAliasedColumnName(1));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"WorkLogId\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" = @id))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"WorkLogId\" from \"WorkLog\" where (\"WorkLog\".\"Id\" = @id)", sql);
         }
 
         [TestMethod]
@@ -154,7 +154,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => monolithicRepository.GetByNameFilter(new Employee.EmployeeNameFilter() { Name = null }));
 
-            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where ((\"Employee\".\"Name\" is null))", sql);
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where (\"Employee\".\"Name\" is null)", sql);
         }
 
         [TestMethod]
@@ -162,7 +162,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => monolithicRepository.GetByNameFilterNot(new Employee.EmployeeNameNotFilter() { Name = null }));
 
-            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where ((\"Employee\".\"Name\" is not null))", sql);
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where (\"Employee\".\"Name\" is not null)", sql);
         }
 
         [TestMethod]
@@ -171,7 +171,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetByFilter));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where ((\"Employee\".\"Id\" = @Id))", sql);
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where (\"Employee\".\"Id\" = @Id)", sql);
         }
 
         [TestMethod]
@@ -179,7 +179,7 @@ namespace SigQL.Tests
         {
             var sql = this.GetSqlForCall(() => this.monolithicRepository.GetByFilterWithSqlIdentifierAttribute(new MyEmployeeIdFilter() { Id = 1 }));
 
-            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where ((\"Employee\".\"Id\" = @Id))", sql);
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where (\"Employee\".\"Id\" = @Id)", sql);
         }
 
         [TestMethod]
@@ -223,7 +223,7 @@ namespace SigQL.Tests
         {
             var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithJoinRelationAttribute());
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"View.RowNumber\", \"WorkLogEmployeeView\".\"WorkLogId\" \"View.WorkLogId\", \"WorkLogEmployeeView\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeId\" \"View.EmployeeId\", \"WorkLogEmployeeView\".\"EmployeeName\" \"View.EmployeeName\" from \"WorkLog\" left outer join (select ROW_NUMBER() over(order by \"WorkLogId\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on ((\"WorkLog\".\"EmployeeId\" = \"WorkLogEmployeeView\".\"EmployeeId\"))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"View.RowNumber\", \"WorkLogEmployeeView\".\"WorkLogId\" \"View.WorkLogId\", \"WorkLogEmployeeView\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeId\" \"View.EmployeeId\", \"WorkLogEmployeeView\".\"EmployeeName\" \"View.EmployeeName\" from \"WorkLog\" left outer join (select ROW_NUMBER() over(order by \"WorkLogId\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on (\"WorkLog\".\"EmployeeId\" = \"WorkLogEmployeeView\".\"EmployeeId\")", sql);
         }
 
         [TestMethod]
@@ -239,7 +239,7 @@ namespace SigQL.Tests
         {
             var sql = this.GetSqlForCall(() => this.monolithicRepository.GetJoinAttributeWithMultiTableRelationalPath());
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Address\".\"Id\" \"Addresses.Id\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) left outer join \"EmployeeAddress\" on ((\"Employee\".\"Id\" = \"EmployeeAddress\".\"EmployeeId\")) left outer join \"Address\" on ((\"EmployeeAddress\".\"AddressId\" = \"Address\".\"Id\"))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Address\".\"Id\" \"Addresses.Id\" from \"WorkLog\" left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") left outer join \"EmployeeAddress\" on (\"Employee\".\"Id\" = \"EmployeeAddress\".\"EmployeeId\") left outer join \"Address\" on (\"EmployeeAddress\".\"AddressId\" = \"Address\".\"Id\")", sql);
         }
 
         [TestMethod]
@@ -247,7 +247,7 @@ namespace SigQL.Tests
         {
             var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithJoinRelationAttributeOnViewWithTableNavigationCollection());
 
-            Assert.AreEqual("select \"WorkLogEmployeeView\".\"RowNumber\" \"RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"EmployeeName\", \"Employee\".\"Id\" \"Employees.Id\", \"Address\".\"Id\" \"Employees.Addresses.Id\", \"Address\".\"StreetAddress\" \"Employees.Addresses.StreetAddress\" from (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" left outer join \"Employee\" on ((\"WorkLogEmployeeView\".\"EmployeeId\" = \"Employee\".\"Id\")) left outer join \"EmployeeAddress\" on ((\"EmployeeAddress\".\"EmployeeId\" = \"Employee\".\"Id\")) left outer join \"Address\" on ((\"EmployeeAddress\".\"AddressId\" = \"Address\".\"Id\"))", sql);
+            Assert.AreEqual("select \"WorkLogEmployeeView\".\"RowNumber\" \"RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"EmployeeName\", \"Employee\".\"Id\" \"Employees.Id\", \"Address\".\"Id\" \"Employees.Addresses.Id\", \"Address\".\"StreetAddress\" \"Employees.Addresses.StreetAddress\" from (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" left outer join \"Employee\" on (\"WorkLogEmployeeView\".\"EmployeeId\" = \"Employee\".\"Id\") left outer join \"EmployeeAddress\" on (\"EmployeeAddress\".\"EmployeeId\" = \"Employee\".\"Id\") left outer join \"Address\" on (\"EmployeeAddress\".\"AddressId\" = \"Address\".\"Id\")", sql);
         }
 
         [TestMethod]
@@ -255,7 +255,7 @@ namespace SigQL.Tests
         {
             var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithJoinRelationAttributeOnTableWithViewNavigationCollection());
 
-            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"View.RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"View.EmployeeName\" from \"Employee\" left outer join (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on ((\"Employee\".\"Id\" = \"WorkLogEmployeeView\".\"EmployeeId\"))", sql);
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"View.RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"View.EmployeeName\" from \"Employee\" left outer join (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on (\"Employee\".\"Id\" = \"WorkLogEmployeeView\".\"EmployeeId\")", sql);
         }
 
 
@@ -264,7 +264,7 @@ namespace SigQL.Tests
         {
             var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithNestedJoinRelationAttribute());
 
-            Assert.AreEqual("select \"Address\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"Employee.View.RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"Employee.View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"Employee.View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"Employee.View.EmployeeName\" from \"Address\" left outer join \"EmployeeAddress\" on ((\"EmployeeAddress\".\"AddressId\" = \"Address\".\"Id\")) left outer join \"Employee\" on ((\"EmployeeAddress\".\"EmployeeId\" = \"Employee\".\"Id\")) left outer join (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on ((\"Employee\".\"Id\" = \"WorkLogEmployeeView\".\"EmployeeId\"))", sql);
+            Assert.AreEqual("select \"Address\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"WorkLogEmployeeView\".\"RowNumber\" \"Employee.View.RowNumber\", \"WorkLogEmployeeView\".\"StartDate\" \"Employee.View.StartDate\", \"WorkLogEmployeeView\".\"EndDate\" \"Employee.View.EndDate\", \"WorkLogEmployeeView\".\"EmployeeName\" \"Employee.View.EmployeeName\" from \"Address\" left outer join \"EmployeeAddress\" on (\"EmployeeAddress\".\"AddressId\" = \"Address\".\"Id\") left outer join \"Employee\" on (\"EmployeeAddress\".\"EmployeeId\" = \"Employee\".\"Id\") left outer join (select ROW_NUMBER() over(order by \"StartDate\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" on (\"Employee\".\"Id\" = \"WorkLogEmployeeView\".\"EmployeeId\")", sql);
         }
 
         [TestMethod]
@@ -334,7 +334,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetClrOnlyMixedWithColumnParams(1, 2));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"EmployeeId\" = @employeeId))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"EmployeeId\" = @employeeId)", sql);
         }
 
         [TestMethod]
@@ -350,7 +350,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetClrOnlyFilterClassProperty(new WorkLog.ClrOnlyFilter()));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"EmployeeId\" = @EmployeeId))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"EmployeeId\" = @EmployeeId)", sql);
         }
 
         [TestMethod]
@@ -366,7 +366,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithNestedClrOnlyProperty());
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\" from \"WorkLog\" left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
         }
 
         [TestMethod]
@@ -1076,7 +1076,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.TakeWorkLogs));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" order by (select 1) offset 0 rows fetch next @take rows only) \"offset_WorkLog\" inner join \"WorkLog\" on ((\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\")) left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" order by (select 1) offset 0 rows fetch next @take rows only) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
         }
 
         [TestMethod]
@@ -1103,7 +1103,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.TakeWorkLogsOnlyWithFilter));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" = @id)) order by (select 1) offset 0 rows fetch next @take rows only", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"Id\" = @id) order by (select 1) offset 0 rows fetch next @take rows only", sql);
         }
 
         [TestMethod]
@@ -1112,7 +1112,7 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() =>
                 this.monolithicRepository.TakeWorkLogsViaClassFilter(new WorkLog.FilterWithFetch()));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" order by (select 1) offset 0 rows fetch next @filterFetch rows only) \"offset_WorkLog\" inner join \"WorkLog\" on ((\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\")) left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" order by (select 1) offset 0 rows fetch next @filterFetch rows only) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
         }
 
         [TestMethod]
@@ -1139,7 +1139,7 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() =>
                 this.monolithicRepository.TakeWorkLogsOnlyWithFilterViaClassFilter(new WorkLog.FilterWithFetchAndParameter()));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" = @Id)) order by (select 1) offset 0 rows fetch next @filterFetch rows only", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"Id\" = @Id) order by (select 1) offset 0 rows fetch next @filterFetch rows only", sql);
         }
 
         [TestMethod]
@@ -1723,7 +1723,7 @@ update ""WorkLog$employees$WorkLog$Lookup"" set ""Id"" = ""insertedWorkLog$emplo
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.DeleteEmployeeWithAttributeTableNameWithValuesByParams("bob"));
 
-            AssertSqlEqual("delete from \"Employee\" where ((\"Employee\".\"Name\" = @name))", sql);
+            AssertSqlEqual("delete from \"Employee\" where (\"Employee\".\"Name\" = @name)", sql);
         }
 
         #endregion Delete

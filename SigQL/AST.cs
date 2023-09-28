@@ -347,7 +347,12 @@ namespace SigQL
 
     }
 
-    public class AndOperator : LogicalOperator
+    public class ConditionalOperator : LogicalOperator
+    {
+
+    }
+
+    public class AndOperator : ConditionalOperator
     {
         public AndOperator()
         {
@@ -355,7 +360,7 @@ namespace SigQL
         }
     }
 
-    public class OrOperator : LogicalOperator
+    public class OrOperator : ConditionalOperator
     {
         public OrOperator()
         {
