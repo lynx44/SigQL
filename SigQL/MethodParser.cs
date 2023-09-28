@@ -843,7 +843,7 @@ namespace SigQL
 
 
             return new AndOperator().SetArgs(
-                new Exists().SetArgs(selectStatement));
+                new LogicalGrouping().SetArgs(new Exists().SetArgs(selectStatement)));
         }
 
         private AstNode AppendGetConditionalOperand(IDictionary<string, AstNode> conditionalLookup, string groupName, AstNode outerNode)
