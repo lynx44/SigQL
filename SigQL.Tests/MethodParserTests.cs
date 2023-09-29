@@ -384,7 +384,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogByEmployeeName));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" = @Employee0Name)))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" = @Employee0Name))))", sql);
         }
 
         // consider if this behavior is desired
@@ -403,7 +403,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetEmployeeByStreetAddress));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress0\" where ((\"EmployeeAddress0\".\"EmployeeId\" = \"Employee\".\"Id\") and (exists (select 1 from \"Address\" \"Address00\" where ((\"Address00\".\"Id\" = \"EmployeeAddress0\".\"AddressId\") and (\"Address00\".\"StreetAddress\" = @Address00StreetAddress))))))))", sql);
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress0\" where ((\"EmployeeAddress0\".\"EmployeeId\" = \"Employee\".\"Id\") and (exists (select 1 from \"Address\" \"Address00\" where ((\"Address00\".\"Id\" = \"EmployeeAddress0\".\"AddressId\") and (\"Address00\".\"StreetAddress\" = @Address00StreetAddress)))))))", sql);
         }
 
         [TestMethod]
@@ -412,7 +412,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetEmployeesByNameWithLike));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((\"Employee\".\"Name\" like @name))", sql);
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where (\"Employee\".\"Name\" like @name)", sql);
         }
 
         [TestMethod]
@@ -421,7 +421,7 @@ namespace SigQL.Tests
             
             var sql = GetSqlForCall(() => monolithicRepository.GetEmployeesByNameWithNotLike(Like.FromUnsafeRawValue("name")));
 
-            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((\"Employee\".\"Name\" not like @name))", sql);
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where (\"Employee\".\"Name\" not like @name)", sql);
         }
 
         [TestMethod]
@@ -438,7 +438,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyId(new List<int?>() { 1 }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" in (@id0)))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"Id\" in (@id0))", sql);
         }
 
         [TestMethod]
@@ -446,7 +446,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyIdIgnoreIfNullOrEmpty(new List<int>()));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((1 = 1))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (1 = 1)", sql);
         }
 
         [TestMethod]
@@ -454,7 +454,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyIdIgnoreIfNullOrEmpty(null));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((1 = 1))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (1 = 1)", sql);
         }
 
         [TestMethod]
@@ -470,7 +470,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyId(new List<int?>() { null }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" is null))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"Id\" is null)", sql);
         }
 
         [TestMethod]
@@ -503,7 +503,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyIdNotIn(new List<int?>() { 1 }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" not in (@id0)))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"Id\" not in (@id0))", sql);
         }
 
         [TestMethod]
@@ -511,7 +511,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyIdNotIn(new List<int?>() { 1, null }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (((\"WorkLog\".\"Id\" not in (@id0)) and (\"WorkLog\".\"Id\" is not null)))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" not in (@id0)) and (\"WorkLog\".\"Id\" is not null))", sql);
         }
 
         [TestMethod]
@@ -519,7 +519,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyIdNotIn(new List<int?>() { null }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" is not null))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"Id\" is not null)", sql);
         }
         
         [TestMethod]
@@ -527,7 +527,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyIdPlural(new List<int>() { 1 }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" in (@ids0)))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"Id\" in (@ids0))", sql);
         }
         
         [TestMethod]
@@ -535,7 +535,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyId(null));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" in (select null where (0 = 1))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"Id\" in (select null where (0 = 1)))", sql);
         }
 
         [TestMethod]
@@ -544,7 +544,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsGreaterThanStartDate));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" > @startDate))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"StartDate\" > @startDate)", sql);
         }
 
         [TestMethod]
@@ -553,7 +553,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsGreaterThanOrEqualToStartDate));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" >= @startDate))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"StartDate\" >= @startDate)", sql);
         }
 
         [TestMethod]
@@ -562,7 +562,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsGreaterThanStartDateClassFilter));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" > @StartDate))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"StartDate\" > @StartDate)", sql);
         }
 
         [TestMethod]
@@ -571,7 +571,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsGreaterThanOrEqualToStartDateClassFilter));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" >= @StartDate))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"StartDate\" >= @StartDate)", sql);
         }
 
         [TestMethod]
@@ -589,7 +589,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsLessThanStartDate));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" < @startDate))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"StartDate\" < @startDate)", sql);
         }
 
         [TestMethod]
@@ -598,7 +598,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsLessThanOrEqualToStartDate));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" <= @startDate))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"StartDate\" <= @startDate)", sql);
         }
 
         [TestMethod]
@@ -607,7 +607,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsLessThanStartDateClassFilter));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" < @StartDate))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"StartDate\" < @StartDate)", sql);
         }
 
         [TestMethod]
@@ -616,7 +616,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsLessThanOrEqualToStartDateClassFilter));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" <= @StartDate))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"StartDate\" <= @StartDate)", sql);
         }
 
         [TestMethod]
@@ -625,7 +625,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsByEmployeeNamesWithIn));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" in ())))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" in ()))))", sql);
         }
 
         [TestMethod]
@@ -645,7 +645,7 @@ namespace SigQL.Tests
                 monolithicRepository.GetWorkLogsByEmployeeNamesViaRelation(new WorkLog.GetEmployeeNamesViaRelation()
                     {Names = Array.Empty<string>()}));
             
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1)))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1))", sql);
         }
 
         [TestMethod]
@@ -655,7 +655,7 @@ namespace SigQL.Tests
                 monolithicRepository.GetWorkLogsByEmployeeNamesViaRelation(new WorkLog.GetEmployeeNamesViaRelation()
                     {Names = null}));
             
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1)))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1))", sql);
         }
 
         [TestMethod]
@@ -1031,7 +1031,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetNextWorkLogsWithPrimaryTableFilter));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" = @startDate)) order by (select 1) offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" where (\"WorkLog\".\"StartDate\" = @startDate) order by (select 1) offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
         }
 
         [TestMethod]
@@ -1058,7 +1058,7 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() =>
                 this.monolithicRepository.GetNextWorkLogsViaClassFilterAndParameter(new WorkLog.FilterWithOffsetAndParameter() { Offset = 50, StartDate = DateTime.Today }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" = @StartDate)) order by (select 1) offset @filterOffset rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" where (\"WorkLog\".\"StartDate\" = @StartDate) order by (select 1) offset @filterOffset rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
         }
 
         [TestMethod]
@@ -1067,7 +1067,7 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() =>
                 this.monolithicRepository.GetNextWorkLogsWithNavigationTableFilterWithOffset(new WorkLog.GetByEmployeeNameFilterWithOffset() { Offset = 50, Employee = new Employee.EmployeeNameFilter() { Name = "something" }}));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" = @Employee0Name))))) order by (select 1) offset @filterOffset rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" = @Employee0Name)))) order by (select 1) offset @filterOffset rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
         }
 
         [TestMethod]
@@ -1244,7 +1244,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.itvf_GetWorkLogsByEmployeeId(2, DateTime.Today));
 
-            Assert.AreEqual("select \"itvf_GetWorkLogsByEmployeeId\".\"RowNumber\" \"RowNumber\", \"itvf_GetWorkLogsByEmployeeId\".\"Id\" \"Id\" from (select ROW_NUMBER() over(order by \"Id\") \"RowNumber\", \"Id\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"LocationId\" from itvf_GetWorkLogsByEmployeeId(@empId)) \"itvf_GetWorkLogsByEmployeeId\" where ((\"itvf_GetWorkLogsByEmployeeId\".\"StartDate\" > @startDate))", sql);
+            Assert.AreEqual("select \"itvf_GetWorkLogsByEmployeeId\".\"RowNumber\" \"RowNumber\", \"itvf_GetWorkLogsByEmployeeId\".\"Id\" \"Id\" from (select ROW_NUMBER() over(order by \"Id\") \"RowNumber\", \"Id\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"LocationId\" from itvf_GetWorkLogsByEmployeeId(@empId)) \"itvf_GetWorkLogsByEmployeeId\" where (\"itvf_GetWorkLogsByEmployeeId\".\"StartDate\" > @startDate)", sql);
         }
 
         [TestMethod]
@@ -1738,7 +1738,7 @@ update ""WorkLog$employees$WorkLog$Lookup"" set ""Id"" = ""insertedWorkLog$emplo
             AssertSqlEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
 declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
 insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@id, @name, 0)
-merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Employee"" where ((""Employee"".""Id"" = ""EmployeeLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where ((""Id"" is null) or not exists (select 1 from ""Employee"" where (""Employee"".""Id"" = ""EmployeeLookup"".""Id"")))) as i (""Id"",""Name"",""_index"") on (1 = 0)
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
@@ -1776,14 +1776,14 @@ update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee""
 declare @insertedEmployee table(""Id"" int, ""_index"" int)
 declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
 insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0), (@employeesId1, @employeesName1, 1)
-merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Employee"" where ((""Employee"".""Id"" = ""EmployeeLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where ((""Id"" is null) or not exists (select 1 from ""Employee"" where (""Employee"".""Id"" = ""EmployeeLookup"".""Id"")))) as i (""Id"",""Name"",""_index"") on (1 = 0)
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
 update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));
 declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
 insert @WorkLogLookup(""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") values(@employeesWorkLogs_Id0, @employeesWorkLogs_StartDate0, @employeesWorkLogs_EndDate0, 0, 0), (@employeesWorkLogs_Id1, @employeesWorkLogs_StartDate1, @employeesWorkLogs_EndDate1, 1, 0), (@employeesWorkLogs_Id2, @employeesWorkLogs_StartDate2, @employeesWorkLogs_EndDate2, 2, 1), (@employeesWorkLogs_Id3, @employeesWorkLogs_StartDate3, @employeesWorkLogs_EndDate3, 3, 1)
-merge ""WorkLog"" using (select ""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"" from @WorkLogLookup ""WorkLogLookup"" where (((""Id"" is null)) or not exists (select 1 from ""WorkLog"" where ((""WorkLog"".""Id"" = ""WorkLogLookup"".""Id""))))) as i (""Id"",""StartDate"",""EndDate"",""_index"",""EmployeeId_index"") on (1 = 0)
+merge ""WorkLog"" using (select ""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"" from @WorkLogLookup ""WorkLogLookup"" where ((""Id"" is null) or not exists (select 1 from ""WorkLog"" where (""WorkLog"".""Id"" = ""WorkLogLookup"".""Id"")))) as i (""Id"",""StartDate"",""EndDate"",""_index"",""EmployeeId_index"") on (1 = 0)
  when not matched then
  insert (""Id"", ""StartDate"", ""EndDate"", ""EmployeeId"") values(""i"".""Id"", ""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
 update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLookup ""WorkLogLookup"" inner join @insertedWorkLog ""insertedWorkLog"" on (""WorkLogLookup"".""_index"" = ""insertedWorkLog"".""_index"");
@@ -1821,14 +1821,14 @@ update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDat
 declare @insertedEmployee table(""Id"" int, ""_index"" int)
 declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
 insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0), (@employeesId1, @employeesName1, 1)
-merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Employee"" where ((""Employee"".""Id"" = ""EmployeeLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where ((""Id"" is null) or not exists (select 1 from ""Employee"" where (""Employee"".""Id"" = ""EmployeeLookup"".""Id"")))) as i (""Id"",""Name"",""_index"") on (1 = 0)
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
 update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));
 declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
 insert @WorkLogLookup(""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") values(@employeesWorkLogs_Id0, @employeesWorkLogs_StartDate0, @employeesWorkLogs_EndDate0, 0, 0), (@employeesWorkLogs_Id1, @employeesWorkLogs_StartDate1, @employeesWorkLogs_EndDate1, 1, 0), (@employeesWorkLogs_Id2, @employeesWorkLogs_StartDate2, @employeesWorkLogs_EndDate2, 2, 1), (@employeesWorkLogs_Id3, @employeesWorkLogs_StartDate3, @employeesWorkLogs_EndDate3, 3, 1)
-merge ""WorkLog"" using (select ""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"" from @WorkLogLookup ""WorkLogLookup"" where (((""Id"" is null)) or not exists (select 1 from ""WorkLog"" where ((""WorkLog"".""Id"" = ""WorkLogLookup"".""Id""))))) as i (""Id"",""StartDate"",""EndDate"",""_index"",""EmployeeId_index"") on (1 = 0)
+merge ""WorkLog"" using (select ""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"" from @WorkLogLookup ""WorkLogLookup"" where ((""Id"" is null) or not exists (select 1 from ""WorkLog"" where (""WorkLog"".""Id"" = ""WorkLogLookup"".""Id"")))) as i (""Id"",""StartDate"",""EndDate"",""_index"",""EmployeeId_index"") on (1 = 0)
  when not matched then
  insert (""Id"", ""StartDate"", ""EndDate"", ""EmployeeId"") values(""i"".""Id"", ""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
 update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLookup ""WorkLogLookup"" inner join @insertedWorkLog ""insertedWorkLog"" on (""WorkLogLookup"".""_index"" = ""insertedWorkLog"".""_index"");
@@ -1897,28 +1897,28 @@ declare @insertedAddress table(""Id"" int, ""_index"" int)
 declare @insertedEmployee table(""Id"" int, ""_index"" int)
 declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
 insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesEmployee_Id0, @employeesEmployee_Name0, 0), (@employeesEmployee_Id1, @employeesEmployee_Name1, 1)
-merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Employee"" where ((""Employee"".""Id"" = ""EmployeeLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where ((""Id"" is null) or not exists (select 1 from ""Employee"" where (""Employee"".""Id"" = ""EmployeeLookup"".""Id"")))) as i (""Id"",""Name"",""_index"") on (1 = 0)
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
 update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));
 declare @AddressLookup table(""Id"" int, ""StreetAddress"" nvarchar(max), ""City"" nvarchar(max), ""State"" nvarchar(max), ""_index"" int)
 insert @AddressLookup(""Id"", ""StreetAddress"", ""City"", ""State"", ""_index"") values(@employeesEmployee_Addresses_Id0, @employeesEmployee_Addresses_StreetAddress0, @employeesEmployee_Addresses_City0, @employeesEmployee_Addresses_State0, 0), (@employeesEmployee_Addresses_Id1, @employeesEmployee_Addresses_StreetAddress1, @employeesEmployee_Addresses_City1, @employeesEmployee_Addresses_State1, 1)
-merge ""Address"" using (select ""Id"", ""StreetAddress"", ""City"", ""State"", ""_index"" from @AddressLookup ""AddressLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Address"" where ((""Address"".""Id"" = ""AddressLookup"".""Id""))))) as i (""Id"",""StreetAddress"",""City"",""State"",""_index"") on (1 = 0)
+merge ""Address"" using (select ""Id"", ""StreetAddress"", ""City"", ""State"", ""_index"" from @AddressLookup ""AddressLookup"" where ((""Id"" is null) or not exists (select 1 from ""Address"" where (""Address"".""Id"" = ""AddressLookup"".""Id"")))) as i (""Id"",""StreetAddress"",""City"",""State"",""_index"") on (1 = 0)
  when not matched then
  insert (""Id"", ""StreetAddress"", ""City"", ""State"") values(""i"".""Id"", ""i"".""StreetAddress"", ""i"".""City"", ""i"".""State"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedAddress(""Id"", ""_index"");
 update ""AddressLookup"" set ""Id"" = ""insertedAddress"".""Id"" from @AddressLookup ""AddressLookup"" inner join @insertedAddress ""insertedAddress"" on (""AddressLookup"".""_index"" = ""insertedAddress"".""_index"");
 update ""Address"" set ""StreetAddress"" = ""AddressLookup"".""StreetAddress"", ""City"" = ""AddressLookup"".""City"", ""State"" = ""AddressLookup"".""State"" from ""Address"" inner join @AddressLookup ""AddressLookup"" on (""AddressLookup"".""Id"" = ""Address"".""Id"") where not exists (select 1 from ""Address"" inner join @insertedAddress ""insertedAddress"" on (""Address"".""Id"" = ""insertedAddress"".""Id"") where (""AddressLookup"".""Id"" = ""insertedAddress"".""Id""));
 declare @LocationLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
 insert @LocationLookup(""Id"", ""Name"", ""_index"") values(@employeesLocation_Id0, @employeesLocation_Name0, 0), (@employeesLocation_Id1, @employeesLocation_Name1, 1)
-merge ""Location"" using (select ""Id"", ""Name"", ""_index"" from @LocationLookup ""LocationLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Location"" where ((""Location"".""Id"" = ""LocationLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+merge ""Location"" using (select ""Id"", ""Name"", ""_index"" from @LocationLookup ""LocationLookup"" where ((""Id"" is null) or not exists (select 1 from ""Location"" where (""Location"".""Id"" = ""LocationLookup"".""Id"")))) as i (""Id"",""Name"",""_index"") on (1 = 0)
  when not matched then
  insert (""Id"", ""Name"") values(""i"".""Id"", ""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedLocation(""Id"", ""_index"");
 update ""LocationLookup"" set ""Id"" = ""insertedLocation"".""Id"" from @LocationLookup ""LocationLookup"" inner join @insertedLocation ""insertedLocation"" on (""LocationLookup"".""_index"" = ""insertedLocation"".""_index"");
 update ""Location"" set ""Name"" = ""LocationLookup"".""Name"" from ""Location"" inner join @LocationLookup ""LocationLookup"" on (""LocationLookup"".""Id"" = ""Location"".""Id"") where not exists (select 1 from ""Location"" inner join @insertedLocation ""insertedLocation"" on (""Location"".""Id"" = ""insertedLocation"".""Id"") where (""LocationLookup"".""Id"" = ""insertedLocation"".""Id""));
 declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int, ""LocationId_index"" int)
 insert @WorkLogLookup(""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""LocationId_index"") values(@employeesId0, @employeesStartDate0, @employeesEndDate0, 0, 0, 0), (@employeesId1, @employeesStartDate1, @employeesEndDate1, 1, 1, 1)
-merge ""WorkLog"" using (select ""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""LocationId_index"" from @WorkLogLookup ""WorkLogLookup"" where (((""Id"" is null)) or not exists (select 1 from ""WorkLog"" where ((""WorkLog"".""Id"" = ""WorkLogLookup"".""Id""))))) as i (""Id"",""StartDate"",""EndDate"",""_index"",""EmployeeId_index"",""LocationId_index"") on (1 = 0)
+merge ""WorkLog"" using (select ""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""LocationId_index"" from @WorkLogLookup ""WorkLogLookup"" where ((""Id"" is null) or not exists (select 1 from ""WorkLog"" where (""WorkLog"".""Id"" = ""WorkLogLookup"".""Id"")))) as i (""Id"",""StartDate"",""EndDate"",""_index"",""EmployeeId_index"",""LocationId_index"") on (1 = 0)
  when not matched then
  insert (""Id"", ""StartDate"", ""EndDate"", ""EmployeeId"", ""LocationId"") values(""i"".""Id"", ""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index"")), (select ""Id"" from @LocationLookup ""LocationLookup"" where (""LocationLookup"".""_index"" = ""i"".""LocationId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
 update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLookup ""WorkLogLookup"" inner join @insertedWorkLog ""insertedWorkLog"" on (""WorkLogLookup"".""_index"" = ""insertedWorkLog"".""_index"");
@@ -1997,7 +1997,7 @@ update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDat
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.UpdateEmployeeById("bob", 1));
 
-            AssertSqlEqual("update \"Employee\" set \"Name\" = @name from \"Employee\" where ((\"Employee\".\"Id\" = @id));", sql);
+            AssertSqlEqual("update \"Employee\" set \"Name\" = @name from \"Employee\" where (\"Employee\".\"Id\" = @id);", sql);
         }
 
         [TestMethod]
