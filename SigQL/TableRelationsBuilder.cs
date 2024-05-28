@@ -22,12 +22,17 @@ namespace SigQL
             TableRelationsColumnSource source,
             ConcurrentDictionary<string, IEnumerable<string>> tableKeyDefinitions)
         {
-            var columnFields = argument.ClassProperties.Where(p => !ColumnAttributes.IsDecoratedNonColumn(p)).Select(p => new ColumnField()
+            List<ColumnField> columnFields = new List<ColumnField>();
+            if (!ColumnAttributes.IsDecoratedNonColumn(argument))
             {
-                Name = this.GetColumnName(p),
-                Type = p.Type,
-                Argument = p
-            }).ToList();
+                columnFields = argument.ClassProperties.Where(p => !ColumnAttributes.IsDecoratedNonColumn(p)).Select(p => new ColumnField()
+                {
+                    Name = this.GetColumnName(p),
+                    Type = p.Type,
+                    Argument = p
+                }).ToList();
+            }
+            
             
             if (argument is ParameterArgument
                 && !ColumnAttributes.IsDecoratedNonColumn(argument)
@@ -535,9 +540,9 @@ namespace SigQL
         public static bool IsDynamicOrderBy(IArgument property)
         {
             return
-                (((property?.Type)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
-                  ((property?.Type)?.IsAssignableFrom(
-                      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
+                property.GetCallsiteTypeName() != "table" && (((property?.Type)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
+                                                              ((property?.Type)?.IsAssignableFrom(
+                                                                  typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
         }
     }
 }
