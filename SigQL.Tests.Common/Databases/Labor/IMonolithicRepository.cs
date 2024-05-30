@@ -47,6 +47,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         Address.IAddressIdWithLocations GetAddressWithLocations();
         Employee.IEmployeeWithAddresses GetEmployeeWithAddresses();
         IEnumerable<Employee.IEmployeeWithAddresses> GetEmployeesWithAddresses();
+        IEnumerable<Employee.IEmployeeWithListAddresses> GetEmployeesWithListAddresses();
+        IEnumerable<Employee.IEmployeeWithIListAddresses> GetEmployeesWithIListAddresses();
+        IEnumerable<Employee.IEmployeeWithReadOnlyCollectionAddresses> GetEmployeesWithReadOnlyCollectionAddresses();
+        IEnumerable<Employee.IEmployeeWithIReadOnlyCollectionAddresses> GetEmployeesWithIReadOnlyCollectionAddresses();
+        IEnumerable<Employee.IEmployeeWithArrayAddresses> GetEmployeesWithArrayAddresses();
         IEnumerable<Address.IStreetAddressCoordinates> GetAddressWithStreetAddress();
         IEnumerable<Address.IStreetAddressCoordinates> GetAddressWithStreetAddressFetch([Fetch] int limit);
 
@@ -223,6 +228,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         // not yet supported
         // [Insert(TableName = nameof(Employee))]
         // void InsertEmployeeWithAttributeWithValuesByUnknownClass(EmployeeInsertFields values);
+
 
 
         [Upsert(TableName = nameof(Employee))]
