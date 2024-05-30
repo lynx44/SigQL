@@ -70,6 +70,10 @@ namespace SigQL
                     result = toArrayMethodForType.Invoke(null, new[] { enumerable });
                 }
             }
+            else
+            {
+                return result.AsEnumerable().SingleOrDefault();
+            }
 
             return result;
         }
