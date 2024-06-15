@@ -17,60 +17,8 @@ namespace SigQL
             List<AstNode> statements;
             List<TokenPath> tokenPaths;
             ConcurrentDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions;
-            //if (upsertSpec.IsSingular)
-            //{
-            //    statements = new List<AstNode>();
-            //    tokenPaths = new List<TokenPath>();
-            //    tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, ITableKeyDefinition>();
-            //    var update = BuildUpdateSingleAst(upsertSpec);
-            //    statements.Add(update);
-            //    var insert = BuildInsertSingleAst(upsertSpec);
-            //    var ifStatement = new If()
-            //    {
-            //        Condition = new EqualsOperator().SetArgs(
-            //            new NamedParameterIdentifier()
-            //            {
-            //                Name = "@ROWCOUNT"
-            //            },
-            //            new Literal()
-            //            {
-            //                Value = "0"
-            //            }
-            //        )
-            //    }.SetArgs(
-            //        insert
-            //    );
-
-            //    statements.Add(ifStatement);
-            //}
-            //else
             {
-                var builderAstCollection = BuildInsertAstCollection(upsertSpec, parameterPaths);
-                for (var index = 0; index < upsertSpec.UpsertTableRelationsCollection.Count; index++)
-                {
-                    var upsertTableRelations = upsertSpec.UpsertTableRelationsCollection[index];
-                    var targetTable = upsertTableRelations.TableRelations.TargetTable;
-                    ModifyMergeSelectStatement(builderAstCollection, targetTable, upsertTableRelations);
-
-                    var updateLookupIdsAst = builderAstCollection.GetReference<AstNode>(targetTable,
-                        InsertBuilderAstCollection.AstReferenceSource.UpdateLookupIds);
-                    if (updateLookupIdsAst != null)
-                    {
-                        var updateLookupIdsAstIndex = builderAstCollection.Statements.IndexOf(updateLookupIdsAst);
-                        if (upsertTableRelations.TableRelations.Argument is TableArgument || upsertTableRelations.TableRelations.Argument.Type != typeof(void))
-                        {
-                            var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations, GetLookupTableName(upsertTableRelations.TableRelations));
-                            AppendWhereClauseToUpdateStatement(updateFromLookupStatement, targetTable, upsertTableRelations);
-                            builderAstCollection.Statements.Insert(updateLookupIdsAstIndex + 1, updateFromLookupStatement);
-                        }
-                        else
-                            // many to many - no need to do an update
-                        {
-                            builderAstCollection.Statements.RemoveAt(updateLookupIdsAstIndex);
-                        }
-                    }
-
-                }
+                var builderAstCollection = BuildUpsertAstCollection(upsertSpec, parameterPaths);
 
                 statements = builderAstCollection.Statements;
                 tokenPaths = builderAstCollection.Tokens;
@@ -91,6 +39,39 @@ namespace SigQL
             };
 
             return sqlStatement;
+        }
+
+        private InsertBuilderAstCollection BuildUpsertAstCollection(UpsertSpec upsertSpec, List<ParameterPath> parameterPaths)
+        {
+            var builderAstCollection = BuildInsertAstCollection(upsertSpec, parameterPaths);
+            for (var index = 0; index < upsertSpec.UpsertTableRelationsCollection.Count; index++)
+            {
+                var upsertTableRelations = upsertSpec.UpsertTableRelationsCollection[index];
+                var targetTable = upsertTableRelations.TableRelations.TargetTable;
+                ModifyMergeSelectStatement(builderAstCollection, targetTable, upsertTableRelations);
+
+                var updateLookupIdsAst = builderAstCollection.GetReference<AstNode>(targetTable,
+                    InsertBuilderAstCollection.AstReferenceSource.UpdateLookupIds);
+                if (updateLookupIdsAst != null)
+                {
+                    var updateLookupIdsAstIndex = builderAstCollection.Statements.IndexOf(updateLookupIdsAst);
+                    if (upsertTableRelations.TableRelations.Argument is TableArgument ||
+                        upsertTableRelations.TableRelations.Argument.Type != typeof(void))
+                    {
+                        var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations,
+                            GetLookupTableName(upsertTableRelations.TableRelations));
+                        AppendWhereClauseToUpdateStatement(updateFromLookupStatement, targetTable, upsertTableRelations);
+                        builderAstCollection.Statements.Insert(updateLookupIdsAstIndex + 1, updateFromLookupStatement);
+                    }
+                    else
+                        // many to many - no need to do an update
+                    {
+                        builderAstCollection.Statements.RemoveAt(updateLookupIdsAstIndex);
+                    }
+                }
+            }
+
+            return builderAstCollection;
         }
 
         private static void AppendWhereClauseToUpdateStatement(Update updateFromLookupStatement, ITableDefinition targetTable,

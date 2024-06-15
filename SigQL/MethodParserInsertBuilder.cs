@@ -925,7 +925,8 @@ namespace SigQL
             var upsertAttribute = 
                 methodInfo.GetCustomAttributes(typeof(InsertAttribute), false).Cast<IUpsertAttribute>().FirstOrDefault() 
                 ?? methodInfo.GetCustomAttributes(typeof(UpdateByKeyAttribute), false).Cast<IUpsertAttribute>().FirstOrDefault()
-                ?? methodInfo.GetCustomAttributes(typeof(UpsertAttribute), false).Cast<IUpsertAttribute>().FirstOrDefault();
+                ?? methodInfo.GetCustomAttributes(typeof(UpsertAttribute), false).Cast<IUpsertAttribute>().FirstOrDefault()
+                ?? methodInfo.GetCustomAttributes(typeof(SyncAttribute), false).Cast<IUpsertAttribute>().FirstOrDefault();
             if (upsertAttribute != null)
             {
                 var methodParameters = methodInfo.GetParameters();
