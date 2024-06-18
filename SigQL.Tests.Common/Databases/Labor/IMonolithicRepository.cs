@@ -245,6 +245,8 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         [Sync]
         void SyncEmployeeWithWorkLogs(Employee.SyncFieldsWithWorkLogs employees);
+        [Sync]
+        void SyncManyToManyEmployeeWithAddresses(Employee.SyncFieldsWithAddresses employees);
 
         //update
         [Update(TableName = nameof(Employee))]

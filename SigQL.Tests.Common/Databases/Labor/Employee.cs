@@ -99,6 +99,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<WorkLog.SyncFields> WorkLogs { get; set; }
         }
 
+        public class SyncFieldsWithAddresses
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public IEnumerable<Address.UpsertFields> Addresses { get; set; }
+        }
+
         public interface IEmployeeWithAddresses
         {
             int Id { get; set; }

@@ -1943,6 +1943,45 @@ update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDat
 delete from ""WorkLog"" where (exists (select 1 from @EmployeeLookup ""EmployeeLookup"" where ((""EmployeeLookup"".""Id"" = ""WorkLog"".""EmployeeId""))) and not exists (select 1 from @WorkLogLookup ""WorkLogLookup"" where ((""WorkLogLookup"".""Id"" = ""WorkLog"".""Id""))))", sql);
         }
 
+        [TestMethod]
+        public void SyncManyToManyNavigationProperty_Void_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SyncManyToManyEmployeeWithAddresses(
+                         new Employee.SyncFieldsWithAddresses()
+                         {
+                             Id = 1,
+                             Name = "Kyle",
+                             Addresses = new []
+                             {
+                                 new Address.UpsertFields() { Id = 1, StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                                 new Address.UpsertFields() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                             }
+                         }));
+
+            AssertSqlEqual(@"declare @insertedAddress table(""Id"" int, ""_index"" int)
+declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Employee"" where ((""Employee"".""Id"" = ""EmployeeLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on ((""Employee"".""Id"" = ""insertedEmployee"".""Id"")) where ((""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id"")));
+declare @AddressLookup table(""Id"" int, ""StreetAddress"" nvarchar(max), ""City"" nvarchar(max), ""State"" nvarchar(max), ""_index"" int)
+insert @AddressLookup(""Id"", ""StreetAddress"", ""City"", ""State"", ""_index"") values(@employeesAddresses_Id0, @employeesAddresses_StreetAddress0, @employeesAddresses_City0, @employeesAddresses_State0, 0), (@employeesAddresses_Id1, @employeesAddresses_StreetAddress1, @employeesAddresses_City1, @employeesAddresses_State1, 1)
+merge ""Address"" using (select ""Id"", ""StreetAddress"", ""City"", ""State"", ""_index"" from @AddressLookup ""AddressLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Address"" where ((""Address"".""Id"" = ""AddressLookup"".""Id""))))) as i (""Id"",""StreetAddress"",""City"",""State"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Id"", ""StreetAddress"", ""City"", ""State"") values(""i"".""Id"", ""i"".""StreetAddress"", ""i"".""City"", ""i"".""State"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedAddress(""Id"", ""_index"");
+update ""AddressLookup"" set ""Id"" = ""insertedAddress"".""Id"" from @AddressLookup ""AddressLookup"" inner join @insertedAddress ""insertedAddress"" on (""AddressLookup"".""_index"" = ""insertedAddress"".""_index"");
+update ""Address"" set ""StreetAddress"" = ""AddressLookup"".""StreetAddress"", ""City"" = ""AddressLookup"".""City"", ""State"" = ""AddressLookup"".""State"" from ""Address"" inner join @AddressLookup ""AddressLookup"" on (""AddressLookup"".""Id"" = ""Address"".""Id"") where not exists (select 1 from ""Address"" inner join @insertedAddress ""insertedAddress"" on ((""Address"".""Id"" = ""insertedAddress"".""Id"")) where ((""AddressLookup"".""Id"" = ""insertedAddress"".""Id"")));
+declare @EmployeeAddressLookup table(""Id"", ""_index"" int, ""AddressId_index"" int, ""EmployeeId_index"" int)
+insert @EmployeeAddressLookup(""_index"", ""AddressId_index"", ""EmployeeId_index"") values(0, 0, 0), (1, 1, 0)
+merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""EmployeeId_index"" from (select * from (select ""AddressLookup"".""Id"" ""AddressLookupAddressId"", ""EmployeeLookup"".""Id"" ""EmployeeLookupEmployeeId"", ""EmployeeAddressLookup"".""AddressId_index"", ""EmployeeAddressLookup"".""EmployeeId_index"", ""EmployeeAddressLookup"".""_index"", ROW_NUMBER() over(partition by ""AddressLookup"".""Id"", ""EmployeeLookup"".""Id"" order by ""AddressLookup"".""Id"", ""EmployeeLookup"".""Id"") ""SigQLRowNumber"" from @EmployeeAddressLookup ""EmployeeAddressLookup"" inner join @AddressLookup ""AddressLookup"" on (""AddressLookup"".""_index"" = ""EmployeeAddressLookup"".""AddressId_index"") inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""_index"" = ""EmployeeAddressLookup"".""EmployeeId_index"")) SigQLM2MRowNumberLookupQuery where not exists (select * from (select ROW_NUMBER() over(partition by ""Id"", ""EmployeeId"", ""AddressId"" order by ""Id"", ""EmployeeId"", ""AddressId"") ""SigQLRowNumber"", ""Id"", ""EmployeeId"", ""AddressId"" from ""EmployeeAddress"") EmployeeAddressM2MRowNumberLookup where ((""SigQLM2MRowNumberLookupQuery"".""SigQLRowNumber"" = ""EmployeeAddressM2MRowNumberLookup"".""SigQLRowNumber"") and (""SigQLM2MRowNumberLookupQuery"".""AddressLookupAddressId"" = ""EmployeeAddressM2MRowNumberLookup"".""AddressId"") and (""SigQLM2MRowNumberLookupQuery"".""EmployeeLookupEmployeeId"" = ""EmployeeAddressM2MRowNumberLookup"".""EmployeeId"")))) SigQLM2MMultiplicityQuery) as i (""_index"",""AddressId_index"",""EmployeeId_index"") on (1 = 0)
+ when not matched then
+ insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index"")));
+delete from ""EmployeeAddress"" where (exists (select 1 from @EmployeeLookup ""EmployeeLookup"" where ((""EmployeeLookup"".""Id"" = ""EmployeeAddress"".""EmployeeId""))) and not exists (select 1 from @EmployeeAddressLookup ""EmployeeAddressLookup"" where ((""EmployeeAddressLookup"".""Id"" = ""EmployeeAddress"".""Id""))))", sql);
+        }
+
         //public void SyncManyToManyNavigationProperty_Void_ReturnsExpectedSql()
 
         //public void SyncManyToOneNavigationProperty_Void_IgnoresRelation_ReturnsExpectedSql()

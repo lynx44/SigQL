@@ -64,9 +64,10 @@ namespace SigQL
                         builderAstCollection.Statements.Insert(updateLookupIdsAstIndex + 1, updateFromLookupStatement);
                     }
                     else
-                        // many to many - no need to do an update
+                    // many to many - no need to do an update
                     {
-                        builderAstCollection.Statements.RemoveAt(updateLookupIdsAstIndex);
+                        
+                        //builderAstCollection.Statements.RemoveAt(updateLookupIdsAstIndex);
                     }
                 }
             }
