@@ -562,10 +562,10 @@ namespace SigQL
                             //    }).ToList();
 
                             IEnumerable<int> indexRange = new List<int>();
-                            if (orderedParametersForInsert.Any())
+                            if (orderedParametersForInsert.Any() || parentIndexMappings.Any())
                             {
-                                var min = orderedParametersForInsert.Min(p => p.Index);
-                                var max = orderedParametersForInsert.Max(p => p.Index);
+                                var min = Math.Min(orderedParametersForInsert.MinOrDefault(p => p.Index, 0), parentIndexMappings.MinOrDefault(p => p.InsertedIndex, 0));
+                                var max = Math.Max(orderedParametersForInsert.MaxOrDefault(p => p.Index, 0), parentIndexMappings.MaxOrDefault(p => p.InsertedIndex, 0));
                                 indexRange = Enumerable.Range(min, max + 1);
                             }
                             
@@ -576,11 +576,12 @@ namespace SigQL
                                     insertTableRelations.TableRelations.TargetTable.Columns
                                         .Where(c =>
                                             insertTableRelations.ForeignTableColumns.Any(fc =>
-                                                fc.ForeignKey.KeyPairs.Any(kp => ColumnEqualityComparer.Default.Equals(kp.ForeignTableColumn, c)))).Select(cp =>
+                                                fc.ForeignKey.KeyPairs.Any(kp => ColumnEqualityComparer.Default.Equals(kp.ForeignTableColumn, c))))
+                                        .Select(cp =>
                                         {
                                             var sqlParameterName = $"{insertTableRelations.TableRelations.TableName}_{cp.Name}{i}";
-                                            var parameterValue = orderedParametersForInsert.First(p => p.Argument.Name == cp.Name && p.Index == i);
-                                            sqlParameters[sqlParameterName] = parameterValue.Value;
+                                            var parameterValue = orderedParametersForInsert.FirstOrDefault(p => p.Argument.Name == cp.Name && p.Index == i);
+                                            sqlParameters[sqlParameterName] = parameterValue?.Value ?? DBNull.Value;
                                             return new NamedParameterIdentifier()
                                             {
                                                 Name = sqlParameterName
