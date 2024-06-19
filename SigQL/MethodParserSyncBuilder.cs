@@ -28,37 +28,37 @@ namespace SigQL
                     var deleteStatements = oneToManyNavigationTables.Select(nt =>
                     {
                         WhereClause deleteWhereClause = null;
-                        //if ((nt.TargetTable.PrimaryKey?.Columns.Any()).GetValueOrDefault(false))
-                        //{
-                        //    deleteWhereClause = new WhereClause().SetArgs(
-                        //        new AndOperator().SetArgs(
-                        //            nt.TargetTable.PrimaryKey.Columns.Select(pk =>
-                        //                new EqualsOperator().SetArgs(
-                        //                    new ColumnIdentifier().SetArgs(
-                        //                        new RelationalTable()
-                        //                        {
-                        //                            Label = GetLookupTableName(nt)
-                        //                        },
-                        //                        new RelationalColumn()
-                        //                        {
-                        //                            Label = pk.Name
-                        //                        }),
-                        //                    new ColumnIdentifier().SetArgs(
-                        //                        new RelationalTable()
-                        //                        {
-                        //                            Label = nt.TableName
-                        //                        },
-                        //                        new RelationalColumn()
-                        //                        {
-                        //                            Label = pk.Name
-                        //                        })
-                        //                )
-                        //            )
-                        //        )
-                        //    );
-                        //}
-                        //else
-                        //{
+                        if (nt.Argument.Type != typeof(void))
+                        {
+                            deleteWhereClause = new WhereClause().SetArgs(
+                                new AndOperator().SetArgs(
+                                    nt.TargetTable.PrimaryKey.Columns.Select(pk =>
+                                        new EqualsOperator().SetArgs(
+                                            new ColumnIdentifier().SetArgs(
+                                                new RelationalTable()
+                                                {
+                                                    Label = GetLookupTableName(nt)
+                                                },
+                                                new RelationalColumn()
+                                                {
+                                                    Label = pk.Name
+                                                }),
+                                            new ColumnIdentifier().SetArgs(
+                                                new RelationalTable()
+                                                {
+                                                    Label = nt.TableName
+                                                },
+                                                new RelationalColumn()
+                                                {
+                                                    Label = pk.Name
+                                                })
+                                        )
+                                    )
+                                )
+                            );
+                        }
+                        else
+                        {
                             deleteWhereClause = new WhereClause().SetArgs(
                                 new AndOperator().SetArgs(
                                     nt.TargetTable.ForeignKeyCollection.SelectMany(fk =>
@@ -87,8 +87,8 @@ namespace SigQL
                                     )
                                 )
                             );
-                        //}
-                        
+                        }
+
                         return new Delete()
                         {
                             FromClause = new FromClause().SetArgs(new TableIdentifier().SetArgs(new RelationalTable()
