@@ -247,6 +247,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         void SyncEmployeeWithWorkLogs(Employee.SyncFieldsWithWorkLogs employees);
         [Sync]
         void SyncManyToManyEmployeeWithAddresses(Employee.SyncFieldsWithAddresses employees);
+        IEnumerable<Employee.SyncFieldsWithAddresses> GetSyncManyToManyEmployeeWithAddresses();
 
         //update
         [Update(TableName = nameof(Employee))]
@@ -271,5 +272,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         // delete
         [Delete(TableName = nameof(Employee))]
         void DeleteEmployeeWithAttributeTableNameWithValuesByParams(string name);
+
+        IEnumerable<EFAddressEFEmployee> GetEFAddressEFEmployees();
     }
 }

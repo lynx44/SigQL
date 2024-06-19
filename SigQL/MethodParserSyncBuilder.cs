@@ -26,7 +26,70 @@ namespace SigQL
                         TableEqualityComparer.Default.Equals(nt.ForeignKeyToParent.PrimaryKeyTable,
                             tableRelations.TargetTable)).ToList();
                     var deleteStatements = oneToManyNavigationTables.Select(nt =>
-                        new Delete()
+                    {
+                        WhereClause deleteWhereClause = null;
+                        //if ((nt.TargetTable.PrimaryKey?.Columns.Any()).GetValueOrDefault(false))
+                        //{
+                        //    deleteWhereClause = new WhereClause().SetArgs(
+                        //        new AndOperator().SetArgs(
+                        //            nt.TargetTable.PrimaryKey.Columns.Select(pk =>
+                        //                new EqualsOperator().SetArgs(
+                        //                    new ColumnIdentifier().SetArgs(
+                        //                        new RelationalTable()
+                        //                        {
+                        //                            Label = GetLookupTableName(nt)
+                        //                        },
+                        //                        new RelationalColumn()
+                        //                        {
+                        //                            Label = pk.Name
+                        //                        }),
+                        //                    new ColumnIdentifier().SetArgs(
+                        //                        new RelationalTable()
+                        //                        {
+                        //                            Label = nt.TableName
+                        //                        },
+                        //                        new RelationalColumn()
+                        //                        {
+                        //                            Label = pk.Name
+                        //                        })
+                        //                )
+                        //            )
+                        //        )
+                        //    );
+                        //}
+                        //else
+                        //{
+                            deleteWhereClause = new WhereClause().SetArgs(
+                                new AndOperator().SetArgs(
+                                    nt.TargetTable.ForeignKeyCollection.SelectMany(fk =>
+                                        fk.KeyPairs.Select(kp =>
+                                            new EqualsOperator().SetArgs(
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = GetLookupTableName(nt)
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = kp.ForeignTableColumn.Name
+                                                    }),
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = nt.TableName
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = kp.ForeignTableColumn.Name
+                                                    })
+                                            )
+                                        )
+                                    )
+                                )
+                            );
+                        //}
+                        
+                        return new Delete()
                         {
                             FromClause = new FromClause().SetArgs(new TableIdentifier().SetArgs(new RelationalTable()
                             {
@@ -38,7 +101,7 @@ namespace SigQL
                                         new Select()
                                         {
                                             SelectClause = new SelectClause().SetArgs(
-                                                new Literal() { Value = "1"}),
+                                                new Literal() {Value = "1"}),
                                             FromClause = new FromClause().SetArgs(
                                                 new FromClauseNode().SetArgs(
                                                     new TableIdentifier().SetArgs(
@@ -78,7 +141,6 @@ namespace SigQL
                                                         )
                                                     )
                                                 )
-                                            
                                             )
                                         }
                                     ),
@@ -86,7 +148,7 @@ namespace SigQL
                                         new Select()
                                         {
                                             SelectClause = new SelectClause().SetArgs(
-                                                new Literal() { Value = "1"}),
+                                                new Literal() {Value = "1"}),
                                             FromClause = new FromClause().SetArgs(
                                                 new FromClauseNode().SetArgs(
                                                     new TableIdentifier().SetArgs(
@@ -100,40 +162,13 @@ namespace SigQL
                                                             }
                                                         )
                                                     )
-                                                    
                                                 )),
-                                            WhereClause = new WhereClause().SetArgs(
-                                                new AndOperator().SetArgs(
-                                                    nt.TargetTable.PrimaryKey.Columns.Select(pk =>
-                                                        new EqualsOperator().SetArgs(
-                                                            new ColumnIdentifier().SetArgs(
-                                                                new RelationalTable()
-                                                                {
-                                                                    Label = GetLookupTableName(nt)
-                                                                },
-                                                                new RelationalColumn()
-                                                                {
-                                                                    Label = pk.Name
-                                                                }),
-                                                            new ColumnIdentifier().SetArgs(
-                                                                new RelationalTable()
-                                                                {
-                                                                    Label = nt.TableName
-                                                                },
-                                                                new RelationalColumn()
-                                                                {
-                                                                    Label = pk.Name
-                                                                })
-                                                        )
-                                                    )
-                                                )
-                                            
-                                            )
+                                            WhereClause = deleteWhereClause
                                         })
                                 )
                             )
-                        }
-                    ).ToList();
+                        };
+                    }).ToList();
                     builderAstCollection.Statements.AddRange(deleteStatements);
                 }
 

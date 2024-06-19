@@ -187,17 +187,24 @@ namespace SigQL
                         statement.Insert(0, declareOutputParameterStatement);
 
                         var insertedTableName = "inserted";
+                        var primaryKeyColumns = upsertTableRelations.TableRelations.TargetTable.PrimaryKey?.Columns.ToList();
+                        if (FindRootArgument(upsertTableRelations.TableRelations.Argument).Type == typeof(void))
+                        {
+                            primaryKeyColumns = upsertTableRelations.TableRelations.TargetTable.ForeignKeyCollection
+                                .SelectMany(fk => fk.KeyPairs.Select(kp => kp.ForeignTableColumn)).ToList();
+                        }
                         merge.WhenNotMatched.Insert.Output = new OutputClause()
                         {
                             Into = new IntoClause()
                             { Object = new NamedParameterIdentifier() { Name = outputParameterTableName } }.SetArgs(
-                                upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
+
+                                primaryKeyColumns.Select(c =>
                                         new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Name }))
                                     .AppendOne(
                                         new ColumnIdentifier().SetArgs(new RelationalColumn()
                                         { Label = MergeIndexColumnName })))
                         }.SetArgs(
-                            upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
+                            primaryKeyColumns.Select(c =>
                                     new ColumnIdentifier().SetArgs(new RelationalTable() { Label = insertedTableName },
                                         new RelationalColumn() { Label = c.Name }))
                                 .AppendOne(
@@ -436,10 +443,8 @@ namespace SigQL
             }
             else
             {
-                tableColumns = upsertTableRelations.TableRelations.TargetTable.Columns
-                    .Where(c => 
-                        upsertTableRelations.ForeignTableColumns.Any(fc => 
-                            fc.ForeignKey.KeyPairs.Any(kp => ColumnEqualityComparer.Default.Equals(kp.ForeignTableColumn, c))))
+                // (upsertTableRelations.TableRelations.TargetTable.PrimaryKey?.Columns.ToList() ?? new List<IColumnDefinition>()).Concat(
+                tableColumns = GetForeignKeyColumns(upsertTableRelations)
                     .Select(c => new ColumnIdentifier().SetArgs(
                     new RelationalColumn() { Label = c.Name }
                 )).ToList();
@@ -499,8 +504,7 @@ namespace SigQL
                         var orderedParameterLookup = new OrderedParameterValueLookup();
                         OrderParameterValues(orderedParameterLookup, parameterValue,
                             FindRootArgument(insertTableRelations.TableRelations.Argument).FindParameter(), null);
-
-
+                        
                         IEnumerable<TableIndexReference> parentIndexMappings;
                         var orderedParametersForInsert =
                             orderedParameterLookup.FindOrderedParameters(
@@ -552,14 +556,6 @@ namespace SigQL
                             var buildManyToManyParentIndexMappings = BuildManyToManyParentIndexMappings(insertTableRelations, orderedParameterLookup);
                             orderedParametersForInsert = buildManyToManyParentIndexMappings.Item1;
                             parentIndexMappings = buildManyToManyParentIndexMappings.Item2;
-                            
-                            //// fake the data for this table by padding it with the same number of indexed rows from above.
-                            //// since there is no row data, only the Foreign Columns will be populated
-                            //orderedParametersForInsert = parentIndexMappings.Select(p => p.InsertedIndex).Distinct().Select(p =>
-                            //    new OrderedParameterValue()
-                            //    {
-                            //        Index = p
-                            //    }).ToList();
 
                             IEnumerable<int> indexRange = new List<int>();
                             if (orderedParametersForInsert.Any() || parentIndexMappings.Any())
@@ -573,10 +569,7 @@ namespace SigQL
                             {
                                 return new ValuesList().SetArgs(
 
-                                    insertTableRelations.TableRelations.TargetTable.Columns
-                                        .Where(c =>
-                                            insertTableRelations.ForeignTableColumns.Any(fc =>
-                                                fc.ForeignKey.KeyPairs.Any(kp => ColumnEqualityComparer.Default.Equals(kp.ForeignTableColumn, c))))
+                                    GetForeignKeyColumns(insertTableRelations)
                                         .Select(cp =>
                                         {
                                             var sqlParameterName = $"{insertTableRelations.TableRelations.TableName}_{cp.Name}{i}";
@@ -595,18 +588,19 @@ namespace SigQL
                             }));
                         }
 
-
-                        //var enumerable = tokenPath.Argument.Type.IsCollectionType()
-                        //    ? parameterValue as IEnumerable
-                        //    : parameterValue.AsEnumerable();
-                        //var allParameters = enumerable?.Cast<object>();
-                        
-
                         return sqlParameters;
                     }
                 };
                 return new Tuple<AstNode, TokenPath>(lookupParameterTableInsert, tokenPath);
             }
+        }
+
+        private static IEnumerable<IColumnDefinition> GetForeignKeyColumns(UpsertTableRelations insertTableRelations)
+        {
+            return insertTableRelations.TableRelations.TargetTable.Columns
+                .Where(c =>
+                    insertTableRelations.ForeignTableColumns.Any(fc =>
+                        fc.ForeignKey.KeyPairs.Any(kp => ColumnEqualityComparer.Default.Equals(kp.ForeignTableColumn, c))));
         }
 
         private static bool IsMethodParamInsert(UpsertTableRelations insertTableRelations)
@@ -773,12 +767,18 @@ namespace SigQL
         private static DeclareStatement BuildDeclareInsertedTableParameterStatement(string outputParameterTableName,
             UpsertTableRelations insertTableRelations)
         {
+            var primaryKeyColumns = insertTableRelations.TableRelations.TargetTable.PrimaryKey?.Columns.ToList();
+            if (FindRootArgument(insertTableRelations.TableRelations.Argument).Type == typeof(void))
+            {
+                primaryKeyColumns = insertTableRelations.TableRelations.TargetTable.ForeignKeyCollection
+                    .SelectMany(fk => fk.KeyPairs.Select(kp => kp.ForeignTableColumn)).ToList();
+            }
             var declareOutputParameterStatement = new DeclareStatement()
             {
                 Parameter = new NamedParameterIdentifier() {Name = outputParameterTableName},
                 DataType = new DataType() {Type = new Literal() {Value = "table"}}
                     .SetArgs(
-                        insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Select(c =>
+                        primaryKeyColumns.Select(c =>
                             new ColumnDeclaration().SetArgs(
                                 new RelationalColumn() {Label = c.Name},
                                 new DataType() {Type = new Literal() {Value = c.DataTypeDeclaration}}
@@ -809,6 +809,20 @@ namespace SigQL
                 ).ToList<AstNode>();
             }
 
+            if (FindRootArgument(insertTableRelations.TableRelations.Argument).Type == typeof(void))
+            {
+                var unincludedForeignKeyColumns =
+                    GetForeignKeyColumns(insertTableRelations).Where(fkc =>
+                        !insertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.Any(c =>
+                            ColumnEqualityComparer.Default.Equals(c, fkc)));
+                primaryKeyColumns.AddRange(unincludedForeignKeyColumns.Select(c =>
+                    new ColumnDeclaration().SetArgs(
+                        new RelationalColumn() { Label = c.Name },
+                        new DataType() { Type = new Literal() { Value = c.DataTypeDeclaration } }
+                    )
+                ).ToList<AstNode>());
+            }
+
             var declareLookupParameterStatement = new DeclareStatement()
             {
                 Parameter = new NamedParameterIdentifier() {Name = lookupParameterTableName},
@@ -837,14 +851,22 @@ namespace SigQL
 
         private AstNode BuildUpdateLookupStatement(TableRelations tableRelations)
         {
-            if ((tableRelations.TargetTable.PrimaryKey?.Columns.Any()).GetValueOrDefault(false))
+            // get the foreign columns for many-to-many and use them if needed
+
+            var primaryKeyColumns = tableRelations.TargetTable.PrimaryKey?.Columns.ToList();
+            if (FindRootArgument(tableRelations.Argument).Type == typeof(void))
+            {
+                primaryKeyColumns = tableRelations.TargetTable.ForeignKeyCollection
+                    .SelectMany(fk => fk.KeyPairs.Select(kp => kp.ForeignTableColumn)).ToList();
+            }
+            if ((primaryKeyColumns?.Any()).GetValueOrDefault(false))
             {
                 var lookupTableName = GetLookupTableName(tableRelations);
                 var insertedTableName = GetInsertedTableName(tableRelations);
                 var ast = new Update()
                 {
                     SetClause =
-                        tableRelations.TargetTable.PrimaryKey.Columns.Select(pk =>
+                        primaryKeyColumns.Select(pk =>
                             new SetEqualOperator()
                                 .SetArgs(
                                     new ColumnIdentifier().SetArgs(
