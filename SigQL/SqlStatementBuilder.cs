@@ -172,6 +172,12 @@ namespace SigQL
                         case Placeholder a:
                             sql.Add(Walk(a.Args.SingleOrDefault())?.Trim());
                             break;
+                        case CommonTableExpression a:
+                            sql.Add($"; with {a.Name} as (\r\n" +
+                                    Walk(a.Definition)?.Trim() +
+                                    "\r\n)\r\n" +
+                                    Walk(a.Args));
+                            break;
                         default:
                             throw new ArgumentException($"Node type {node.GetType()} not supported");
                     }

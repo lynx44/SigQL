@@ -1544,6 +1544,43 @@ namespace SigQL.Tests
             Assert.AreEqual(@"if (@age = 21) begin select 1 end", sql);
         }
 
+        [TestMethod]
+        public void CommonTableExpression()
+        {
+            var ast = new CommonTableExpression()
+            {
+                Name = "cte",
+                Definition = new Select()
+                {
+                    SelectClause = new SelectClause().SetArgs(
+                        new Literal()
+                        {
+                            Value = "1"
+                        }
+                    )
+                }
+            }.SetArgs(
+                new Select()
+                {
+                    SelectClause = new SelectClause().SetArgs(
+                        new Literal()
+                        {
+                            Value = "*"
+                        }
+                    ),
+                    FromClause = new FromClause().SetArgs(new FromClauseNode().SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = "cte" })))
+                }
+            );
+
+            var sql = Build(ast);
+            Assert.AreEqual(@"; with cte as (
+select 1
+)
+select * from ""cte""", sql);
+        }
+
+
+
         private string Build(AstNode arg)
         {
             return builder.Build(arg);
