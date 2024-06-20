@@ -245,9 +245,16 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         [Sync]
         void SyncEmployeeWithWorkLogs(Employee.SyncFieldsWithWorkLogs employees);
+
         [Sync]
         void SyncManyToManyEmployeeWithAddresses(Employee.SyncFieldsWithAddresses employees);
+        // for test assertions only - retrieve the modified date to confirm that the data was synced correctly
         IEnumerable<Employee.SyncFieldsWithAddresses> GetSyncManyToManyEmployeeWithAddresses();
+
+        [Sync]
+        void SyncEmployeeWithAddressesAndLocations(Employee.SyncFieldsWithAddressesAndLocations employees);
+
+        IEnumerable<Employee.SyncFieldsWithAddressesAndLocations> GetSyncEmployeeWithAddressesAndLocations();
 
         //update
         [Update(TableName = nameof(Employee))]

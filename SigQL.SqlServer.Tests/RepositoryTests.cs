@@ -4022,10 +4022,6 @@ namespace SigQL.SqlServer.Tests
             Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
         }
 
-        // Sync: order of properties - delete least dependent properties first
-
-        // sync: number of many-to-many properties deleted
-        
         [TestMethod]
         public void Sync_ManyToMany_AllowsDeletionOfDuplicatedKey()
         {
@@ -4107,6 +4103,129 @@ namespace SigQL.SqlServer.Tests
             Assert.AreEqual("Atlanta", actualEmployee2.Addresses.First(wl => wl.Id == 4).City);
             Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
         }
+
+        [TestMethod]
+        public void Sync_NestedNavigationProperties()
+        {
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress()
+                        {
+                            StreetAddress = "123 fake st", City = "Seattle", State = "WA",
+                            Locations = new List<EFLocation>()
+                            {
+                                new EFLocation()
+                                {
+                                    Name = "Baseball Field"
+                                }
+                            }
+                        },
+                        new EFAddress()
+                        {
+                            StreetAddress = "345 fake st", City = "Portland", State = "OR",
+                            Locations = new List<EFLocation>()
+                            {
+                                new EFLocation()
+                                {
+                                    Name = "Town Center"
+                                }
+                            }
+                        }
+                    }
+                },
+                new EFEmployee()
+                {
+                    Name = "Lester",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL", 
+                            Locations = new List<EFLocation>()
+                            {
+                                new EFLocation()
+                                {
+                                    Name = "Mall"
+                                }
+                            }},
+                        new EFAddress()
+                        {
+                            StreetAddress = "910 fake st", City = "Atlanta", State = "GA",
+                            Locations = new List<EFLocation>()
+                            {
+                                new EFLocation()
+                                {
+                                    Name = "City Hall"
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeeWithAddressesAndLocations(
+                    new Employee.SyncFieldsWithAddressesAndLocations()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        Addresses = new[]
+                        {
+                            new Address.UpsertWithLocation()
+                            {
+                                Id = 1, StreetAddress = "789 fake st", City = "Los Angeles", State = "CA",
+                                Locations = new List<Location.Upsert>()
+                                {
+                                    new Location.Upsert()
+                                    {
+                                        Id = 1,
+                                        Name = "Basketball Court"
+                                    },
+                                    new Location.Upsert()
+                                    {
+                                        Name = "Town Square"
+                                    }
+                                }
+                            },
+                            new Address.UpsertWithLocation()
+                            {
+                                StreetAddress = "2020 fake st", City = "New York", State = "NY",
+                                Locations = new List<Location.Upsert>()
+                                {
+                                    new Location.Upsert()
+                                    {
+                                        Name = "Billiards Room"
+                                    }
+                                }
+                            }
+                        }
+                    });
+            
+            var actual = this.monolithicRepository.GetSyncEmployeeWithAddressesAndLocations();
+
+            Assert.IsFalse(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            var actualEmployee1 = actual.Single(e => e.Id == 1);
+            Assert.AreEqual("Kyle", actualEmployee1.Name);
+            Assert.AreEqual(2, actualEmployee1.Addresses.Count());
+            Assert.AreEqual(2, actualEmployee1.Addresses.First(a => a.Id == 1).Locations.Count);
+            Assert.AreEqual("Basketball Court", actualEmployee1.Addresses.First(a => a.Id == 1).Locations.First().Name);
+            Assert.AreEqual("Town Square", actualEmployee1.Addresses.First(a => a.Id == 1).Locations.Last().Name);
+            Assert.AreEqual(1, actualEmployee1.Addresses.First(a => a.Id == 5).Locations.Count);
+            Assert.AreEqual("Billiards Room", actualEmployee1.Addresses.First(a => a.Id == 5).Locations.First().Name);
+            var actualEmployee2 = actual.Single(e => e.Id == 2);
+            Assert.AreEqual(2, actualEmployee2.Addresses.Count());
+            Assert.AreEqual(1, actualEmployee2.Addresses.First(a => a.Id == 3).Locations.Count);
+            Assert.AreEqual("Mall", actualEmployee2.Addresses.First(a => a.Id == 3).Locations.First().Name);
+            Assert.AreEqual("City Hall", actualEmployee2.Addresses.First(a => a.Id == 4).Locations.First().Name);
+        }
+
+        // Sync: order of properties - delete least dependent properties first
 
         [TestMethod]
         public void UpdateByKey_Single_InsertsRow()

@@ -138,6 +138,9 @@ namespace SigQL
                         }
                         else
                         {
+                            // if this is a many-to-many table, use a CTE so we can delete
+                            // the correct number of rows when duplicated foreign key sets exist
+
                             var cteName = $"SigQL__Delete{nt.TableName}";
                             // ; with SigQL__Delete{Table} as (
                             var sigqlOccurrenceAlias = "SigQL__Occurrence";
@@ -312,24 +315,6 @@ namespace SigQL
                                             }
                                         )
                                     )),
-
-
-                                                //new FromClause().SetArgs(
-                                                //new FromClauseNode().SetArgs(
-                                                //    new TableIdentifier().SetArgs(
-                                                //        new Alias()
-                                                //        {
-                                                //            Label = GetLookupTableName(nt)
-                                                //        }.SetArgs(
-                                                //            new NamedParameterIdentifier()
-                                                //            {
-                                                //                Name = GetLookupTableName(nt)
-                                                //            }
-                                                //        )
-                                                //    )
-                                                //)),
-
-
                                             WhereClause = new WhereClause().SetArgs(
                                                 new AndOperator().SetArgs(
                                                     nt.TargetTable.ForeignKeyCollection.GetAllForeignColumns().Select(c =>

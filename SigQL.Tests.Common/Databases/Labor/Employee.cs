@@ -105,6 +105,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string Name { get; set; }
             public IEnumerable<Address.UpsertFields> Addresses { get; set; }
         }
+        
+        public class SyncFieldsWithAddressesAndLocations
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public IEnumerable<Address.UpsertWithLocation> Addresses { get; set; }
+        }
 
         public interface IEmployeeWithAddresses
         {
