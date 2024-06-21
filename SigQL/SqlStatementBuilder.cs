@@ -124,7 +124,7 @@ namespace SigQL
                             sql.Add(Walk(new AstNode[] { a.OrderByClause }));
                             break;
                         case Insert a:
-                            sql.Add($"insert {Walk(a.Object)}({string.Join(", ", a.ColumnList.Select(a => Walk(a)))}){$" {Walk(a.Output)}".TrimEnd()} {string.Join(", ", Walk(a.ValuesList))}".Trim());
+                            sql.Add($"insert {Walk(a.Object)}({string.Join(", ", a.ColumnList.Select(a => Walk(a)))}){$" {Walk(a.Args)}".TrimEnd()}{$" {Walk(a.Output)}".TrimEnd()} {string.Join(", ", Walk(a.ValuesList))}".Trim());
                             break;
                         case Update a:
                             sql.Add($"update {string.Join(" ", Walk(a.Args))} set {string.Join(", ", a.SetClause.Select(a => Walk(a)))}".Trim());

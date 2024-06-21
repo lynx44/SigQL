@@ -1416,6 +1416,35 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void InsertFromQuery()
+        {
+            var insertStatement = new Insert()
+            {
+                
+                Object = new TableIdentifier() { Args = new[] { new RelationalTable() { Label = "person" } }},
+                ColumnList = new [] {
+                    new ColumnIdentifier() {Args = new[] {new RelationalColumn() {Label = "Name"}}},
+                    new ColumnIdentifier() {Args = new[] {new RelationalColumn() {Label = "Birthdate"}}}
+                }
+            }.SetArgs(new Select()
+            {
+                SelectClause = new SelectClause().SetArgs(
+                    new Literal() { Value = "null" },
+                    new Literal() { Value = "null" }
+                ),
+                WhereClause = new WhereClause().SetArgs(
+                    new EqualsOperator().SetArgs(
+                        new Literal() { Value = "1"},
+                        new Literal() { Value = "0"}
+                    )
+                )
+            });
+        
+            var statement = Build(insertStatement);
+            Assert.AreEqual("insert \"person\"(\"Name\", \"Birthdate\") select null, null where (1 = 0)", statement);
+        }
+
+        [TestMethod]
         public void DeclareTableParameter()
         {
             var declareStatement = new DeclareStatement()

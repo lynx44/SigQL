@@ -546,8 +546,22 @@ namespace SigQL
                             }
                             else
                             {
-                                throw new ArgumentException(
-                                    $"Unable to insert items for {targetTableName} (via method {rootMethodName}) from null or empty list.");
+                                // if there are no values to insert, then fake the insert with an empty set
+                                lookupParameterTableInsert.ValuesList = null;
+                                lookupParameterTableInsert.SetArgs(new Select()
+                                {
+                                    SelectClause = new SelectClause().SetArgs(
+                                        lookupParameterTableInsert.ColumnList.Select(c => new Literal() { Value = "null" }).ToList()
+                                    ),
+                                    WhereClause = new WhereClause().SetArgs(
+                                        new EqualsOperator().SetArgs(
+                                            new Literal() {Value = "1"},
+                                            new Literal() {Value = "0"}
+                                        )
+                                    )
+                                });
+                                //throw new ArgumentException(
+                                //    $"Unable to insert items for {targetTableName} (via method {rootMethodName}) from null or empty list.");
                             }
                         }
                         // many-to-many
