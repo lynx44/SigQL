@@ -1989,7 +1989,7 @@ update ""EmployeeAddressLookup"" set ""AddressId"" = ""insertedEmployeeAddress""
 select ""EmployeeAddress"".* from (select *, ROW_NUMBER() over(partition by ""AddressId"", ""EmployeeId"" order by ""AddressId"", ""EmployeeId"") ""SigQL__Occurrence"" from ""EmployeeAddress"") EmployeeAddress where (exists (select 1 from @EmployeeLookup ""EmployeeLookup"" where ((""EmployeeLookup"".""Id"" = ""EmployeeAddress"".""EmployeeId""))) and not exists (select 1 from (select *, ROW_NUMBER() over(partition by ""AddressId"", ""EmployeeId"" order by ""AddressId"", ""EmployeeId"") ""SigQL__Occurrence"" from @EmployeeAddressLookup) EmployeeAddressLookup where ((""EmployeeAddressLookup"".""AddressId"" = ""EmployeeAddress"".""AddressId"") and (""EmployeeAddressLookup"".""EmployeeId"" = ""EmployeeAddress"".""EmployeeId"") and (""EmployeeAddress"".""SigQL__Occurrence"" = ""EmployeeAddressLookup"".""SigQL__Occurrence""))))
 )
 delete from ""SigQL__DeleteEmployeeAddress""
-delete ""Address"" from ""Address"" where (exists (select 1 from @EmployeeAddressLookup ""EmployeeAddressLookup"" where ((""EmployeeAddressLookup"".""AddressId"" = ""Address"".""Id""))) and not exists (select 1 from @AddressLookup ""AddressLookup"" where ((""AddressLookup"".""Id"" = ""Address"".""Id""))))", sql);
+", sql);
         }
 
         [TestMethod]
