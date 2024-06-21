@@ -96,6 +96,15 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string State { get; set; }
             public List<Location.Upsert> Locations { get; set; }
         }
+
+        public class SyncFieldsWithLocationsWithWorkLogs
+        {
+            public int? Id { get; set; }
+            public string StreetAddress { get; set; }
+            public string City { get; set; }
+            public string State { get; set; }
+            public List<Location.UpsertWithWorkLogs> Locations { get; set; }
+        }
     }
 
     public enum AddressClassification

@@ -256,6 +256,11 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         IEnumerable<Employee.SyncFieldsWithAddressesAndLocations> GetSyncEmployeeWithAddressesAndLocations();
 
+        [Sync]
+        void SyncAddressesWithLocationsWithWorkLogs(Address.SyncFieldsWithLocationsWithWorkLogs employees);
+
+        IEnumerable<Address.SyncFieldsWithLocationsWithWorkLogs> GetSyncAddressesWithLocationsWithWorkLogs();
+
         //update
         [Update(TableName = nameof(Employee))]
         void UpdateAllEmployees([Set] string name);

@@ -13,5 +13,12 @@ namespace SigQL.Extensions
         {
             return foreignKeyCollection.SelectMany(c => c.KeyPairs.Select(kp => kp.ForeignTableColumn)).ToList();
         }
+
+        public static IColumnDefinition GetColumnForTable(this IForeignKeyPair keyPair, ITableDefinition table)
+        {
+            return TableEqualityComparer.Default.Equals(keyPair.ForeignTableColumn.Table, table) ? keyPair.ForeignTableColumn :
+                TableEqualityComparer.Default.Equals(keyPair.PrimaryTableColumn.Table, table) ? keyPair.PrimaryTableColumn :
+                throw new InvalidOperationException($"Table {table.Name} is associated with foreign key pair");
+        }
     }
 }

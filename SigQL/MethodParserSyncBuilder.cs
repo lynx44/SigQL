@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using SigQL.Extensions;
 using SigQL.Schema;
+using SigQL.Sql;
 
 namespace SigQL
 {
@@ -19,132 +20,36 @@ namespace SigQL
             ConcurrentDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions;
             {
                 var builderAstCollection = BuildUpsertAstCollection(upsertSpec, parameterPaths);
-                for (var i = 0; i < upsertSpec.UpsertTableRelationsCollection.Count; i++)
+                var deleteOrderedRelations = upsertSpec.UpsertTableRelationsCollection.ToList();
+                deleteOrderedRelations.Reverse();
+                for (var i = 0; i < deleteOrderedRelations.Count(); i++)
                 {
-                    var upsertRelation = upsertSpec.UpsertTableRelationsCollection[i];
+                    var upsertRelation = deleteOrderedRelations[i];
                     var tableRelations = upsertRelation.TableRelations;
-                    var oneToManyNavigationTables = tableRelations.NavigationTables.Where(nt =>
-                        TableEqualityComparer.Default.Equals(nt.ForeignKeyToParent.PrimaryKeyTable,
-                            tableRelations.TargetTable)).ToList();
-                    var deleteStatements = oneToManyNavigationTables.Select(nt =>
+                    var parentRelations = tableRelations;
+                    if (tableRelations.ForeignKeyToParent != null)
                     {
-                        AstNode deleteStatement;
-                        if (nt.Argument.Type != typeof(void))
+                        parentRelations = tableRelations.Parent;
+                        if (tableRelations.Argument.Type != typeof(void))
                         {
-                            deleteStatement = new Delete()
-                            {
-                                FromClause = new FromClause().SetArgs(new TableIdentifier().SetArgs(new RelationalTable()
-                                {
-                                    Label = nt.TableName
-                                })),
-                                WhereClause = new WhereClause().SetArgs(
-                                new AndOperator().SetArgs(
-                                    new Exists().SetArgs(
-                                        new Select()
-                                        {
-                                            SelectClause = new SelectClause().SetArgs(
-                                                new Literal() { Value = "1" }),
-                                            FromClause = new FromClause().SetArgs(
-                                                new FromClauseNode().SetArgs(
-                                                    new TableIdentifier().SetArgs(
-                                                        new Alias()
-                                                        {
-                                                            Label = GetLookupTableName(tableRelations)
-                                                        }.SetArgs(
-                                                            new NamedParameterIdentifier()
-                                                            {
-                                                                Name = GetLookupTableName(tableRelations)
-                                                            }
-                                                        )
-                                                    )
-                                                )),
-                                            WhereClause = new WhereClause().SetArgs(
-                                                new AndOperator().SetArgs(
-                                                    nt.ForeignKeyToParent.KeyPairs.Select(fk =>
-                                                        new EqualsOperator().SetArgs(
-                                                            new ColumnIdentifier().SetArgs(
-                                                                new RelationalTable()
-                                                                {
-                                                                    Label = GetLookupTableName(tableRelations)
-                                                                },
-                                                                new RelationalColumn()
-                                                                {
-                                                                    Label = fk.PrimaryTableColumn.Name
-                                                                }),
-                                                            new ColumnIdentifier().SetArgs(
-                                                                new RelationalTable()
-                                                                {
-                                                                    Label = nt.TableName
-                                                                },
-                                                                new RelationalColumn()
-                                                                {
-                                                                    Label = fk.ForeignTableColumn.Name
-                                                                })
-                                                        )
-                                                    )
-                                                )
-                                            )
-                                        }
-                                    ),
-                                    new NotExists().SetArgs(
-                                        new Select()
-                                        {
-                                            SelectClause = new SelectClause().SetArgs(
-                                                new Literal() { Value = "1" }),
-                                            FromClause = new FromClause().SetArgs(
-                                                new FromClauseNode().SetArgs(
-                                                    new TableIdentifier().SetArgs(
-                                                        new Alias()
-                                                        {
-                                                            Label = GetLookupTableName(nt)
-                                                        }.SetArgs(
-                                                            new NamedParameterIdentifier()
-                                                            {
-                                                                Name = GetLookupTableName(nt)
-                                                            }
-                                                        )
-                                                    )
-                                                )),
-                                            WhereClause = new WhereClause().SetArgs(
-                                                new AndOperator().SetArgs(
-                                                    nt.TargetTable.PrimaryKey.Columns.Select(pk =>
-                                                        new EqualsOperator().SetArgs(
-                                                            new ColumnIdentifier().SetArgs(
-                                                                new RelationalTable()
-                                                                {
-                                                                    Label = GetLookupTableName(nt)
-                                                                },
-                                                                new RelationalColumn()
-                                                                {
-                                                                    Label = pk.Name
-                                                                }),
-                                                            new ColumnIdentifier().SetArgs(
-                                                                new RelationalTable()
-                                                                {
-                                                                    Label = nt.TableName
-                                                                },
-                                                                new RelationalColumn()
-                                                                {
-                                                                    Label = pk.Name
-                                                                })
-                                                        )
-                                                    )
-                                                )
-                                            )
-                                        })
-                                )
-                            )
-                            };
+                            var dependentTables = tableRelations.NavigationTables.Where(nt =>
+                                TableEqualityComparer.Default.Equals(nt.ForeignKeyToParent.PrimaryKeyTable,
+                                    tableRelations.TargetTable)).ToList();
+                            var dependentDeletes = dependentTables.Select(dt =>
+                                BuildOneToManyDeleteStatement(tableRelations, parentRelations, dt)).ToList();
+                            builderAstCollection.Statements.AddRange(dependentDeletes);
+                            var deleteStatement = BuildOneToManyDeleteStatement(tableRelations, parentRelations);
+                            builderAstCollection.Statements.Add(deleteStatement);
                         }
                         else
                         {
                             // if this is a many-to-many table, use a CTE so we can delete
                             // the correct number of rows when duplicated foreign key sets exist
 
-                            var cteName = $"SigQL__Delete{nt.TableName}";
+                            var cteName = $"SigQL__Delete{tableRelations.TableName}";
                             // ; with SigQL__Delete{Table} as (
                             var sigqlOccurrenceAlias = "SigQL__Occurrence";
-                           deleteStatement = new CommonTableExpression()
+                           var deleteStatement = new CommonTableExpression()
                             {
                                 Name = cteName,
                                 Definition = new Select()
@@ -153,7 +58,7 @@ namespace SigQL
                                     SelectClause = new SelectClause().SetArgs(new ColumnIdentifier().SetArgs(
                                         new RelationalTable()
                                         {
-                                            Label = nt.TableName
+                                            Label = tableRelations.TableName
                                         }, new Literal()
                                         {
                                             Value = "*"
@@ -161,7 +66,7 @@ namespace SigQL
                                     FromClause = new FromClause().SetArgs(new FromClauseNode().SetArgs(
                                         new SubqueryAlias()
                                         {
-                                            Alias = nt.TableName
+                                            Alias = tableRelations.TableName
                                         }.SetArgs(
                                             new Select()
                                             {
@@ -180,7 +85,7 @@ namespace SigQL
                                                             }
                                                         }.SetArgs(
                                                             new PartitionByClause().SetArgs(
-                                                                nt.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
+                                                                tableRelations.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
                                                                     .Select(c =>
                                                                         new ColumnIdentifier().SetArgs(
                                                                             new RelationalColumn()
@@ -190,7 +95,7 @@ namespace SigQL
                                                                     ).ToList()
                                                             ),
                                                             new OrderByClause().SetArgs(
-                                                                nt.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
+                                                                tableRelations.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
                                                                     .Select(c =>
                                                                         new ColumnIdentifier().SetArgs(
                                                                             new RelationalColumn()
@@ -203,7 +108,7 @@ namespace SigQL
                                                 FromClause = new FromClause().SetArgs(
                                                     new FromClauseNode().SetArgs(
                                                         new TableIdentifier().SetArgs(new RelationalTable()
-                                                        { Label = nt.TableName })))
+                                                        { Label = tableRelations.TableName })))
                                             }
                                         )
                                     )),
@@ -220,23 +125,23 @@ namespace SigQL
                                                     new TableIdentifier().SetArgs(
                                                         new Alias()
                                                         {
-                                                            Label = GetLookupTableName(tableRelations)
+                                                            Label = GetLookupTableName(parentRelations)
                                                         }.SetArgs(
                                                             new NamedParameterIdentifier()
                                                             {
-                                                                Name = GetLookupTableName(tableRelations)
+                                                                Name = GetLookupTableName(parentRelations)
                                                             }
                                                         )
                                                     )
                                                 )),
                                             WhereClause = new WhereClause().SetArgs(
                                                 new AndOperator().SetArgs(
-                                                    nt.ForeignKeyToParent.KeyPairs.Select(fk =>
+                                                    tableRelations.ForeignKeyToParent.KeyPairs.Select(fk =>
                                                         new EqualsOperator().SetArgs(
                                                             new ColumnIdentifier().SetArgs(
                                                                 new RelationalTable()
                                                                 {
-                                                                    Label = GetLookupTableName(tableRelations)
+                                                                    Label = GetLookupTableName(parentRelations)
                                                                 },
                                                                 new RelationalColumn()
                                                                 {
@@ -245,7 +150,7 @@ namespace SigQL
                                                             new ColumnIdentifier().SetArgs(
                                                                 new RelationalTable()
                                                                 {
-                                                                    Label = nt.TableName
+                                                                    Label = tableRelations.TableName
                                                                 },
                                                                 new RelationalColumn()
                                                                 {
@@ -267,7 +172,7 @@ namespace SigQL
                                                 new FromClause().SetArgs(new FromClauseNode().SetArgs(
                                         new SubqueryAlias()
                                         {
-                                            Alias = GetLookupTableName(nt)
+                                            Alias = GetLookupTableName(tableRelations)
                                         }.SetArgs(
                                             new Select()
                                             {
@@ -286,7 +191,7 @@ namespace SigQL
                                                             }
                                                         }.SetArgs(
                                                             new PartitionByClause().SetArgs(
-                                                                nt.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
+                                                                tableRelations.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
                                                                     .Select(c =>
                                                                         new ColumnIdentifier().SetArgs(
                                                                             new RelationalColumn()
@@ -296,7 +201,7 @@ namespace SigQL
                                                                     ).ToList()
                                                             ),
                                                             new OrderByClause().SetArgs(
-                                                                nt.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
+                                                                tableRelations.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
                                                                     .Select(c =>
                                                                         new ColumnIdentifier().SetArgs(
                                                                             new RelationalColumn()
@@ -310,20 +215,20 @@ namespace SigQL
                                                     new FromClauseNode().SetArgs(
                                                         new NamedParameterIdentifier()
                                                         {
-                                                            Name = GetLookupTableName(nt)
+                                                            Name = GetLookupTableName(tableRelations)
                                                         }))
                                             }
                                         )
                                     )),
                                             WhereClause = new WhereClause().SetArgs(
                                                 new AndOperator().SetArgs(
-                                                    nt.TargetTable.ForeignKeyCollection.GetAllForeignColumns().Select(c =>
+                                                    tableRelations.TargetTable.ForeignKeyCollection.GetAllForeignColumns().Select(c =>
                                                         
                                                             new EqualsOperator().SetArgs(
                                                                 new ColumnIdentifier().SetArgs(
                                                                     new RelationalTable()
                                                                     {
-                                                                        Label = GetLookupTableName(nt)
+                                                                        Label = GetLookupTableName(tableRelations)
                                                                     },
                                                                     new RelationalColumn()
                                                                     {
@@ -332,7 +237,7 @@ namespace SigQL
                                                                 new ColumnIdentifier().SetArgs(
                                                                     new RelationalTable()
                                                                     {
-                                                                        Label = nt.TableName
+                                                                        Label = tableRelations.TableName
                                                                     },
                                                                     new RelationalColumn()
                                                                     {
@@ -342,8 +247,8 @@ namespace SigQL
                                                         )
                                                         .AppendOne(
                                                             new EqualsOperator().SetArgs(
-                                                                new ColumnIdentifier().SetArgs(new RelationalTable() { Label = nt.TableName }, new RelationalColumn() { Label = sigqlOccurrenceAlias }),
-                                                                new ColumnIdentifier().SetArgs(new RelationalTable() { Label = GetLookupTableName(nt) }, new RelationalColumn() { Label = sigqlOccurrenceAlias })
+                                                                new ColumnIdentifier().SetArgs(new RelationalTable() { Label = tableRelations.TableName }, new RelationalColumn() { Label = sigqlOccurrenceAlias }),
+                                                                new ColumnIdentifier().SetArgs(new RelationalTable() { Label = GetLookupTableName(tableRelations) }, new RelationalColumn() { Label = sigqlOccurrenceAlias })
                                                             )
                                                         )
                                                     )
@@ -351,7 +256,6 @@ namespace SigQL
                                         })
                                 )
                             )
-                                
                                 }
                             }.SetArgs(new Delete()
                             {
@@ -359,11 +263,10 @@ namespace SigQL
                                     new FromClauseNode().SetArgs(new TableIdentifier().SetArgs(new RelationalTable()
                                     { Label = cteName })))
                             });
+                           builderAstCollection.Statements.Add(deleteStatement);
                         }
-
-                        return deleteStatement;
-                    }).ToList();
-                    builderAstCollection.Statements.AddRange(deleteStatements);
+                        
+                    }
                 }
 
                 statements = builderAstCollection.Statements;
@@ -385,6 +288,148 @@ namespace SigQL
             };
 
             return sqlStatement;
+        }
+
+        private static Delete BuildOneToManyDeleteStatement(TableRelations tableRelations, TableRelations parentRelations,
+            TableRelations joinSubject = null)
+        {
+            AstNode innerJoin = null;
+            if (joinSubject != null)
+            {
+                innerJoin = new InnerJoin()
+                {
+                    RightNode = new TableIdentifier().SetArgs(new RelationalTable() { Label = joinSubject.TableName })
+                }.SetArgs(
+                    new AndOperator().SetArgs(
+                        new EqualsOperator().SetArgs(
+                            joinSubject.ForeignKeyToParent.KeyPairs.SelectMany(kp =>
+                                new ColumnIdentifier().SetArgs(
+                                        new RelationalTable() { Label = kp.PrimaryTableColumn.Table.Name },
+                                        new RelationalColumn() { Label = kp.PrimaryTableColumn.Name }).AsEnumerable()
+                                    .AppendOne(
+                                        new ColumnIdentifier().SetArgs(
+                                            new RelationalTable() { Label = kp.ForeignTableColumn.Table.Name },
+                                            new RelationalColumn() { Label = kp.ForeignTableColumn.Name }))
+                            )
+                        )
+                    ));
+            }
+            
+            return new Delete()
+            {
+                FromClause = new FromClause().SetArgs(
+                    new FromClauseNode().SetArgs(
+                        new TableIdentifier().SetArgs(new RelationalTable()
+                        {
+                            Label = tableRelations.TableName
+                        }),
+                        innerJoin
+                    )
+                ),
+                WhereClause = new WhereClause().SetArgs(
+                    new AndOperator().SetArgs(
+                        new Exists().SetArgs(
+                            new Select()
+                            {
+                                SelectClause = new SelectClause().SetArgs(
+                                    new Literal() { Value = "1" }),
+                                FromClause = new FromClause().SetArgs(
+                                    new FromClauseNode().SetArgs(
+                                        new TableIdentifier().SetArgs(
+                                            new Alias()
+                                            {
+                                                Label = GetLookupTableName(parentRelations)
+                                            }.SetArgs(
+                                                new NamedParameterIdentifier()
+                                                {
+                                                    Name = GetLookupTableName(parentRelations)
+                                                }
+                                            )
+                                        )
+                                    )),
+                                WhereClause = new WhereClause().SetArgs(
+                                    new AndOperator().SetArgs(
+                                        tableRelations.ForeignKeyToParent.KeyPairs.Select(fk =>
+                                            new EqualsOperator().SetArgs(
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = GetLookupTableName(parentRelations)
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = fk.GetColumnForTable(parentRelations.TargetTable).Name 
+                                                    }),
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = tableRelations.TableName
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = fk.GetColumnForTable(tableRelations.TargetTable).Name
+                                                    })
+                                            )
+                                        )
+                                    )
+                                )
+                            }
+                        ),
+                        new NotExists().SetArgs(
+                            new Select()
+                            {
+                                SelectClause = new SelectClause().SetArgs(
+                                    new Literal() { Value = "1" }),
+                                FromClause = new FromClause().SetArgs(
+                                    new FromClauseNode().SetArgs(
+                                        new TableIdentifier().SetArgs(
+                                            new Alias()
+                                            {
+                                                Label = GetLookupTableName(tableRelations)
+                                            }.SetArgs(
+                                                new NamedParameterIdentifier()
+                                                {
+                                                    Name = GetLookupTableName(tableRelations)
+                                                }
+                                            )
+                                        )
+                                    )),
+                                WhereClause = new WhereClause().SetArgs(
+                                    new AndOperator().SetArgs(
+                                        tableRelations.TargetTable.PrimaryKey.Columns.Select(pk =>
+                                            new EqualsOperator().SetArgs(
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = GetLookupTableName(tableRelations)
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = pk.Name
+                                                    }),
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = tableRelations.TableName
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = pk.Name
+                                                    })
+                                            )
+                                        )
+                                    )
+                                )
+                            })
+                    )
+                )
+            }.SetArgs(new []
+            {
+                new Alias()
+                {
+                    Label = joinSubject?.TableName ?? tableRelations.TableName
+                }
+            });
         }
     }
 }
