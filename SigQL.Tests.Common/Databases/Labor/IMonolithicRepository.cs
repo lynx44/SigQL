@@ -253,13 +253,23 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         [Sync]
         void SyncEmployeeWithAddressesAndLocations(Employee.SyncFieldsWithAddressesAndLocations employees);
-
+        // for test assertions only - retrieve the modified date to confirm that the data was synced correctly
         IEnumerable<Employee.SyncFieldsWithAddressesAndLocations> GetSyncEmployeeWithAddressesAndLocations();
 
         [Sync]
         void SyncAddressesWithLocationsWithWorkLogs(Address.SyncFieldsWithLocationsWithWorkLogs employees);
-
+        // for test assertions only - retrieve the modified date to confirm that the data was synced correctly
         IEnumerable<Address.SyncFieldsWithLocationsWithWorkLogs> GetSyncAddressesWithLocationsWithWorkLogs();
+
+        [Sync]
+        void SyncLocationWithAddress(Location.UpsertWithAddress values);
+
+        IEnumerable<Location.UpsertWithAddress> GetSyncLocationWithAddress();
+
+        [Sync]
+        void SyncWorkLogWithLocationWithAddress(WorkLog.UpsertWithLocationWithAddress values);
+
+        IEnumerable<WorkLog.UpsertWithLocationWithAddress> GetSyncWorkLogWithLocationWithAddress();
 
         //update
         [Update(TableName = nameof(Employee))]

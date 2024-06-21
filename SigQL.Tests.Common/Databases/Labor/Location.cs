@@ -45,5 +45,12 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string Name { get; set; }
             public List<WorkLog.UpsertFields> WorkLogs { get; set; }
         }
+
+        public class UpsertWithAddress
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public Address.UpsertFields Address { get; set; }
+        }
     }
 }

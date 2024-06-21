@@ -4283,6 +4283,105 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Sync_ProcessesDeleteOneRelationship()
+        {
+            this.monolithicRepository.SyncLocationWithAddress(
+                    new Location.UpsertWithAddress()
+                    {
+                            Name = "Mall",
+                            Address = new Address.UpsertFields()
+                            {
+                                StreetAddress = "789 fake st",
+                                City = "Los Angeles",
+                                State = "CA",
+                            }
+                    });
+            
+            var actual = this.monolithicRepository.GetSyncLocationWithAddress();
+
+            Assert.AreEqual(1, actual.Count());
+            var actualLocation = actual.Single();
+            Assert.AreEqual(1, actualLocation.Address.Id);
+        }
+
+        [TestMethod]
+        public void Sync_ProcessesNestedOneRelationship()
+        {
+            this.monolithicRepository.SyncWorkLogWithLocationWithAddress(
+                new WorkLog.UpsertWithLocationWithAddress()
+                {
+                    StartDate = new DateTime(2024, 1, 1),
+                    EndDate = new DateTime(2024, 2, 1),
+                    Location = new Location.UpsertWithAddress()
+                    {
+                        Name = "Mall",
+                        Address = new Address.UpsertFields()
+                        {
+                            StreetAddress = "789 fake st",
+                            City = "Los Angeles",
+                            State = "CA",
+                        }
+                    }
+                });
+            
+            var actual = this.monolithicRepository.GetSyncWorkLogWithLocationWithAddress();
+
+            Assert.AreEqual(1, actual.Count());
+            var actualWorklog = actual.Single();
+            Assert.AreEqual(1, actualWorklog.Location.Id);
+            Assert.AreEqual(1, actualWorklog.Location.Address.Id);
+        }
+
+        [TestMethod]
+        public void Sync_DoesNotDeleteNestedOneRelationship()
+        {
+            this.monolithicRepository.SyncWorkLogWithLocationWithAddress(
+                new WorkLog.UpsertWithLocationWithAddress()
+                {
+                    StartDate = new DateTime(2024, 1, 1),
+                    EndDate = new DateTime(2024, 2, 1),
+                    Location = new Location.UpsertWithAddress()
+                    {
+                        Name = "Mall",
+                        Address = new Address.UpsertFields()
+                        {
+                            StreetAddress = "789 fake st",
+                            City = "Los Angeles",
+                            State = "CA",
+                        }
+                    }
+                });
+
+            this.monolithicRepository.SyncWorkLogWithLocationWithAddress(
+                new WorkLog.UpsertWithLocationWithAddress()
+                {
+                    Id = 1,
+                    StartDate = new DateTime(2024, 2, 1),
+                    EndDate = new DateTime(2024, 3, 1),
+                    Location = new Location.UpsertWithAddress()
+                    {
+                        Name = "Mall 2",
+                        Address = new Address.UpsertFields()
+                        {
+                            StreetAddress = "2789 fake st",
+                            City = "2Los Angeles",
+                            State = "2CA",
+                        }
+                    }
+                });
+            
+            var actual = this.monolithicRepository.GetSyncWorkLogWithLocationWithAddress();
+            
+            Assert.AreEqual(1, actual.Count());
+            var actualWorklog = actual.Single();
+            Assert.AreEqual(2, actualWorklog.Location.Id);
+            Assert.AreEqual(2, actualWorklog.Location.Address.Id);
+            Assert.AreEqual(1, laborDbContext.WorkLog.Count());
+            Assert.AreEqual(2, laborDbContext.Location.Count());
+            Assert.AreEqual(2, laborDbContext.Address.Count());
+        }
+
+        [TestMethod]
         public void Sync_AllowsEmptyLists()
         {
             this.monolithicRepository.SyncAddressesWithLocationsWithWorkLogs(

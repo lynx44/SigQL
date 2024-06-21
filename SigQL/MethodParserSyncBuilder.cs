@@ -290,9 +290,16 @@ namespace SigQL
             return sqlStatement;
         }
 
-        private static Delete BuildOneToManyDeleteStatement(TableRelations tableRelations, TableRelations parentRelations,
+        private static AstNode BuildOneToManyDeleteStatement(TableRelations tableRelations, TableRelations parentRelations,
             TableRelations joinSubject = null)
         {
+            // if this is the one side of a one-to-many relationship, then don't delete
+            if (TableEqualityComparer.Default.Equals(tableRelations.TargetTable,
+                    tableRelations.ForeignKeyToParent.PrimaryKeyTable))
+            {
+                return null;
+            }
+
             AstNode innerJoin = null;
             if (joinSubject != null)
             {
