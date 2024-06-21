@@ -1486,7 +1486,8 @@ update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLo
                 }
             }));
 
-            AssertSqlEqual(@"declare @insertedWorkLog table(""Id"" int, ""_index"" int)
+            AssertSqlEqual(@"declare @insertedEmployeeAddress table(""AddressId"", ""EmployeeId"", ""_index"" int)
+declare @insertedWorkLog table(""Id"" int, ""_index"" int)
 declare @insertedLocation table(""Id"" int, ""_index"" int)
 declare @insertedAddress table(""Id"" int, ""_index"" int)
 declare @insertedEmployee table(""Id"" int, ""_index"" int)
@@ -1514,11 +1515,12 @@ merge ""WorkLog"" using (select ""StartDate"", ""EndDate"", ""_index"", ""Employ
  when not matched then
  insert (""StartDate"", ""EndDate"", ""EmployeeId"", ""LocationId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index"")), (select ""Id"" from @LocationLookup ""LocationLookup"" where (""LocationLookup"".""_index"" = ""i"".""LocationId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
 update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLookup ""WorkLogLookup"" inner join @insertedWorkLog ""insertedWorkLog"" on (""WorkLogLookup"".""_index"" = ""insertedWorkLog"".""_index"");
-declare @EmployeeAddressLookup table(""_index"" int, ""AddressId_index"" int, ""EmployeeId_index"" int)
-insert @EmployeeAddressLookup(""_index"", ""AddressId_index"", ""EmployeeId_index"") values(0, 0, 0), (1, 1, 1)
+declare @EmployeeAddressLookup table(""Id"", ""EmployeeId"", ""AddressId"", ""_index"" int, ""AddressId_index"" int, ""EmployeeId_index"" int)
+insert @EmployeeAddressLookup(""EmployeeId"", ""AddressId"", ""_index"", ""AddressId_index"", ""EmployeeId_index"") values(@EmployeeAddress_EmployeeId0, @EmployeeAddress_AddressId0, 0, 0, 0), (@EmployeeAddress_EmployeeId1, @EmployeeAddress_AddressId1, 1, 1, 1)
 merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""EmployeeId_index"" from @EmployeeAddressLookup ""EmployeeAddressLookup"") as i (""_index"",""AddressId_index"",""EmployeeId_index"") on (1 = 0)
  when not matched then
- insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index"")));", sql);
+ insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""AddressId"", ""inserted"".""EmployeeId"", ""i"".""_index"" into @insertedEmployeeAddress(""AddressId"", ""EmployeeId"", ""_index"");
+update ""EmployeeAddressLookup"" set ""AddressId"" = ""insertedEmployeeAddress"".""AddressId"", ""EmployeeId"" = ""insertedEmployeeAddress"".""EmployeeId"" from @EmployeeAddressLookup ""EmployeeAddressLookup"" inner join @insertedEmployeeAddress ""insertedEmployeeAddress"" on (""EmployeeAddressLookup"".""_index"" = ""insertedEmployeeAddress"".""_index"");", sql);
         }
 
         [TestMethod]
@@ -1594,7 +1596,8 @@ merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""Emplo
                 }
             }));
 
-            AssertSqlEqual(@"declare @insertedWorkLog table(""Id"" int, ""_index"" int)
+            AssertSqlEqual(@"declare @insertedEmployeeAddress table(""AddressId"", ""EmployeeId"", ""_index"" int)
+declare @insertedWorkLog table(""Id"" int, ""_index"" int)
 declare @insertedLocation table(""Id"" int, ""_index"" int)
 declare @insertedAddress table(""Id"" int, ""_index"" int)
 declare @insertedEmployee table(""Id"" int, ""_index"" int)
@@ -1622,11 +1625,12 @@ merge ""WorkLog"" using (select ""StartDate"", ""EndDate"", ""_index"", ""Employ
  when not matched then
  insert (""StartDate"", ""EndDate"", ""EmployeeId"", ""LocationId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index"")), (select ""Id"" from @LocationLookup ""LocationLookup"" where (""LocationLookup"".""_index"" = ""i"".""LocationId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
 update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLookup ""WorkLogLookup"" inner join @insertedWorkLog ""insertedWorkLog"" on (""WorkLogLookup"".""_index"" = ""insertedWorkLog"".""_index"");
-declare @EmployeeAddressLookup table(""_index"" int, ""AddressId_index"" int, ""EmployeeId_index"" int)
-insert @EmployeeAddressLookup(""_index"", ""AddressId_index"", ""EmployeeId_index"") values(0, 0, 0), (1, 3, 1), (2, 1, 0), (3, 2, 0), (4, 4, 1)
+declare @EmployeeAddressLookup table(""Id"", ""EmployeeId"", ""AddressId"", ""_index"" int, ""AddressId_index"" int, ""EmployeeId_index"" int)
+insert @EmployeeAddressLookup(""EmployeeId"", ""AddressId"", ""_index"", ""AddressId_index"", ""EmployeeId_index"") values(@EmployeeAddress_EmployeeId0, @EmployeeAddress_AddressId0, 0, 0, 0), (@EmployeeAddress_EmployeeId1, @EmployeeAddress_AddressId1, 1, 3, 1), (@EmployeeAddress_EmployeeId2, @EmployeeAddress_AddressId2, 2, 1, 0), (@EmployeeAddress_EmployeeId3, @EmployeeAddress_AddressId3, 3, 2, 0), (@EmployeeAddress_EmployeeId4, @EmployeeAddress_AddressId4, 4, 4, 1)
 merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""EmployeeId_index"" from @EmployeeAddressLookup ""EmployeeAddressLookup"") as i (""_index"",""AddressId_index"",""EmployeeId_index"") on (1 = 0)
  when not matched then
- insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index"")));
+ insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""AddressId"", ""inserted"".""EmployeeId"", ""i"".""_index"" into @insertedEmployeeAddress(""AddressId"", ""EmployeeId"", ""_index"");
+update ""EmployeeAddressLookup"" set ""AddressId"" = ""insertedEmployeeAddress"".""AddressId"", ""EmployeeId"" = ""insertedEmployeeAddress"".""EmployeeId"" from @EmployeeAddressLookup ""EmployeeAddressLookup"" inner join @insertedEmployeeAddress ""insertedEmployeeAddress"" on (""EmployeeAddressLookup"".""_index"" = ""insertedEmployeeAddress"".""_index"");
 select ""WorkLog<WorkLog>"".""Id"" ""Id"", ""WorkLog<WorkLog>"".""StartDate"" ""StartDate"", ""WorkLog<WorkLog>"".""EndDate"" ""EndDate"", ""WorkLog<WorkLog>"".""EmployeeId"" ""EmployeeId"", ""WorkLog<WorkLog>"".""LocationId"" ""LocationId"", ""Employee<WorkLog.Employee>"".""Id"" ""Employee.Id"", ""Employee<WorkLog.Employee>"".""Name"" ""Employee.Name"", ""Address<WorkLog.Employee.Addresses>"".""Id"" ""Employee.Addresses.Id"", ""Address<WorkLog.Employee.Addresses>"".""StreetAddress"" ""Employee.Addresses.StreetAddress"", ""Address<WorkLog.Employee.Addresses>"".""City"" ""Employee.Addresses.City"", ""Address<WorkLog.Employee.Addresses>"".""State"" ""Employee.Addresses.State"", ""Address<WorkLog.Employee.Addresses>"".""Classification"" ""Employee.Addresses.Classification"", ""Location<WorkLog.Employee.Addresses.Locations>"".""Id"" ""Employee.Addresses.Locations.Id"", ""Location<WorkLog.Employee.Addresses.Locations>"".""Name"" ""Employee.Addresses.Locations.Name"", ""Location<WorkLog.Employee.Addresses.Locations>"".""AddressId"" ""Employee.Addresses.Locations.AddressId"", ""Location<WorkLog.Location>"".""Id"" ""Location.Id"", ""Location<WorkLog.Location>"".""Name"" ""Location.Name"", ""Location<WorkLog.Location>"".""AddressId"" ""Location.AddressId"", ""Address<WorkLog.Location.Address>"".""Id"" ""Location.Address.Id"", ""Address<WorkLog.Location.Address>"".""StreetAddress"" ""Location.Address.StreetAddress"", ""Address<WorkLog.Location.Address>"".""City"" ""Location.Address.City"", ""Address<WorkLog.Location.Address>"".""State"" ""Location.Address.State"", ""Address<WorkLog.Location.Address>"".""Classification"" ""Location.Address.Classification"", ""Employee<WorkLog.Location.Address.Employees>"".""Id"" ""Location.Address.Employees.Id"", ""Employee<WorkLog.Location.Address.Employees>"".""Name"" ""Location.Address.Employees.Name"" from ""WorkLog"" ""WorkLog<WorkLog>"" left outer join ""Employee"" ""Employee<WorkLog.Employee>"" on ((""WorkLog<WorkLog>"".""EmployeeId"" = ""Employee<WorkLog.Employee>"".""Id"")) left outer join ""EmployeeAddress"" ""EmployeeAddress<WorkLog.Employee>"" on ((""EmployeeAddress<WorkLog.Employee>"".""EmployeeId"" = ""Employee<WorkLog.Employee>"".""Id"")) left outer join ""Address"" ""Address<WorkLog.Employee.Addresses>"" on ((""EmployeeAddress<WorkLog.Employee>"".""AddressId"" = ""Address<WorkLog.Employee.Addresses>"".""Id"")) left outer join ""Location"" ""Location<WorkLog.Employee.Addresses.Locations>"" on ((""Location<WorkLog.Employee.Addresses.Locations>"".""AddressId"" = ""Address<WorkLog.Employee.Addresses>"".""Id"")) left outer join ""Location"" ""Location<WorkLog.Location>"" on ((""WorkLog<WorkLog>"".""LocationId"" = ""Location<WorkLog.Location>"".""Id"")) left outer join ""Address"" ""Address<WorkLog.Location.Address>"" on ((""Location<WorkLog.Location>"".""AddressId"" = ""Address<WorkLog.Location.Address>"".""Id"")) left outer join ""EmployeeAddress"" ""EmployeeAddress<WorkLog.Location.Address>"" on ((""EmployeeAddress<WorkLog.Location.Address>"".""AddressId"" = ""Address<WorkLog.Location.Address>"".""Id"")) left outer join ""Employee"" ""Employee<WorkLog.Location.Address.Employees>"" on ((""EmployeeAddress<WorkLog.Location.Address>"".""EmployeeId"" = ""Employee<WorkLog.Location.Address.Employees>"".""Id"")) inner join @WorkLogLookup ""WorkLogLookup"" on ((""WorkLog<WorkLog>"".""Id"" = ""WorkLogLookup"".""Id"")) order by ""WorkLogLookup"".""_index""", sql);
         }
 
@@ -1864,7 +1868,8 @@ select ""Employee"".""Id"" ""Id"" from ""Employee"" inner join @EmployeeLookup "
                 }
             }));
 
-            AssertSqlEqual(@"declare @insertedWorkLog table(""Id"" int, ""_index"" int)
+            AssertSqlEqual(@"declare @insertedEmployeeAddress table(""AddressId"", ""EmployeeId"", ""_index"" int)
+declare @insertedWorkLog table(""Id"" int, ""_index"" int)
 declare @insertedLocation table(""Id"" int, ""_index"" int)
 declare @insertedAddress table(""Id"" int, ""_index"" int)
 declare @insertedEmployee table(""Id"" int, ""_index"" int)
@@ -1896,14 +1901,154 @@ merge ""WorkLog"" using (select ""Id"", ""StartDate"", ""EndDate"", ""_index"", 
  insert (""Id"", ""StartDate"", ""EndDate"", ""EmployeeId"", ""LocationId"") values(""i"".""Id"", ""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index"")), (select ""Id"" from @LocationLookup ""LocationLookup"" where (""LocationLookup"".""_index"" = ""i"".""LocationId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
 update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLookup ""WorkLogLookup"" inner join @insertedWorkLog ""insertedWorkLog"" on (""WorkLogLookup"".""_index"" = ""insertedWorkLog"".""_index"");
 update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDate"" = ""WorkLogLookup"".""EndDate"", ""EmployeeId"" = (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""WorkLogLookup"".""EmployeeId_index"")), ""LocationId"" = (select ""Id"" from @LocationLookup ""LocationLookup"" where (""LocationLookup"".""_index"" = ""WorkLogLookup"".""LocationId_index"")) from ""WorkLog"" inner join @WorkLogLookup ""WorkLogLookup"" on (""WorkLogLookup"".""Id"" = ""WorkLog"".""Id"") where not exists (select 1 from ""WorkLog"" inner join @insertedWorkLog ""insertedWorkLog"" on ((""WorkLog"".""Id"" = ""insertedWorkLog"".""Id"")) where ((""WorkLogLookup"".""Id"" = ""insertedWorkLog"".""Id"")));
-declare @EmployeeAddressLookup table(""_index"" int, ""AddressId_index"" int, ""EmployeeId_index"" int)
-insert @EmployeeAddressLookup(""_index"", ""AddressId_index"", ""EmployeeId_index"") values(0, 0, 0), (1, 1, 1)
-merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""EmployeeId_index"" from (select * from (select ""AddressLookup"".""Id"" ""AddressLookupAddressId"", ""EmployeeLookup"".""Id"" ""EmployeeLookupEmployeeId"", ""EmployeeAddressLookup"".""AddressId_index"", ""EmployeeAddressLookup"".""EmployeeId_index"", ""EmployeeAddressLookup"".""_index"", ROW_NUMBER() over(partition by ""AddressLookup"".""Id"", ""EmployeeLookup"".""Id"" order by ""AddressLookup"".""Id"", ""EmployeeLookup"".""Id"") ""SigQLRowNumber"" from @EmployeeAddressLookup ""EmployeeAddressLookup"" inner join @AddressLookup ""AddressLookup"" on (""AddressLookup"".""_index"" = ""EmployeeAddressLookup"".""AddressId_index"") inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""_index"" = ""EmployeeAddressLookup"".""EmployeeId_index"")) SigQLM2MRowNumberLookupQuery where not exists (select * from (select ROW_NUMBER() over(partition by ""EmployeeId"", ""AddressId"" order by ""EmployeeId"", ""AddressId"") ""SigQLRowNumber"", ""EmployeeId"", ""AddressId"" from ""EmployeeAddress"") EmployeeAddressM2MRowNumberLookup where ((""SigQLM2MRowNumberLookupQuery"".""SigQLRowNumber"" = ""EmployeeAddressM2MRowNumberLookup"".""SigQLRowNumber"") and (""SigQLM2MRowNumberLookupQuery"".""AddressLookupAddressId"" = ""EmployeeAddressM2MRowNumberLookup"".""AddressId"") and (""SigQLM2MRowNumberLookupQuery"".""EmployeeLookupEmployeeId"" = ""EmployeeAddressM2MRowNumberLookup"".""EmployeeId"")))) SigQLM2MMultiplicityQuery) as i (""_index"",""AddressId_index"",""EmployeeId_index"") on (1 = 0)
+declare @EmployeeAddressLookup table(""Id"", ""EmployeeId"", ""AddressId"", ""_index"" int, ""AddressId_index"" int, ""EmployeeId_index"" int)
+insert @EmployeeAddressLookup(""EmployeeId"", ""AddressId"", ""_index"", ""AddressId_index"", ""EmployeeId_index"") values(@EmployeeAddress_EmployeeId0, @EmployeeAddress_AddressId0, 0, 0, 0), (@EmployeeAddress_EmployeeId1, @EmployeeAddress_AddressId1, 1, 1, 1)
+merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""EmployeeId_index"" from (select * from (select ""AddressLookup"".""Id"" ""AddressLookupAddressId"", ""EmployeeLookup"".""Id"" ""EmployeeLookupEmployeeId"", ""EmployeeAddressLookup"".""AddressId_index"", ""EmployeeAddressLookup"".""EmployeeId_index"", ""EmployeeAddressLookup"".""_index"", ROW_NUMBER() over(partition by ""AddressLookup"".""Id"", ""EmployeeLookup"".""Id"" order by ""AddressLookup"".""Id"", ""EmployeeLookup"".""Id"") ""SigQLRowNumber"" from @EmployeeAddressLookup ""EmployeeAddressLookup"" inner join @AddressLookup ""AddressLookup"" on (""AddressLookup"".""_index"" = ""EmployeeAddressLookup"".""AddressId_index"") inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""_index"" = ""EmployeeAddressLookup"".""EmployeeId_index"")) SigQLM2MRowNumberLookupQuery where not exists (select * from (select ROW_NUMBER() over(partition by ""Id"", ""EmployeeId"", ""AddressId"" order by ""Id"", ""EmployeeId"", ""AddressId"") ""SigQLRowNumber"", ""Id"", ""EmployeeId"", ""AddressId"" from ""EmployeeAddress"") EmployeeAddressM2MRowNumberLookup where ((""SigQLM2MRowNumberLookupQuery"".""SigQLRowNumber"" = ""EmployeeAddressM2MRowNumberLookup"".""SigQLRowNumber"") and (""SigQLM2MRowNumberLookupQuery"".""AddressLookupAddressId"" = ""EmployeeAddressM2MRowNumberLookup"".""AddressId"") and (""SigQLM2MRowNumberLookupQuery"".""EmployeeLookupEmployeeId"" = ""EmployeeAddressM2MRowNumberLookup"".""EmployeeId"")))) SigQLM2MMultiplicityQuery) as i (""_index"",""AddressId_index"",""EmployeeId_index"") on (1 = 0)
  when not matched then
- insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index"")));", sql);
+ insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""AddressId"", ""inserted"".""EmployeeId"", ""i"".""_index"" into @insertedEmployeeAddress(""AddressId"", ""EmployeeId"", ""_index"");
+update ""EmployeeAddressLookup"" set ""AddressId"" = ""insertedEmployeeAddress"".""AddressId"", ""EmployeeId"" = ""insertedEmployeeAddress"".""EmployeeId"" from @EmployeeAddressLookup ""EmployeeAddressLookup"" inner join @insertedEmployeeAddress ""insertedEmployeeAddress"" on (""EmployeeAddressLookup"".""_index"" = ""insertedEmployeeAddress"".""_index"");", sql);
         }
-        
+
         #endregion
+
+        #region Sync
+        
+        [TestMethod]
+        public void SyncOneToManyNavigationProperty_Void_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SyncEmployeeWithWorkLogs(
+                         new Employee.SyncFieldsWithWorkLogs()
+                         {
+                             Id = 1,
+                             Name = "Kyle",
+                             WorkLogs = new []
+                             {
+                                 new WorkLog.SyncFields() { Id = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) },
+                                 new WorkLog.SyncFields() { StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) }
+                             }
+                         }));
+
+            AssertSqlEqual(@"declare @insertedWorkLog table(""Id"" int, ""_index"" int)
+declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Employee"" where ((""Employee"".""Id"" = ""EmployeeLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on ((""Employee"".""Id"" = ""insertedEmployee"".""Id"")) where ((""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id"")));
+declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
+insert @WorkLogLookup(""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") values(@employeesWorkLogs_Id0, @employeesWorkLogs_StartDate0, @employeesWorkLogs_EndDate0, 0, 0), (@employeesWorkLogs_Id1, @employeesWorkLogs_StartDate1, @employeesWorkLogs_EndDate1, 1, 0)
+merge ""WorkLog"" using (select ""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"" from @WorkLogLookup ""WorkLogLookup"" where (((""Id"" is null)) or not exists (select 1 from ""WorkLog"" where ((""WorkLog"".""Id"" = ""WorkLogLookup"".""Id""))))) as i (""Id"",""StartDate"",""EndDate"",""_index"",""EmployeeId_index"") on (1 = 0)
+ when not matched then
+ insert (""Id"", ""StartDate"", ""EndDate"", ""EmployeeId"") values(""i"".""Id"", ""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
+update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLookup ""WorkLogLookup"" inner join @insertedWorkLog ""insertedWorkLog"" on (""WorkLogLookup"".""_index"" = ""insertedWorkLog"".""_index"");
+update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDate"" = ""WorkLogLookup"".""EndDate"", ""EmployeeId"" = (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""WorkLogLookup"".""EmployeeId_index"")) from ""WorkLog"" inner join @WorkLogLookup ""WorkLogLookup"" on (""WorkLogLookup"".""Id"" = ""WorkLog"".""Id"") where not exists (select 1 from ""WorkLog"" inner join @insertedWorkLog ""insertedWorkLog"" on ((""WorkLog"".""Id"" = ""insertedWorkLog"".""Id"")) where ((""WorkLogLookup"".""Id"" = ""insertedWorkLog"".""Id"")));
+delete ""WorkLog"" from ""WorkLog"" where (exists (select 1 from @EmployeeLookup ""EmployeeLookup"" where ((""EmployeeLookup"".""Id"" = ""WorkLog"".""EmployeeId""))) and not exists (select 1 from @WorkLogLookup ""WorkLogLookup"" where ((""WorkLogLookup"".""Id"" = ""WorkLog"".""Id""))))", sql);
+        }
+
+        [TestMethod]
+        public void SyncManyToManyNavigationProperty_Void_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SyncManyToManyEmployeeWithAddresses(
+                         new Employee.SyncFieldsWithAddresses()
+                         {
+                             Id = 1,
+                             Name = "Kyle",
+                             Addresses = new []
+                             {
+                                 new Address.UpsertFields() { Id = 1, StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                                 new Address.UpsertFields() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                             }
+                         }));
+
+            AssertSqlEqual(@"declare @insertedEmployeeAddress table(""AddressId"", ""EmployeeId"", ""_index"" int)
+declare @insertedAddress table(""Id"" int, ""_index"" int)
+declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Employee"" where ((""Employee"".""Id"" = ""EmployeeLookup"".""Id""))))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+update ""Employee"" set ""Name"" = ""EmployeeLookup"".""Name"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on ((""Employee"".""Id"" = ""insertedEmployee"".""Id"")) where ((""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id"")));
+declare @AddressLookup table(""Id"" int, ""StreetAddress"" nvarchar(max), ""City"" nvarchar(max), ""State"" nvarchar(max), ""_index"" int)
+insert @AddressLookup(""Id"", ""StreetAddress"", ""City"", ""State"", ""_index"") values(@employeesAddresses_Id0, @employeesAddresses_StreetAddress0, @employeesAddresses_City0, @employeesAddresses_State0, 0), (@employeesAddresses_Id1, @employeesAddresses_StreetAddress1, @employeesAddresses_City1, @employeesAddresses_State1, 1)
+merge ""Address"" using (select ""Id"", ""StreetAddress"", ""City"", ""State"", ""_index"" from @AddressLookup ""AddressLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Address"" where ((""Address"".""Id"" = ""AddressLookup"".""Id""))))) as i (""Id"",""StreetAddress"",""City"",""State"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Id"", ""StreetAddress"", ""City"", ""State"") values(""i"".""Id"", ""i"".""StreetAddress"", ""i"".""City"", ""i"".""State"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedAddress(""Id"", ""_index"");
+update ""AddressLookup"" set ""Id"" = ""insertedAddress"".""Id"" from @AddressLookup ""AddressLookup"" inner join @insertedAddress ""insertedAddress"" on (""AddressLookup"".""_index"" = ""insertedAddress"".""_index"");
+update ""Address"" set ""StreetAddress"" = ""AddressLookup"".""StreetAddress"", ""City"" = ""AddressLookup"".""City"", ""State"" = ""AddressLookup"".""State"" from ""Address"" inner join @AddressLookup ""AddressLookup"" on (""AddressLookup"".""Id"" = ""Address"".""Id"") where not exists (select 1 from ""Address"" inner join @insertedAddress ""insertedAddress"" on ((""Address"".""Id"" = ""insertedAddress"".""Id"")) where ((""AddressLookup"".""Id"" = ""insertedAddress"".""Id"")));
+declare @EmployeeAddressLookup table(""Id"", ""EmployeeId"", ""AddressId"", ""_index"" int, ""AddressId_index"" int, ""EmployeeId_index"" int)
+insert @EmployeeAddressLookup(""EmployeeId"", ""AddressId"", ""_index"", ""AddressId_index"", ""EmployeeId_index"") values(@EmployeeAddress_EmployeeId0, @EmployeeAddress_AddressId0, 0, 0, 0), (@EmployeeAddress_EmployeeId1, @EmployeeAddress_AddressId1, 1, 1, 0)
+merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""EmployeeId_index"" from (select * from (select ""AddressLookup"".""Id"" ""AddressLookupAddressId"", ""EmployeeLookup"".""Id"" ""EmployeeLookupEmployeeId"", ""EmployeeAddressLookup"".""AddressId_index"", ""EmployeeAddressLookup"".""EmployeeId_index"", ""EmployeeAddressLookup"".""_index"", ROW_NUMBER() over(partition by ""AddressLookup"".""Id"", ""EmployeeLookup"".""Id"" order by ""AddressLookup"".""Id"", ""EmployeeLookup"".""Id"") ""SigQLRowNumber"" from @EmployeeAddressLookup ""EmployeeAddressLookup"" inner join @AddressLookup ""AddressLookup"" on (""AddressLookup"".""_index"" = ""EmployeeAddressLookup"".""AddressId_index"") inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""_index"" = ""EmployeeAddressLookup"".""EmployeeId_index"")) SigQLM2MRowNumberLookupQuery where not exists (select * from (select ROW_NUMBER() over(partition by ""Id"", ""EmployeeId"", ""AddressId"" order by ""Id"", ""EmployeeId"", ""AddressId"") ""SigQLRowNumber"", ""Id"", ""EmployeeId"", ""AddressId"" from ""EmployeeAddress"") EmployeeAddressM2MRowNumberLookup where ((""SigQLM2MRowNumberLookupQuery"".""SigQLRowNumber"" = ""EmployeeAddressM2MRowNumberLookup"".""SigQLRowNumber"") and (""SigQLM2MRowNumberLookupQuery"".""AddressLookupAddressId"" = ""EmployeeAddressM2MRowNumberLookup"".""AddressId"") and (""SigQLM2MRowNumberLookupQuery"".""EmployeeLookupEmployeeId"" = ""EmployeeAddressM2MRowNumberLookup"".""EmployeeId"")))) SigQLM2MMultiplicityQuery) as i (""_index"",""AddressId_index"",""EmployeeId_index"") on (1 = 0)
+ when not matched then
+ insert (""AddressId"", ""EmployeeId"") values((select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""i"".""AddressId_index"")), (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""AddressId"", ""inserted"".""EmployeeId"", ""i"".""_index"" into @insertedEmployeeAddress(""AddressId"", ""EmployeeId"", ""_index"");
+update ""EmployeeAddressLookup"" set ""AddressId"" = ""insertedEmployeeAddress"".""AddressId"", ""EmployeeId"" = ""insertedEmployeeAddress"".""EmployeeId"" from @EmployeeAddressLookup ""EmployeeAddressLookup"" inner join @insertedEmployeeAddress ""insertedEmployeeAddress"" on (""EmployeeAddressLookup"".""_index"" = ""insertedEmployeeAddress"".""_index"");
+; with SigQL__DeleteEmployeeAddress as (
+select ""EmployeeAddress"".* from (select *, ROW_NUMBER() over(partition by ""AddressId"", ""EmployeeId"" order by ""AddressId"", ""EmployeeId"") ""SigQL__Occurrence"" from ""EmployeeAddress"") EmployeeAddress where (exists (select 1 from @EmployeeLookup ""EmployeeLookup"" where ((""EmployeeLookup"".""Id"" = ""EmployeeAddress"".""EmployeeId""))) and not exists (select 1 from (select *, ROW_NUMBER() over(partition by ""AddressId"", ""EmployeeId"" order by ""AddressId"", ""EmployeeId"") ""SigQL__Occurrence"" from @EmployeeAddressLookup) EmployeeAddressLookup where ((""EmployeeAddressLookup"".""AddressId"" = ""EmployeeAddress"".""AddressId"") and (""EmployeeAddressLookup"".""EmployeeId"" = ""EmployeeAddress"".""EmployeeId"") and (""EmployeeAddress"".""SigQL__Occurrence"" = ""EmployeeAddressLookup"".""SigQL__Occurrence""))))
+)
+delete from ""SigQL__DeleteEmployeeAddress""
+delete ""Address"" from ""Address"" where (exists (select 1 from @EmployeeAddressLookup ""EmployeeAddressLookup"" where ((""EmployeeAddressLookup"".""AddressId"" = ""Address"".""Id""))) and not exists (select 1 from @AddressLookup ""AddressLookup"" where ((""AddressLookup"".""Id"" = ""Address"".""Id""))))", sql);
+        }
+
+        [TestMethod]
+        public void SyncOneToManyNavigationProperty_DeletesLeastDependentTablesFirst_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SyncAddressesWithLocationsWithWorkLogs(
+                new Address.SyncFieldsWithLocationsWithWorkLogs()
+                {
+                    Id = 1,
+                    StreetAddress = "1011 fake st",
+                    City = "Charlotte",
+                    State = "NC",
+                    Locations = new List<Location.UpsertWithWorkLogs>()
+                    {
+                        new Location.UpsertWithWorkLogs()
+                        {
+                            Name = "Postal Service",
+                            WorkLogs = new List<WorkLog.UpsertFields>()
+                            {
+                                new WorkLog.UpsertFields()
+                                {
+                                    StartDate = new DateTime(2024, 03, 01),
+                                    EndDate = new DateTime(2024, 04, 01)
+                                }
+                            }
+                        }
+                    }
+                }));
+
+            AssertSqlEqual(@"declare @insertedWorkLog table(""Id"" int, ""_index"" int)
+declare @insertedLocation table(""Id"" int, ""_index"" int)
+declare @insertedAddress table(""Id"" int, ""_index"" int)
+declare @AddressLookup table(""Id"" int, ""StreetAddress"" nvarchar(max), ""City"" nvarchar(max), ""State"" nvarchar(max), ""_index"" int)
+insert @AddressLookup(""Id"", ""StreetAddress"", ""City"", ""State"", ""_index"") values(@employeesId0, @employeesStreetAddress0, @employeesCity0, @employeesState0, 0)
+merge ""Address"" using (select ""Id"", ""StreetAddress"", ""City"", ""State"", ""_index"" from @AddressLookup ""AddressLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Address"" where ((""Address"".""Id"" = ""AddressLookup"".""Id""))))) as i (""Id"",""StreetAddress"",""City"",""State"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Id"", ""StreetAddress"", ""City"", ""State"") values(""i"".""Id"", ""i"".""StreetAddress"", ""i"".""City"", ""i"".""State"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedAddress(""Id"", ""_index"");
+update ""AddressLookup"" set ""Id"" = ""insertedAddress"".""Id"" from @AddressLookup ""AddressLookup"" inner join @insertedAddress ""insertedAddress"" on (""AddressLookup"".""_index"" = ""insertedAddress"".""_index"");
+update ""Address"" set ""StreetAddress"" = ""AddressLookup"".""StreetAddress"", ""City"" = ""AddressLookup"".""City"", ""State"" = ""AddressLookup"".""State"" from ""Address"" inner join @AddressLookup ""AddressLookup"" on (""AddressLookup"".""Id"" = ""Address"".""Id"") where not exists (select 1 from ""Address"" inner join @insertedAddress ""insertedAddress"" on ((""Address"".""Id"" = ""insertedAddress"".""Id"")) where ((""AddressLookup"".""Id"" = ""insertedAddress"".""Id"")));
+declare @LocationLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int, ""AddressId_index"" int)
+insert @LocationLookup(""Id"", ""Name"", ""_index"", ""AddressId_index"") values(@employeesLocations_Id0, @employeesLocations_Name0, 0, 0)
+merge ""Location"" using (select ""Id"", ""Name"", ""_index"", ""AddressId_index"" from @LocationLookup ""LocationLookup"" where (((""Id"" is null)) or not exists (select 1 from ""Location"" where ((""Location"".""Id"" = ""LocationLookup"".""Id""))))) as i (""Id"",""Name"",""_index"",""AddressId_index"") on (1 = 0)
+ when not matched then
+ insert (""Id"", ""Name"", ""AddressId"") values(""i"".""Id"", ""i"".""Name"", (select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""i"".""AddressId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedLocation(""Id"", ""_index"");
+update ""LocationLookup"" set ""Id"" = ""insertedLocation"".""Id"" from @LocationLookup ""LocationLookup"" inner join @insertedLocation ""insertedLocation"" on (""LocationLookup"".""_index"" = ""insertedLocation"".""_index"");
+update ""Location"" set ""Name"" = ""LocationLookup"".""Name"", ""AddressId"" = (select ""Id"" from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""_index"" = ""LocationLookup"".""AddressId_index"")) from ""Location"" inner join @LocationLookup ""LocationLookup"" on (""LocationLookup"".""Id"" = ""Location"".""Id"") where not exists (select 1 from ""Location"" inner join @insertedLocation ""insertedLocation"" on ((""Location"".""Id"" = ""insertedLocation"".""Id"")) where ((""LocationLookup"".""Id"" = ""insertedLocation"".""Id"")));
+declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""LocationId_index"" int)
+insert @WorkLogLookup(""Id"", ""StartDate"", ""EndDate"", ""_index"", ""LocationId_index"") values(@employeesLocations_WorkLogs_Id0, @employeesLocations_WorkLogs_StartDate0, @employeesLocations_WorkLogs_EndDate0, 0, 0)
+merge ""WorkLog"" using (select ""Id"", ""StartDate"", ""EndDate"", ""_index"", ""LocationId_index"" from @WorkLogLookup ""WorkLogLookup"" where (((""Id"" is null)) or not exists (select 1 from ""WorkLog"" where ((""WorkLog"".""Id"" = ""WorkLogLookup"".""Id""))))) as i (""Id"",""StartDate"",""EndDate"",""_index"",""LocationId_index"") on (1 = 0)
+ when not matched then
+ insert (""Id"", ""StartDate"", ""EndDate"", ""LocationId"") values(""i"".""Id"", ""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @LocationLookup ""LocationLookup"" where (""LocationLookup"".""_index"" = ""i"".""LocationId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
+update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLookup ""WorkLogLookup"" inner join @insertedWorkLog ""insertedWorkLog"" on (""WorkLogLookup"".""_index"" = ""insertedWorkLog"".""_index"");
+update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDate"" = ""WorkLogLookup"".""EndDate"", ""LocationId"" = (select ""Id"" from @LocationLookup ""LocationLookup"" where (""LocationLookup"".""_index"" = ""WorkLogLookup"".""LocationId_index"")) from ""WorkLog"" inner join @WorkLogLookup ""WorkLogLookup"" on (""WorkLogLookup"".""Id"" = ""WorkLog"".""Id"") where not exists (select 1 from ""WorkLog"" inner join @insertedWorkLog ""insertedWorkLog"" on ((""WorkLog"".""Id"" = ""insertedWorkLog"".""Id"")) where ((""WorkLogLookup"".""Id"" = ""insertedWorkLog"".""Id"")));
+delete ""WorkLog"" from ""WorkLog"" where (exists (select 1 from @LocationLookup ""LocationLookup"" where ((""LocationLookup"".""Id"" = ""WorkLog"".""LocationId""))) and not exists (select 1 from @WorkLogLookup ""WorkLogLookup"" where ((""WorkLogLookup"".""Id"" = ""WorkLog"".""Id""))))
+delete ""WorkLog"" from ""Location"" inner join ""WorkLog"" on ((""Location"".""Id"" = ""WorkLog"".""LocationId"")) where (exists (select 1 from @AddressLookup ""AddressLookup"" where ((""AddressLookup"".""Id"" = ""Location"".""AddressId""))) and not exists (select 1 from @LocationLookup ""LocationLookup"" where ((""LocationLookup"".""Id"" = ""Location"".""Id""))))
+delete ""Location"" from ""Location"" where (exists (select 1 from @AddressLookup ""AddressLookup"" where ((""AddressLookup"".""Id"" = ""Location"".""AddressId""))) and not exists (select 1 from @LocationLookup ""LocationLookup"" where ((""LocationLookup"".""Id"" = ""Location"".""Id""))))", sql);
+        }
+
+        #endregion Sync
 
         #region UpdateByKey
 

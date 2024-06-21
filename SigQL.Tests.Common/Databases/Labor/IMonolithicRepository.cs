@@ -243,6 +243,24 @@ namespace SigQL.Tests.Common.Databases.Labor
         [Upsert]
         void UpsertMultipleWorkLogsWithAdjacentAndNestedRelations(IEnumerable<WorkLog.UpsertFieldsWithEmployeeAndLocation> employees);
 
+        [Sync]
+        void SyncEmployeeWithWorkLogs(Employee.SyncFieldsWithWorkLogs employees);
+
+        [Sync]
+        void SyncManyToManyEmployeeWithAddresses(Employee.SyncFieldsWithAddresses employees);
+        // for test assertions only - retrieve the modified date to confirm that the data was synced correctly
+        IEnumerable<Employee.SyncFieldsWithAddresses> GetSyncManyToManyEmployeeWithAddresses();
+
+        [Sync]
+        void SyncEmployeeWithAddressesAndLocations(Employee.SyncFieldsWithAddressesAndLocations employees);
+
+        IEnumerable<Employee.SyncFieldsWithAddressesAndLocations> GetSyncEmployeeWithAddressesAndLocations();
+
+        [Sync]
+        void SyncAddressesWithLocationsWithWorkLogs(Address.SyncFieldsWithLocationsWithWorkLogs employees);
+
+        IEnumerable<Address.SyncFieldsWithLocationsWithWorkLogs> GetSyncAddressesWithLocationsWithWorkLogs();
+
         //update
         [Update(TableName = nameof(Employee))]
         void UpdateAllEmployees([Set] string name);
@@ -266,5 +284,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         // delete
         [Delete(TableName = nameof(Employee))]
         void DeleteEmployeeWithAttributeTableNameWithValuesByParams(string name);
+
+        IEnumerable<EFAddressEFEmployee> GetEFAddressEFEmployees();
     }
 }

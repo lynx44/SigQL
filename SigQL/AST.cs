@@ -513,4 +513,10 @@ namespace SigQL
     //         this.Label = "on";
     //     }
     // }
+
+    public class CommonTableExpression : AstNode
+    {
+        public string Name { get; set; }
+        public AstNode Definition { get; set; }
+    }
 }

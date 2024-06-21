@@ -18,5 +18,21 @@ namespace SigQL.Extensions
         {
             return enumerable.Concat(new T[] {item});
         }
+
+        public static TResult MinOrDefault<TSource, TResult>(this IEnumerable<TSource> enumerable, Func<TSource, TResult> selector, TResult defaultValue)
+        {
+            if (enumerable.Any())
+                return enumerable.Min(selector);
+
+            return defaultValue;
+        }
+
+        public static TResult MaxOrDefault<TSource, TResult>(this IEnumerable<TSource> enumerable, Func<TSource, TResult> selector, TResult defaultValue)
+        {
+            if (enumerable.Any())
+                return enumerable.Max(selector);
+
+            return defaultValue;
+        }
     }
 }
