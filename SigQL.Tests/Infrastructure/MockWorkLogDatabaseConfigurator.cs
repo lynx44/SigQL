@@ -50,6 +50,8 @@ namespace SigQL.Tests.Infrastructure
             streetAddressCoordinateTable.PrimaryKey = new TableKeyDefinition(streetAddressCoordinateTable.Columns.FindByName(nameof(StreetAddressCoordinate.Id)));
             employeeStatusesTable.PrimaryKey = new TableKeyDefinition(employeeStatusesTable.Columns.FindByName(nameof(EmployeeStatuses.Id)));
             var employeeAddressTable = new TableDefinition(dbo, nameof(EmployeeAddress), typeof(EmployeeAddress).GetProperties().Select(p => p.Name));
+            employeeAddressTable.PrimaryKey =
+                new TableKeyDefinition(employeeAddressTable.Columns.FindByName(nameof(EmployeeAddress.Id)));
             workLogTable.ForeignKeyCollection = new ForeignKeyDefinitionCollection().AddForeignKeys(
                 new ForeignKeyDefinition(employeeTable, new ForeignKeyPair(workLogTable.Columns.FindByName(nameof(WorkLog.EmployeeId)), employeeTable.Columns.FindByName(nameof(Employee.Id)))),
                 new ForeignKeyDefinition(locationTable, new ForeignKeyPair(workLogTable.Columns.FindByName(nameof(WorkLog.LocationId)), locationTable.Columns.FindByName(nameof(Location.Id))))

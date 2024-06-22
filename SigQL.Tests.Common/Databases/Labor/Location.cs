@@ -1,4 +1,6 @@
-﻿namespace SigQL.Tests.Common.Databases.Labor
+﻿using System.Collections.Generic;
+
+namespace SigQL.Tests.Common.Databases.Labor
 {
     public class Location : Location.ILocationId
     {
@@ -40,6 +42,20 @@
         public class LocationName
         {
             public string Name { get; set; }
+        }
+
+        public class UpsertWithWorkLogs
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public List<WorkLog.UpsertFields> WorkLogs { get; set; }
+        }
+
+        public class UpsertWithAddress
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public Address.UpsertFields Address { get; set; }
         }
     }
 }

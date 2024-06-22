@@ -236,6 +236,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             public DateTime? EndDate { get; set; }
         }
 
+        public class SyncFields
+        {
+            public int? Id { get; set; }
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
+        }
+
         public class SetDateFields
         {
             public DateTime StartDate { get; set; }
@@ -424,6 +431,22 @@ namespace SigQL.Tests.Common.Databases.Labor
             public DateTime? StartDate { get; set; }
             public DateTime? EndDate { get; set; }
             public Employee.UpsertFieldsWithAddress Employee { get; set; }
+            public Location.Upsert Location { get; set; }
+        }
+        
+        public class UpsertWithLocationWithAddress
+        {
+            public int? Id { get; set; }
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
+            public Location.UpsertWithAddress Location { get; set; }
+        }
+
+        public class SyncFieldsWithLocation
+        {
+            public int? Id { get; set; }
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
             public Location.Upsert Location { get; set; }
         }
 

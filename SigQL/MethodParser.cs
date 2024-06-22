@@ -46,6 +46,11 @@ namespace SigQL
                 var spec = GetUpsertSpec(methodInfo);
                 return BuildUpsertStatement(spec, Enumerable.Select<UpsertColumnParameter, ParameterPath>(spec.UpsertTableRelationsCollection.First().ColumnParameters, cp => cp.ParameterPath).ToList());
             }
+            if (statementType == StatementType.Sync)
+            {
+                var spec = GetUpsertSpec(methodInfo);
+                return BuildSyncStatement(spec, Enumerable.Select<UpsertColumnParameter, ParameterPath>(spec.UpsertTableRelationsCollection.First().ColumnParameters, cp => cp.ParameterPath).ToList());
+            }
             if (statementType == StatementType.Delete)
             {
                 var deleteSpec = GetDeleteSpec(methodInfo);
@@ -553,6 +558,10 @@ namespace SigQL
             {
                 return StatementType.Upsert;
             }
+            if (IsSyncMethod(methodInfo))
+            {
+                return StatementType.Sync;
+            }
 
             return StatementType.Select;
         }
@@ -573,6 +582,10 @@ namespace SigQL
         private bool IsUpsertMethod(MethodInfo methodInfo)
         {
             return (methodInfo.GetCustomAttributes(typeof(UpsertAttribute), false)?.Any()).GetValueOrDefault(false);
+        }
+        private bool IsSyncMethod(MethodInfo methodInfo)
+        {
+            return (methodInfo.GetCustomAttributes(typeof(SyncAttribute), false)?.Any()).GetValueOrDefault(false);
         }
 
         private WhereClause BuildWhereClauseFromTargetTablePerspective(AstNode primaryTableReference, IEnumerable<TableRelations> whereClauseTableRelations, List<ParameterPath> parameterPaths, List<TokenPath> tokens)
@@ -1518,7 +1531,8 @@ namespace SigQL
             Update,
             Delete,
             UpdateByKey,
-            Upsert
+            Upsert,
+            Sync
         }
     }
 

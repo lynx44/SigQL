@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using SigQL.Types;
 using SigQL.Types.Attributes;
 
@@ -58,6 +59,12 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<Address.InsertFields> Addresses  { get; set; }
         }
 
+        public class InsertFieldsWithListAddresses
+        {
+            public string Name { get; set; }
+            public List<Address.InsertFields> Addresses  { get; set; }
+        }
+
         public class UpsertFieldsWithAddress
         {
             public int? Id { get; set; }
@@ -85,10 +92,61 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<WorkLog.UpsertFields> WorkLogs { get; set; }
         }
 
+        public class SyncFieldsWithWorkLogs
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public IEnumerable<WorkLog.SyncFields> WorkLogs { get; set; }
+        }
+
+        public class SyncFieldsWithAddresses
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public IEnumerable<Address.UpsertFields> Addresses { get; set; }
+        }
+        
+        public class SyncFieldsWithAddressesAndLocations
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public IEnumerable<Address.UpsertWithLocation> Addresses { get; set; }
+        }
+
         public interface IEmployeeWithAddresses
         {
             int Id { get; set; }
             IEnumerable<Address.IAddressFields> Addresses { get; set; }
+        }
+
+        public interface IEmployeeWithListAddresses
+        {
+            int Id { get; set; }
+            List<Address.IAddressFields> Addresses { get; set; }
+        }
+
+        public interface IEmployeeWithIListAddresses
+        {
+            int Id { get; set; }
+            IList<Address.IAddressFields> Addresses { get; set; }
+        }
+
+        public interface IEmployeeWithReadOnlyCollectionAddresses
+        {
+            int Id { get; set; }
+            ReadOnlyCollection<Address.IAddressFields> Addresses { get; set; }
+        }
+
+        public interface IEmployeeWithIReadOnlyCollectionAddresses
+        {
+            int Id { get; set; }
+            IReadOnlyCollection<Address.IAddressFields> Addresses { get; set; }
+        }
+
+        public interface IEmployeeWithArrayAddresses
+        {
+            int Id { get; set; }
+            Address.IAddressFields[] Addresses { get; set; }
         }
 
         public class EmployeeWithAddressesPoco

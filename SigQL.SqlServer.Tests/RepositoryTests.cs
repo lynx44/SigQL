@@ -36,6 +36,12 @@ namespace SigQL.SqlServer.Tests
             laborDbContext.Database.Migrate();
             sqlStatements = new List<PreparedSqlStatement>();
 
+            ConfigureSigQL();
+        }
+
+        private void ConfigureSigQL()
+        {
+            var sqlConnection = (laborDbConnection as SqlConnection);
             var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.ConnectionString);
             repositoryBuilder = new RepositoryBuilder(new SqlQueryExecutor(() => laborDbConnection), sqlDatabaseConfiguration, statement =>
             {
@@ -518,6 +524,101 @@ namespace SigQL.SqlServer.Tests
             var addressIds = employee.Addresses.Select(a => a.Id).ToList();
 
             AreEquivalent(addressIds, actual.First().Addresses.Select(a => a.Id).ToList());
+            AreEquivalent(addressIds, actual.First().Addresses.Select(a => a.Id).ToList());
+        }
+
+        [TestMethod]
+        public void GetWithListNavigationProperty()
+        {
+            var employee = new EFEmployee() { Name = "A Name", Addresses = new List<EFAddress>()
+            {
+                new EFAddress()
+                {
+                    StreetAddress = "123 fake st"
+                }
+            }};
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetEmployeesWithListAddresses();
+            
+            var addressIds = employee.Addresses.Select(a => a.Id).ToList();
+
+            AreEquivalent(addressIds, actual.First().Addresses.Select(a => a.Id).ToList());
+        }
+
+        [TestMethod]
+        public void GetWithIListNavigationProperty()
+        {
+            var employee = new EFEmployee() { Name = "A Name", Addresses = new List<EFAddress>()
+            {
+                new EFAddress()
+                {
+                    StreetAddress = "123 fake st"
+                }
+            }};
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetEmployeesWithIListAddresses();
+            
+            var addressIds = employee.Addresses.Select(a => a.Id).ToList();
+
+            AreEquivalent(addressIds, actual.First().Addresses.Select(a => a.Id).ToList());
+        }
+
+        [TestMethod]
+        public void GetWithReadOnlyCollectionNavigationProperty()
+        {
+            var employee = new EFEmployee() { Name = "A Name", Addresses = new List<EFAddress>()
+            {
+                new EFAddress()
+                {
+                    StreetAddress = "123 fake st"
+                }
+            }};
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetEmployeesWithReadOnlyCollectionAddresses();
+            
+            var addressIds = employee.Addresses.Select(a => a.Id).ToList();
+
+            AreEquivalent(addressIds, actual.First().Addresses.Select(a => a.Id).ToList());
+        }
+
+        [TestMethod]
+        public void GetWithIReadOnlyCollectionNavigationProperty()
+        {
+            var employee = new EFEmployee() { Name = "A Name", Addresses = new List<EFAddress>()
+            {
+                new EFAddress()
+                {
+                    StreetAddress = "123 fake st"
+                }
+            }};
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetEmployeesWithIReadOnlyCollectionAddresses();
+            
+            var addressIds = employee.Addresses.Select(a => a.Id).ToList();
+
+            AreEquivalent(addressIds, actual.First().Addresses.Select(a => a.Id).ToList());
+        }
+
+        [TestMethod]
+        public void GetWithArrayNavigationProperty()
+        {
+            var employee = new EFEmployee() { Name = "A Name", Addresses = new List<EFAddress>()
+            {
+                new EFAddress()
+                {
+                    StreetAddress = "123 fake st"
+                }
+            }};
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetEmployeesWithArrayAddresses();
+            
+            var addressIds = employee.Addresses.Select(a => a.Id).ToList();
+
             AreEquivalent(addressIds, actual.First().Addresses.Select(a => a.Id).ToList());
         }
         
@@ -4026,6 +4127,132 @@ namespace SigQL.SqlServer.Tests
 
         }
 
+        [TestMethod]
+        public void InsertWithPropertyListReturnType_ReturnsExpected()
+        {
+            var insertFields = new[]
+            {
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee =
+                        new Employee.InsertFieldsWithAddress()
+                        {
+                            Name = "Mike",
+                            Addresses = new Address.InsertFields[]
+                            {
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "123 fake st",
+                                    City = "Pennsylvania",
+                                    State = "PA"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "456 fake st",
+                                    City = "Portland",
+                                    State = "OR"
+                                },
+                                new Address.InsertFields()
+                                {
+                                    StreetAddress = "567 fake st",
+                                    City = "San Diego",
+                                    State = "CA"
+                                }
+                            }
+
+                        },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Ice Queen"
+                    }
+                },
+                new WorkLog.InsertFieldsWithEmployeeAndLocation()
+                {
+                    StartDate = new DateTime(2021, 3, 1), 
+                    EndDate = new DateTime(2021, 1, 2),
+                    Employee = 
+                        new Employee.InsertFieldsWithAddress()
+                            { 
+                                Name = "Lester", 
+                                Addresses = new Address.InsertFields[]
+                                {
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "234 fake st", 
+                                        City = "New York",
+                                        State = "NY"
+                                    },
+                                    new Address.InsertFields()
+                                    {
+                                        StreetAddress = "345 fake st", 
+                                        City = "Manchester",
+                                        State = "NH"
+                                    }
+                                }
+
+                            },
+                    Location = new Location.Insert()
+                    {
+                        Name = "Burger Hut"
+                    }
+                }
+            };
+            var actual = this.monolithicRepository.InsertMultipleWorkLogsWithAdjacentAndNestedRelationsAndReturnResult(insertFields);
+
+            Assert.AreEqual(2, actual.Count());
+            AreSame(actual.Select(p => p.Employee.Name).ToList(), insertFields.Select(wl => wl.Employee.Name).ToList());
+            Assert.AreEqual(2, actual.Count());
+
+            var efWorkLog1 = actual.First();
+            Assert.AreEqual(new DateTime(2021, 1, 1), efWorkLog1.StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 2), efWorkLog1.EndDate);
+
+                var efEmployee1 = efWorkLog1.Employee;
+                Assert.AreEqual("Mike", efEmployee1.Name);
+                Assert.AreEqual(3, efEmployee1.Addresses.Count());
+                
+                    var efEmployee1Address1 = efEmployee1.Addresses.First();
+                    Assert.AreEqual("123 fake st", efEmployee1Address1.StreetAddress);
+                    Assert.AreEqual("Pennsylvania", efEmployee1Address1.City);
+                    Assert.AreEqual("PA", efEmployee1Address1.State);
+                    
+                    var efEmployee1Address2 = efEmployee1.Addresses.Skip(1).First();
+                    Assert.AreEqual("456 fake st", efEmployee1Address2.StreetAddress);
+                    Assert.AreEqual("Portland", efEmployee1Address2.City);
+                    Assert.AreEqual("OR", efEmployee1Address2.State);
+
+                    var efEmployee1Address3 = efEmployee1.Addresses.Skip(2).First();
+                    Assert.AreEqual("567 fake st", efEmployee1Address3.StreetAddress);
+                    Assert.AreEqual("San Diego", efEmployee1Address3.City);
+                    Assert.AreEqual("CA", efEmployee1Address3.State);
+
+                var efLocation1 = efWorkLog1.Location;
+                Assert.AreEqual("Ice Queen", efLocation1.Name);
+
+            var efWorkLog2 = actual.Last();
+            Assert.AreEqual(new DateTime(2021, 3, 1), efWorkLog2.StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 2), efWorkLog2.EndDate);
+
+                var efEmployee2 = efWorkLog2.Employee;
+                Assert.AreEqual("Lester", efEmployee2.Name);
+                Assert.AreEqual(2, efEmployee2.Addresses.Count());
+                
+                    var efEmployee2Address1 = efEmployee2.Addresses.First();
+                    Assert.AreEqual("234 fake st", efEmployee2Address1.StreetAddress);
+                    Assert.AreEqual("New York", efEmployee2Address1.City);
+                    Assert.AreEqual("NY", efEmployee2Address1.State);
+                    
+                    var efEmployee2Address2 = efEmployee2.Addresses.Skip(1).First();
+                    Assert.AreEqual("345 fake st", efEmployee2Address2.StreetAddress);
+                    Assert.AreEqual("Manchester", efEmployee2Address2.City);
+                    Assert.AreEqual("NH", efEmployee2Address2.State);
+
+                var efLocation2 = efWorkLog2.Location;
+                Assert.AreEqual("Burger Hut", efLocation2.Name);
+
+        }
+
         // test insert when empty collections are passed
 
         [TestMethod]
@@ -4580,6 +4807,689 @@ namespace SigQL.SqlServer.Tests
 
             Assert.AreEqual(1, actual.Id);
             Assert.AreEqual("bob", actual.Name);
+        }
+        
+        [TestMethod]
+        public void Sync_SingleCollectionNavigationProperty()
+        {
+            var insertFields = new Employee.InsertFieldsWithWorkLogs[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields()
+                            {StartDate = new DateTime(2021, 4, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                }
+            };
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(insertFields);
+
+            this.monolithicRepository.SyncEmployeeWithWorkLogs(
+                    new Employee.SyncFieldsWithWorkLogs()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        WorkLogs = new[]
+                        {
+                            new WorkLog.SyncFields()
+                                {Id = 1, StartDate = new DateTime(2022, 1, 1), EndDate = new DateTime(2022, 1, 2)},
+                            new WorkLog.SyncFields()
+                                {StartDate = new DateTime(2022, 2, 1), EndDate = new DateTime(2022, 2, 2)}
+                        }
+                    });
+
+            var actual = laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+
+            Assert.IsFalse(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            var actualEmployee1 = actual.Single(e => e.Id == 1);
+            Assert.AreEqual("Kyle", actualEmployee1.Name);
+            Assert.AreEqual(2, actualEmployee1.WorkLogs.Count);
+            Assert.AreEqual(new DateTime(2022, 1, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).StartDate);
+            Assert.AreEqual(new DateTime(2022, 1, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 1).EndDate);
+            Assert.AreEqual(new DateTime(2022, 2, 1), actualEmployee1.WorkLogs.First(wl => wl.Id == 5).StartDate);
+            Assert.AreEqual(new DateTime(2022, 2, 2), actualEmployee1.WorkLogs.First(wl => wl.Id == 5).EndDate);
+            var actualEmployee2 = actual.Single(e => e.Id == 2);
+            Assert.AreEqual(2, actualEmployee2.WorkLogs.Count);
+            Assert.AreEqual(new DateTime(2021, 3, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 3).StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 3).EndDate);
+            Assert.AreEqual(new DateTime(2021, 4, 1), actualEmployee2.WorkLogs.First(wl => wl.Id == 4).StartDate);
+            Assert.AreEqual(new DateTime(2021, 2, 2), actualEmployee2.WorkLogs.First(wl => wl.Id == 4).EndDate);
+        }
+
+        [TestMethod]
+        public void Sync_ManyToManyPrimaryKeyFromForeignKeyNavigationProperty()
+        {
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                        new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                    }
+                },
+                new EFEmployee()
+                {
+                    Name = "Lester",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL" },
+                        new EFAddress() { StreetAddress = "910 fake st", City = "Atlanta", State = "GA" }
+                    }
+                }
+            };
+
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncManyToManyEmployeeWithAddresses(
+                    new Employee.SyncFieldsWithAddresses()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        Addresses = new[]
+                        {
+                            new Address.UpsertFields() { Id = 1, StreetAddress = "789 fake st", City = "Los Angeles", State = "CA" },
+                            new Address.UpsertFields() { StreetAddress = "2020 fake st", City = "New York", State = "NY" }
+                        }
+                    });
+
+            laborDbContext.ChangeTracker.Clear();
+            var actual = this.monolithicRepository.GetSyncManyToManyEmployeeWithAddresses();
+
+            Assert.IsFalse(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            var actualEmployee1 = actual.Single(e => e.Id == 1);
+            Assert.AreEqual("Kyle", actualEmployee1.Name);
+            Assert.AreEqual(2, actualEmployee1.Addresses.Count());
+            Assert.AreEqual("789 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 1).StreetAddress);
+            Assert.AreEqual("Los Angeles", actualEmployee1.Addresses.First(wl => wl.Id == 1).City);
+            Assert.AreEqual("CA", actualEmployee1.Addresses.First(wl => wl.Id == 1).State);
+            Assert.AreEqual("2020 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 5).StreetAddress);
+            Assert.AreEqual("New York", actualEmployee1.Addresses.First(wl => wl.Id == 5).City);
+            Assert.AreEqual("NY", actualEmployee1.Addresses.First(wl => wl.Id == 5).State);
+            var actualEmployee2 = actual.Single(e => e.Id == 2);
+            Assert.AreEqual(2, actualEmployee2.Addresses.Count());
+            Assert.AreEqual("678 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 3).StreetAddress);
+            Assert.AreEqual("Orlando", actualEmployee2.Addresses.First(wl => wl.Id == 3).City);
+            Assert.AreEqual("FL", actualEmployee2.Addresses.First(wl => wl.Id == 3).State);
+            Assert.AreEqual("910 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 4).StreetAddress);
+            Assert.AreEqual("Atlanta", actualEmployee2.Addresses.First(wl => wl.Id == 4).City);
+            Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
+        }
+
+        [TestMethod]
+        public void Sync_ManyToManyNoPrimaryKeyNavigationProperty()
+        {
+            var sqlCommand = new SqlCommand(@"ALTER TABLE EFAddressEFEmployee DROP CONSTRAINT PK_EFAddressEFEmployee;", (this.laborDbConnection as SqlConnection));
+            DatabaseHelpers.RunCommand(sqlCommand);
+            ConfigureSigQL();
+
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                        new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                    }
+                },
+                new EFEmployee()
+                {
+                    Name = "Lester",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL" },
+                        new EFAddress() { StreetAddress = "910 fake st", City = "Atlanta", State = "GA" }
+                    }
+                }
+            };
+
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncManyToManyEmployeeWithAddresses(
+                    new Employee.SyncFieldsWithAddresses()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        Addresses = new[]
+                        {
+                            new Address.UpsertFields() { Id = 1, StreetAddress = "789 fake st", City = "Los Angeles", State = "CA" },
+                            new Address.UpsertFields() { Id = 1, StreetAddress = "789 fake st", City = "Los Angeles", State = "CA" },
+                            new Address.UpsertFields() { StreetAddress = "2020 fake st", City = "New York", State = "NY" }
+                        }
+                    });
+
+            laborDbContext.ChangeTracker.Clear();
+
+            var actual = this.monolithicRepository.GetSyncManyToManyEmployeeWithAddresses();
+            var efAddressEfEmployees = this.monolithicRepository.GetEFAddressEFEmployees();
+
+            Assert.IsFalse(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            var actualEmployee1 = actual.Single(e => e.Id == 1);
+            Assert.AreEqual("Kyle", actualEmployee1.Name);
+            Assert.AreEqual(3, efAddressEfEmployees.Count(a => a.EmployeesId == 1));
+            Assert.AreEqual(2, efAddressEfEmployees.Count(a => a.AddressesId == 1 && a.EmployeesId == 1));
+            //Assert.AreEqual(3, efAddressEfEmployees.Where(e => e.EmployeesId == actualEmployee1.Id).Count());
+            //Assert.AreEqual(2, efAddressEfEmployees.Where(e => e.EmployeesId == actualEmployee1.Id).Where(a => a.AddressesId == 1).Count());
+            Assert.AreEqual("789 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 1).StreetAddress);
+            Assert.AreEqual("Los Angeles", actualEmployee1.Addresses.First(wl => wl.Id == 1).City);
+            Assert.AreEqual("CA", actualEmployee1.Addresses.First(wl => wl.Id == 1).State);
+            Assert.AreEqual("2020 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 5).StreetAddress);
+            Assert.AreEqual("New York", actualEmployee1.Addresses.First(wl => wl.Id == 5).City);
+            Assert.AreEqual("NY", actualEmployee1.Addresses.First(wl => wl.Id == 5).State);
+            var actualEmployee2 = actual.Single(e => e.Id == 2);
+            Assert.AreEqual(2, actualEmployee2.Addresses.Count());
+            Assert.AreEqual("678 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 3).StreetAddress);
+            Assert.AreEqual("Orlando", actualEmployee2.Addresses.First(wl => wl.Id == 3).City);
+            Assert.AreEqual("FL", actualEmployee2.Addresses.First(wl => wl.Id == 3).State);
+            Assert.AreEqual("910 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 4).StreetAddress);
+            Assert.AreEqual("Atlanta", actualEmployee2.Addresses.First(wl => wl.Id == 4).City);
+            Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
+        }
+
+        [TestMethod]
+        public void Sync_ManyToManyIndependentPrimaryKeyNavigationProperty()
+        {
+            var sqlCommand = new SqlCommand("ALTER TABLE EFAddressEFEmployee DROP CONSTRAINT PK_EFAddressEFEmployee;alter table [EFAddressEFEmployee] add Id int identity primary key;", (this.laborDbConnection as SqlConnection));
+            DatabaseHelpers.RunCommand(sqlCommand);
+            ConfigureSigQL();
+
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                        new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                    }
+                },
+                new EFEmployee()
+                {
+                    Name = "Lester",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL" },
+                        new EFAddress() { StreetAddress = "910 fake st", City = "Atlanta", State = "GA" }
+                    }
+                }
+            };
+
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncManyToManyEmployeeWithAddresses(
+                    new Employee.SyncFieldsWithAddresses()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        Addresses = new[]
+                        {
+                            new Address.UpsertFields() { Id = 1, StreetAddress = "789 fake st", City = "Los Angeles", State = "CA" },
+                            new Address.UpsertFields() { Id = 1, StreetAddress = "789 fake st", City = "Los Angeles", State = "CA" },
+                            new Address.UpsertFields() { StreetAddress = "2020 fake st", City = "New York", State = "NY" }
+                        }
+                    });
+
+            laborDbContext.ChangeTracker.Clear();
+
+            var actual = this.monolithicRepository.GetSyncManyToManyEmployeeWithAddresses();
+            var efAddressEfEmployees = this.monolithicRepository.GetEFAddressEFEmployees();
+
+            Assert.IsFalse(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            var actualEmployee1 = actual.Single(e => e.Id == 1);
+            Assert.AreEqual("Kyle", actualEmployee1.Name);
+            Assert.AreEqual(3, efAddressEfEmployees.Count(a => a.EmployeesId == 1));
+            Assert.AreEqual(2, efAddressEfEmployees.Count(a => a.AddressesId == 1 && a.EmployeesId == 1));
+            Assert.AreEqual("789 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 1).StreetAddress);
+            Assert.AreEqual("Los Angeles", actualEmployee1.Addresses.First(wl => wl.Id == 1).City);
+            Assert.AreEqual("CA", actualEmployee1.Addresses.First(wl => wl.Id == 1).State);
+            Assert.AreEqual("2020 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 5).StreetAddress);
+            Assert.AreEqual("New York", actualEmployee1.Addresses.First(wl => wl.Id == 5).City);
+            Assert.AreEqual("NY", actualEmployee1.Addresses.First(wl => wl.Id == 5).State);
+            var actualEmployee2 = actual.Single(e => e.Id == 2);
+            Assert.AreEqual(2, actualEmployee2.Addresses.Count());
+            Assert.AreEqual("678 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 3).StreetAddress);
+            Assert.AreEqual("Orlando", actualEmployee2.Addresses.First(wl => wl.Id == 3).City);
+            Assert.AreEqual("FL", actualEmployee2.Addresses.First(wl => wl.Id == 3).State);
+            Assert.AreEqual("910 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 4).StreetAddress);
+            Assert.AreEqual("Atlanta", actualEmployee2.Addresses.First(wl => wl.Id == 4).City);
+            Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
+        }
+
+        [TestMethod]
+        public void Sync_ManyToMany_AllowsDeletionOfDuplicatedKey()
+        {
+            var sqlCommand = new SqlCommand(@"ALTER TABLE EFAddressEFEmployee DROP CONSTRAINT PK_EFAddressEFEmployee;", (this.laborDbConnection as SqlConnection));
+            DatabaseHelpers.RunCommand(sqlCommand);
+            ConfigureSigQL();
+
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                        new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                    }
+                },
+                new EFEmployee()
+                {
+                    Name = "Lester",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL" },
+                        new EFAddress() { StreetAddress = "910 fake st", City = "Atlanta", State = "GA" }
+                    }
+                }
+            };
+
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncManyToManyEmployeeWithAddresses(
+                    new Employee.SyncFieldsWithAddresses()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        Addresses = new[]
+                        {
+                            new Address.UpsertFields() { Id = 1, StreetAddress = "789 fake st", City = "Los Angeles", State = "CA" },
+                            new Address.UpsertFields() { Id = 1, StreetAddress = "789 fake st", City = "Los Angeles", State = "CA" },
+                            new Address.UpsertFields() { StreetAddress = "2020 fake st", City = "New York", State = "NY" }
+                        }
+                    });
+
+            this.monolithicRepository.SyncManyToManyEmployeeWithAddresses(
+                    new Employee.SyncFieldsWithAddresses()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        Addresses = new[]
+                        {
+                            new Address.UpsertFields() { Id = 1, StreetAddress = "789 fake st", City = "Los Angeles", State = "CA" },
+                            new Address.UpsertFields() { StreetAddress = "2020 fake st", City = "New York", State = "NY" }
+                        }
+                    });
+            
+            var actual = this.monolithicRepository.GetSyncManyToManyEmployeeWithAddresses();
+            var efAddressEfEmployees = this.monolithicRepository.GetEFAddressEFEmployees();
+
+            Assert.IsFalse(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            var actualEmployee1 = actual.Single(e => e.Id == 1);
+            Assert.AreEqual("Kyle", actualEmployee1.Name);
+            Assert.AreEqual(2, efAddressEfEmployees.Count(a => a.EmployeesId == 1));
+            Assert.AreEqual(1, efAddressEfEmployees.Count(a => a.AddressesId == 1 && a.EmployeesId == 1));
+            Assert.AreEqual("789 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 1).StreetAddress);
+            Assert.AreEqual("Los Angeles", actualEmployee1.Addresses.First(wl => wl.Id == 1).City);
+            Assert.AreEqual("CA", actualEmployee1.Addresses.First(wl => wl.Id == 1).State);
+            Assert.AreEqual("2020 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 6).StreetAddress);
+            Assert.AreEqual("New York", actualEmployee1.Addresses.First(wl => wl.Id == 6).City);
+            Assert.AreEqual("NY", actualEmployee1.Addresses.First(wl => wl.Id == 6).State);
+            var actualEmployee2 = actual.Single(e => e.Id == 2);
+            Assert.AreEqual(2, actualEmployee2.Addresses.Count());
+            Assert.AreEqual("678 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 3).StreetAddress);
+            Assert.AreEqual("Orlando", actualEmployee2.Addresses.First(wl => wl.Id == 3).City);
+            Assert.AreEqual("FL", actualEmployee2.Addresses.First(wl => wl.Id == 3).State);
+            Assert.AreEqual("910 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 4).StreetAddress);
+            Assert.AreEqual("Atlanta", actualEmployee2.Addresses.First(wl => wl.Id == 4).City);
+            Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
+        }
+
+        [TestMethod]
+        public void Sync_NestedNavigationProperties()
+        {
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress()
+                        {
+                            StreetAddress = "123 fake st", City = "Seattle", State = "WA",
+                            Locations = new List<EFLocation>()
+                            {
+                                new EFLocation()
+                                {
+                                    Name = "Baseball Field"
+                                }
+                            }
+                        },
+                        new EFAddress()
+                        {
+                            StreetAddress = "345 fake st", City = "Portland", State = "OR",
+                            Locations = new List<EFLocation>()
+                            {
+                                new EFLocation()
+                                {
+                                    Name = "Town Center"
+                                }
+                            }
+                        }
+                    }
+                },
+                new EFEmployee()
+                {
+                    Name = "Lester",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL", 
+                            Locations = new List<EFLocation>()
+                            {
+                                new EFLocation()
+                                {
+                                    Name = "Mall"
+                                }
+                            }},
+                        new EFAddress()
+                        {
+                            StreetAddress = "910 fake st", City = "Atlanta", State = "GA",
+                            Locations = new List<EFLocation>()
+                            {
+                                new EFLocation()
+                                {
+                                    Name = "City Hall"
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeeWithAddressesAndLocations(
+                    new Employee.SyncFieldsWithAddressesAndLocations()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        Addresses = new[]
+                        {
+                            new Address.UpsertWithLocation()
+                            {
+                                Id = 1, StreetAddress = "789 fake st", City = "Los Angeles", State = "CA",
+                                Locations = new List<Location.Upsert>()
+                                {
+                                    new Location.Upsert()
+                                    {
+                                        Id = 1,
+                                        Name = "Basketball Court"
+                                    },
+                                    new Location.Upsert()
+                                    {
+                                        Name = "Town Square"
+                                    }
+                                }
+                            },
+                            new Address.UpsertWithLocation()
+                            {
+                                StreetAddress = "2020 fake st", City = "New York", State = "NY",
+                                Locations = new List<Location.Upsert>()
+                                {
+                                    new Location.Upsert()
+                                    {
+                                        Name = "Billiards Room"
+                                    }
+                                }
+                            }
+                        }
+                    });
+            
+            var actual = this.monolithicRepository.GetSyncEmployeeWithAddressesAndLocations();
+
+            Assert.IsFalse(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            var actualEmployee1 = actual.Single(e => e.Id == 1);
+            Assert.AreEqual("Kyle", actualEmployee1.Name);
+            Assert.AreEqual(2, actualEmployee1.Addresses.Count());
+            Assert.AreEqual(2, actualEmployee1.Addresses.First(a => a.Id == 1).Locations.Count);
+            Assert.AreEqual("Basketball Court", actualEmployee1.Addresses.First(a => a.Id == 1).Locations.First().Name);
+            Assert.AreEqual("Town Square", actualEmployee1.Addresses.First(a => a.Id == 1).Locations.Last().Name);
+            Assert.AreEqual(1, actualEmployee1.Addresses.First(a => a.Id == 5).Locations.Count);
+            Assert.AreEqual("Billiards Room", actualEmployee1.Addresses.First(a => a.Id == 5).Locations.First().Name);
+            var actualEmployee2 = actual.Single(e => e.Id == 2);
+            Assert.AreEqual(2, actualEmployee2.Addresses.Count());
+            Assert.AreEqual(1, actualEmployee2.Addresses.First(a => a.Id == 3).Locations.Count);
+            Assert.AreEqual("Mall", actualEmployee2.Addresses.First(a => a.Id == 3).Locations.First().Name);
+            Assert.AreEqual("City Hall", actualEmployee2.Addresses.First(a => a.Id == 4).Locations.First().Name);
+        }
+
+        [TestMethod]
+        public void Sync_DeletesLeastDependentTablesFirst()
+        {
+            this.monolithicRepository.SyncAddressesWithLocationsWithWorkLogs(
+                    new Address.SyncFieldsWithLocationsWithWorkLogs()
+                    {
+                        StreetAddress = "789 fake st", City = "Los Angeles", State = "CA",
+                        Locations = new List<Location.UpsertWithWorkLogs>()
+                        {
+                            new Location.UpsertWithWorkLogs()
+                            {
+                                Name = "Mall",
+                                WorkLogs = new List<WorkLog.UpsertFields>()
+                                {
+                                    new WorkLog.UpsertFields()
+                                    {
+                                        StartDate = new DateTime(2024, 01, 01),
+                                        EndDate = new DateTime(2024, 02, 01)
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+            
+            this.monolithicRepository.SyncAddressesWithLocationsWithWorkLogs(
+                    new Address.SyncFieldsWithLocationsWithWorkLogs()
+                    {
+                        Id = 1,
+                        StreetAddress = "1011 fake st", City = "Charlotte", State = "NC",
+                        Locations = new List<Location.UpsertWithWorkLogs>()
+                        {
+                            new Location.UpsertWithWorkLogs()
+                            {
+                                Name = "Postal Service",
+                                WorkLogs = new List<WorkLog.UpsertFields>()
+                                {
+                                    new WorkLog.UpsertFields()
+                                    {
+                                        StartDate = new DateTime(2024, 03, 01),
+                                        EndDate = new DateTime(2024, 04, 01)
+                                    }
+                                }
+                            }
+                        }
+                    });
+            
+            var actual = this.monolithicRepository.GetSyncAddressesWithLocationsWithWorkLogs();
+
+            Assert.AreEqual(1, actual.Count());
+            var actualAddress = actual.Single();
+            Assert.AreEqual(1, actualAddress.Locations.Count);
+            Assert.AreEqual(2, actualAddress.Locations.Single().Id);
+            Assert.AreEqual(1, actualAddress.Locations.Single().WorkLogs.Count);
+            Assert.AreEqual(2, actualAddress.Locations.Single().WorkLogs.Single().Id);
+        }
+
+        [TestMethod]
+        public void Sync_ProcessesDeleteOneRelationship()
+        {
+            this.monolithicRepository.SyncLocationWithAddress(
+                    new Location.UpsertWithAddress()
+                    {
+                            Name = "Mall",
+                            Address = new Address.UpsertFields()
+                            {
+                                StreetAddress = "789 fake st",
+                                City = "Los Angeles",
+                                State = "CA",
+                            }
+                    });
+            
+            var actual = this.monolithicRepository.GetSyncLocationWithAddress();
+
+            Assert.AreEqual(1, actual.Count());
+            var actualLocation = actual.Single();
+            Assert.AreEqual(1, actualLocation.Address.Id);
+        }
+
+        [TestMethod]
+        public void Sync_ProcessesNestedOneRelationship()
+        {
+            this.monolithicRepository.SyncWorkLogWithLocationWithAddress(
+                new WorkLog.UpsertWithLocationWithAddress()
+                {
+                    StartDate = new DateTime(2024, 1, 1),
+                    EndDate = new DateTime(2024, 2, 1),
+                    Location = new Location.UpsertWithAddress()
+                    {
+                        Name = "Mall",
+                        Address = new Address.UpsertFields()
+                        {
+                            StreetAddress = "789 fake st",
+                            City = "Los Angeles",
+                            State = "CA",
+                        }
+                    }
+                });
+            
+            var actual = this.monolithicRepository.GetSyncWorkLogWithLocationWithAddress();
+
+            Assert.AreEqual(1, actual.Count());
+            var actualWorklog = actual.Single();
+            Assert.AreEqual(1, actualWorklog.Location.Id);
+            Assert.AreEqual(1, actualWorklog.Location.Address.Id);
+        }
+
+        [TestMethod]
+        public void Sync_DoesNotDeleteNestedOneRelationship()
+        {
+            this.monolithicRepository.SyncWorkLogWithLocationWithAddress(
+                new WorkLog.UpsertWithLocationWithAddress()
+                {
+                    StartDate = new DateTime(2024, 1, 1),
+                    EndDate = new DateTime(2024, 2, 1),
+                    Location = new Location.UpsertWithAddress()
+                    {
+                        Name = "Mall",
+                        Address = new Address.UpsertFields()
+                        {
+                            StreetAddress = "789 fake st",
+                            City = "Los Angeles",
+                            State = "CA",
+                        }
+                    }
+                });
+
+            this.monolithicRepository.SyncWorkLogWithLocationWithAddress(
+                new WorkLog.UpsertWithLocationWithAddress()
+                {
+                    Id = 1,
+                    StartDate = new DateTime(2024, 2, 1),
+                    EndDate = new DateTime(2024, 3, 1),
+                    Location = new Location.UpsertWithAddress()
+                    {
+                        Name = "Mall 2",
+                        Address = new Address.UpsertFields()
+                        {
+                            StreetAddress = "2789 fake st",
+                            City = "2Los Angeles",
+                            State = "2CA",
+                        }
+                    }
+                });
+            
+            var actual = this.monolithicRepository.GetSyncWorkLogWithLocationWithAddress();
+            
+            Assert.AreEqual(1, actual.Count());
+            var actualWorklog = actual.Single();
+            Assert.AreEqual(2, actualWorklog.Location.Id);
+            Assert.AreEqual(2, actualWorklog.Location.Address.Id);
+            Assert.AreEqual(1, laborDbContext.WorkLog.Count());
+            Assert.AreEqual(2, laborDbContext.Location.Count());
+            Assert.AreEqual(2, laborDbContext.Address.Count());
+        }
+
+        [TestMethod]
+        public void Sync_AllowsEmptyLists()
+        {
+            this.monolithicRepository.SyncAddressesWithLocationsWithWorkLogs(
+                    new Address.SyncFieldsWithLocationsWithWorkLogs()
+                    {
+                        StreetAddress = "789 fake st", City = "Los Angeles", State = "CA",
+                        Locations = new List<Location.UpsertWithWorkLogs>()
+                        {
+                            new Location.UpsertWithWorkLogs()
+                            {
+                                Name = "Mall",
+                                WorkLogs = new List<WorkLog.UpsertFields>()
+                                {
+                                    new WorkLog.UpsertFields()
+                                    {
+                                        StartDate = new DateTime(2024, 01, 01),
+                                        EndDate = new DateTime(2024, 02, 01)
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+            
+            this.monolithicRepository.SyncAddressesWithLocationsWithWorkLogs(
+                    new Address.SyncFieldsWithLocationsWithWorkLogs()
+                    {
+                        Id = 1,
+                        StreetAddress = "1011 fake st", City = "Charlotte", State = "NC",
+                        Locations = new List<Location.UpsertWithWorkLogs>()
+                        {
+                            new Location.UpsertWithWorkLogs()
+                            {
+                                Name = "Postal Service",
+                                WorkLogs = new List<WorkLog.UpsertFields>()
+                                {
+                                }
+                            }
+                        }
+                    });
+            
+            var actual = this.monolithicRepository.GetSyncAddressesWithLocationsWithWorkLogs();
+
+            Assert.AreEqual(1, actual.Count());
+            var actualAddress = actual.Single();
+            Assert.AreEqual(1, actualAddress.Locations.Count);
+            Assert.AreEqual(2, actualAddress.Locations.Single().Id);
+            Assert.AreEqual(0, actualAddress.Locations.Single().WorkLogs.Count);
         }
 
         [TestMethod]

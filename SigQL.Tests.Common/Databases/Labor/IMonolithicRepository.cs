@@ -47,6 +47,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         Address.IAddressIdWithLocations GetAddressWithLocations();
         Employee.IEmployeeWithAddresses GetEmployeeWithAddresses();
         IEnumerable<Employee.IEmployeeWithAddresses> GetEmployeesWithAddresses();
+        IEnumerable<Employee.IEmployeeWithListAddresses> GetEmployeesWithListAddresses();
+        IEnumerable<Employee.IEmployeeWithIListAddresses> GetEmployeesWithIListAddresses();
+        IEnumerable<Employee.IEmployeeWithReadOnlyCollectionAddresses> GetEmployeesWithReadOnlyCollectionAddresses();
+        IEnumerable<Employee.IEmployeeWithIReadOnlyCollectionAddresses> GetEmployeesWithIReadOnlyCollectionAddresses();
+        IEnumerable<Employee.IEmployeeWithArrayAddresses> GetEmployeesWithArrayAddresses();
         IEnumerable<Address.IStreetAddressCoordinates> GetAddressWithStreetAddress();
         IEnumerable<Address.IStreetAddressCoordinates> GetAddressWithStreetAddressFetch([Fetch] int limit);
 
@@ -302,6 +307,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         // void InsertEmployeeWithAttributeWithValuesByUnknownClass(EmployeeInsertFields values);
 
 
+
         [Upsert(TableName = nameof(Employee))]
         void UpsertEmployeeViaMethodParams(int? id, string name);
         [Upsert]
@@ -313,6 +319,34 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeId> UpsertMultipleEmployeesWithWorkLogs_OutputIds(IEnumerable<Employee.UpsertFieldsWithWorkLogs> employees);
         [Upsert]
         void UpsertMultipleWorkLogsWithAdjacentAndNestedRelations(IEnumerable<WorkLog.UpsertFieldsWithEmployeeAndLocation> employees);
+
+        [Sync]
+        void SyncEmployeeWithWorkLogs(Employee.SyncFieldsWithWorkLogs employees);
+
+        [Sync]
+        void SyncManyToManyEmployeeWithAddresses(Employee.SyncFieldsWithAddresses employees);
+        // for test assertions only - retrieve the modified date to confirm that the data was synced correctly
+        IEnumerable<Employee.SyncFieldsWithAddresses> GetSyncManyToManyEmployeeWithAddresses();
+
+        [Sync]
+        void SyncEmployeeWithAddressesAndLocations(Employee.SyncFieldsWithAddressesAndLocations employees);
+        // for test assertions only - retrieve the modified date to confirm that the data was synced correctly
+        IEnumerable<Employee.SyncFieldsWithAddressesAndLocations> GetSyncEmployeeWithAddressesAndLocations();
+
+        [Sync]
+        void SyncAddressesWithLocationsWithWorkLogs(Address.SyncFieldsWithLocationsWithWorkLogs employees);
+        // for test assertions only - retrieve the modified date to confirm that the data was synced correctly
+        IEnumerable<Address.SyncFieldsWithLocationsWithWorkLogs> GetSyncAddressesWithLocationsWithWorkLogs();
+
+        [Sync]
+        void SyncLocationWithAddress(Location.UpsertWithAddress values);
+
+        IEnumerable<Location.UpsertWithAddress> GetSyncLocationWithAddress();
+
+        [Sync]
+        void SyncWorkLogWithLocationWithAddress(WorkLog.UpsertWithLocationWithAddress values);
+
+        IEnumerable<WorkLog.UpsertWithLocationWithAddress> GetSyncWorkLogWithLocationWithAddress();
 
         //update
         [Update(TableName = nameof(Employee))]
@@ -337,5 +371,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         // delete
         [Delete(TableName = nameof(Employee))]
         void DeleteEmployeeWithAttributeTableNameWithValuesByParams(string name);
+
+        IEnumerable<EFAddressEFEmployee> GetEFAddressEFEmployees();
     }
 }

@@ -4,6 +4,20 @@ namespace SigQL.SqlServer.Tests.Data
 {
     class DatabaseHelpers
     {
+        public static void RunCommand(SqlCommand sqlCommand)
+        {
+            sqlCommand.Connection.Open();
+            try
+            {
+                
+                sqlCommand.ExecuteNonQuery();
+            }
+            finally
+            {
+                sqlCommand.Connection.Close();
+            }
+        }
+
         public static void DropAllObjects(SqlConnection connection)
         {
             var sqlCommand = new SqlCommand(@"
