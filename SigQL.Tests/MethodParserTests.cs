@@ -430,7 +430,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsByEmployeeNameWithLike));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" like @Employee0Name)))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" like @Employee0Name))))", sql);
         }
 
         [TestMethod]
@@ -462,7 +462,7 @@ namespace SigQL.Tests
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyId(new List<int?>() { 1, null }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (((\"WorkLog\".\"Id\" in (@id0)) or (\"WorkLog\".\"Id\" is null)))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"Id\" in (@id0)) or (\"WorkLog\".\"Id\" is null))", sql);
         }
 
         [TestMethod]
@@ -495,7 +495,7 @@ namespace SigQL.Tests
                 }
             }));
             
-            AssertSqlEqual("select \"Address\".\"Id\" \"Id\", \"Address\".\"StreetAddress\" \"StreetAddress\" from \"Address\" where ((((\"Address\".\"City\" = @City0) and (\"Address\".\"State\" = @State0)) or ((\"Address\".\"City\" = @City1) and (\"Address\".\"State\" = @State1)) or ((\"Address\".\"City\" = @City2) and (\"Address\".\"State\" = @State2))))", sql);
+            AssertSqlEqual("select \"Address\".\"Id\" \"Id\", \"Address\".\"StreetAddress\" \"StreetAddress\" from \"Address\" where (((\"Address\".\"City\" = @City0) and (\"Address\".\"State\" = @State0)) or ((\"Address\".\"City\" = @City1) and (\"Address\".\"State\" = @State1)) or ((\"Address\".\"City\" = @City2) and (\"Address\".\"State\" = @State2)))", sql);
         }
 
         [TestMethod]
@@ -635,7 +635,7 @@ namespace SigQL.Tests
                 monolithicRepository.GetWorkLogsByEmployeeNamesViaRelation(new WorkLog.GetEmployeeNamesViaRelation()
                     {Names = new[] {"bob", "joe"}}));
             
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" in (@Employee0Name0, @Employee0Name1))))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" in (@Employee0Name0, @Employee0Name1)))))", sql);
         }
 
         [TestMethod]
@@ -665,7 +665,7 @@ namespace SigQL.Tests
                 monolithicRepository.GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelation(new WorkLog.GetEmployeeNamesAndAddressCitiesViaRelation()
                     {EmployeeNames = null, AddressCities = new List<string>() { "City1" } }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (1 = 1) and (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress00\" where ((\"EmployeeAddress00\".\"EmployeeId\" = \"Employee0\".\"Id\") and (exists (select 1 from \"Address\" \"Address000\" where ((\"Address000\".\"Id\" = \"EmployeeAddress00\".\"AddressId\") and (\"Address000\".\"City\" in (@Address000City0))))))))))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((1 = 1) and (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress00\" where ((\"EmployeeAddress00\".\"EmployeeId\" = \"Employee0\".\"Id\") and (exists (select 1 from \"Address\" \"Address000\" where ((\"Address000\".\"Id\" = \"EmployeeAddress00\".\"AddressId\") and (\"Address000\".\"City\" in (@Address000City0))))))))))))", sql);
         }
 
         [TestMethod]
@@ -675,7 +675,7 @@ namespace SigQL.Tests
                 monolithicRepository.GetWorkLogsByEmployeeNamesAndEmployeeIdsViaRelation(new WorkLog.GetEmployeeNamesAndEmployeeIdsViaRelation()
                     {EmployeeNames = null, EmployeeIds = new List<int>() { 1 } }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (1 = 1) and (\"Employee0\".\"Id\" in (@Employee0Id0))))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((1 = 1) and (\"Employee0\".\"Id\" in (@Employee0Id0))))))", sql);
         }
 
         [TestMethod]
@@ -685,7 +685,7 @@ namespace SigQL.Tests
                 monolithicRepository.GetWorkLogsByEmployeeNamesAndEmployeeIdsViaRelation(new WorkLog.GetEmployeeNamesAndEmployeeIdsViaRelation()
                     {EmployeeNames = new List<string>(), EmployeeIds = new List<int>() { 1 } }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (1 = 1) and (\"Employee0\".\"Id\" in (@Employee0Id0))))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((1 = 1) and (\"Employee0\".\"Id\" in (@Employee0Id0))))))", sql);
         }
 
         [TestMethod]
@@ -695,7 +695,7 @@ namespace SigQL.Tests
                 monolithicRepository.GetWorkLogsByEmployeeNamesAndEmployeeIdsViaRelation(new WorkLog.GetEmployeeNamesAndEmployeeIdsViaRelation()
                     {EmployeeNames = new List<string>() { "bob" }, EmployeeIds = new List<int>() { 1 } }));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" in (@Employee0Name0)) and (\"Employee0\".\"Id\" in (@Employee0Id0))))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((\"Employee0\".\"Name\" in (@Employee0Name0)) and (\"Employee0\".\"Id\" in (@Employee0Id0))))))", sql);
         }
 
         [TestMethod]
@@ -1040,7 +1040,7 @@ namespace SigQL.Tests
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetNextWorkLogsWithNavigationTableFilter));
             var sql = GetSqlFor(methodInfo);
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" = @Employee0Name))))) order by (select 1) offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" = @Employee0Name)))) order by (select 1) offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
         }
         
         [TestMethod]

@@ -613,6 +613,7 @@ namespace SigQL
 
                         var columnConditional = AppendGetConditionalOperand(conditionalLookup, columnGroup.Key, tableRelationsConditional);
 
+                        var parentArgumentCount = new Dictionary<IArgument, int>();
                         // columns
                         columnConditional.SetArgs(
                             columnGroup.Select(columnIdentifier =>
@@ -633,6 +634,19 @@ namespace SigQL
                                 }
                                 else
                                 {
+                                    if (argument.Parent.ClassProperties?.Count() > 1)
+                                    {
+                                        if (parentArgumentCount.ContainsKey(argument.Parent))
+                                        {
+                                            parentArgumentCount[argument.Parent] += 1;
+                                            return null;
+                                        }
+                                        else
+                                        {
+                                            parentArgumentCount[argument.Parent] = 1;
+                                        }
+                                    }
+                                    
                                     var placeholder = new Placeholder();
                                     var token = new TokenPath(argument.Parent)
                                     {
@@ -677,7 +691,7 @@ namespace SigQL
                                     tokens.Add(token);
                                     return ((AstNode)placeholder);
                                 }
-                            }).ToList()
+                            }).Where(n => n != null).ToList()
                         );
                     }
 
