@@ -593,7 +593,7 @@ namespace SigQL
                     tableRelationsConditional = new OrOperator();
                 }
                 conditionals.Add(tableRelationsConditional);
-
+                
                 foreach (var tableRelations in tableRelationsGroup)
                 {
                     var projectedColumns =
@@ -681,7 +681,7 @@ namespace SigQL
                         );
                     }
 
-                    var navigationTablesGroup = tableRelationsGroup.SelectMany(tr => tr.NavigationTables)
+                    var navigationTablesGroup = tableRelations.NavigationTables
                         .GroupBy(tr => tr.Argument?.GetCustomAttribute<OrGroupAttribute>()?.Group).ToList();
 
                     foreach (var navigationTables in navigationTablesGroup)
@@ -694,12 +694,14 @@ namespace SigQL
                         );
                     }
                 }
+
+
                 
 
                 //var tableNodes = tableRelationsGroup.SelectMany(nt =>
                 //    nt.NavigationTables.Select(ntc => BuildWhereClauseForPerspective(primaryTableReference, ntc, "0", parameterPaths,
                 //        tokens))).ToList();
-                
+
                 //tableRelationsConditional.AppendArgs(tableNodes);
                 //}
                 //}

@@ -704,7 +704,7 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() =>
                 monolithicRepository.OrGroupByTwoColumnsOfSameTable(DateTime.Today, DateTime.Today));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (((\"WorkLog\".\"StartDate\" = @startDate) or (\"WorkLog\".\"EndDate\" = @endDate)))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" = @startDate) or (\"WorkLog\".\"EndDate\" = @endDate))", sql);
         }
 
         [TestMethod]
@@ -722,7 +722,7 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() =>
                 monolithicRepository.OrGroupByTwoColumnsOfAdjacentTablesViaRelation(DateTime.Today, "joe", "new york"));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (((\"WorkLog\".\"StartDate\" = @startDate)) or ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" = @Employee0Name)))) or (exists (select 1 from \"Location\" \"Location0\" where ((\"Location0\".\"Id\" = \"WorkLog\".\"LocationId\") and (\"Location0\".\"Name\" = @Location0Name)))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((\"WorkLog\".\"StartDate\" = @startDate) or (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" = @Employee0Name)))) or (exists (select 1 from \"Location\" \"Location0\" where ((\"Location0\".\"Id\" = \"WorkLog\".\"LocationId\") and (\"Location0\".\"Name\" = @Location0Name)))))", sql);
         }
 
         [TestMethod]
