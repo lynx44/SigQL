@@ -240,6 +240,27 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string Name { get; set; }
             public WorkLog.InsertFieldsWithEmployee WorkLog { get; set; }
         }
+
+        public class OrColumns
+        {
+            [OrGroup]
+            public int Id { get; set; }
+            [OrGroup]
+            public string Name { get; set; }
+        }
+
+        public class NestedWithTwoOrGroups
+        {
+            public WorkLog.TwoOrGroups WorkLog { get; set; }
+        }
+        
+        public class ColumnOrNavigationClassFilter
+        {
+            [OrGroup]
+            public string Name { get; set; }
+            [OrGroup]
+            public Address.AddressStreetAddress Address { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(Employee))]

@@ -39,6 +39,11 @@ namespace SigQL.Tests.Common.Databases.Labor
             Address.IAddressFields Address { get; set; }
         }
 
+        public class LocationName
+        {
+            public string Name { get; set; }
+        }
+
         public class UpsertWithWorkLogs
         {
             public int? Id { get; set; }

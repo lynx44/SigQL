@@ -88,6 +88,11 @@ namespace SigQL.Tests.Common.Databases.Labor
             Employee.IEmployeeToWorkLogView Employee { get; }
         }
 
+        public class AddressStreetAddress
+        {
+            public string StreetAddress { get; set; }
+        }
+
         public class UpsertWithLocation
         {
             public int? Id { get; set; }

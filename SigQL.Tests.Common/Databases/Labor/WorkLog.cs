@@ -459,6 +459,74 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             public string Id { get; set; }
         }
+
+        public class BetweenDates
+        {
+            [GreaterThanOrEqual]
+            public DateTime StartDate { get; set; }
+            [LessThanOrEqual]
+            public DateTime EndDate { get; set; }
+        }
+
+        public class IdAndEmployeeId
+        {
+            public int Id { get; set; }
+            public int EmployeeId { get; set; }
+        }
+
+        public class OrColumns
+        {
+            [OrGroup]
+            public int EmployeeId { get; set; }
+            [OrGroup]
+            public DateTime StartDate { get; set; }
+        }
+
+        public class OrColumns2
+        {
+            [OrGroup]
+            public int Id { get; set; }
+            [OrGroup]
+            public DateTime EndDate { get; set; }
+        }
+
+        public class NestedOrColumns
+        {
+            public Employee.OrColumns Employee { get; set; }
+        }
+
+        public class TwoOrGroups
+        {
+            [OrGroup("1")]
+            public DateTime StartDate { get; set; }
+            [OrGroup("1")]
+            public DateTime EndDate { get; set; }
+            [OrGroup("2")]
+            public int Id { get; set; }
+            [OrGroup("2")]
+            public int EmployeeId { get; set; }
+        }
+
+        public class NestedColumnAndNavigationClassFilter
+        {
+            public Employee.ColumnOrNavigationClassFilter Employee { get; set; }
+        }
+        
+        public class OrGroupClassWithColumnAndNavigationClass
+        {
+            [OrGroup]
+            public int Id { get; set; }
+            [OrGroup]
+            public Employee.EmployeeNameFilter Employee { get; set; }
+        }
+
+        public class TwoNestedNavigationClassFilters
+        {
+            [OrGroup]
+            public Employee.EmployeeNameFilter Employee { get; set; }
+            [OrGroup]
+            public Location.LocationName Location { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

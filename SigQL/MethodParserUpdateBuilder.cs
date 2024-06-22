@@ -25,7 +25,7 @@ namespace SigQL
                 var tableRelations = this.databaseResolver.BuildTableRelations(primaryTable, new TableArgument(primaryTable, updateSpec.FilterParameters.AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>());
 
                 whereClause = BuildWhereClauseFromTargetTablePerspective(
-                    new RelationalTable() { Label = primaryTable.Name }, tableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause), parameterPaths,
+                    new RelationalTable() { Label = primaryTable.Name }, tableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause).AsEnumerable(), parameterPaths,
                     tokens);
             }
 

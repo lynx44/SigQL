@@ -236,7 +236,8 @@ namespace SigQL
                 TargetTable = tableDefinition,
                 NavigationTables = new []{ navigationTableRelations },
                 ProjectedColumns = new List<TableRelationColumnDefinition>(),
-                ForeignKeyToParent = foreignKeyDefinition
+                ForeignKeyToParent = foreignKeyDefinition,
+                IsManyToMany = true
             };
             navigationTables.Add(manyToManyTableRelations);
             foreach (var navigationTable in manyToManyTableRelations.NavigationTables)

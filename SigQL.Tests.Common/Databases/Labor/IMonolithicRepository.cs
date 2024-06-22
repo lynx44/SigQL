@@ -121,6 +121,83 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddressViaClassFilter(Employee.StreetAddressFilterViaRelation filter);
         IEnumerable<Employee.IEmployeeId> EF_GetEmployeeIdsForStreetAddressViaClassFilter(Employee.EFStreetAddressFilterViaRelation filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameWithDifferingParameterNameViaClassFilter(WorkLog.EmployeeNameFilterWithAliasViaRelation filter);
+        
+        // or
+        IEnumerable<WorkLog.IWorkLogId> OrGroupByTwoColumnsOfSameTable([OrGroup] DateTime startDate, [OrGroup] DateTime endDate);
+        IEnumerable<WorkLog.IWorkLogId> OrGroupByTwoGroupsForColumnsOfSameTable([OrGroup("dates")] DateTime startDate, [OrGroup("dates")] DateTime endDate, [OrGroup("ids")] int id, [OrGroup("ids")] int employeeId);
+        IEnumerable<WorkLog.IWorkLogId> OrGroupByTwoColumnsOfAdjacentTablesViaRelation(
+            [OrGroup] DateTime startDate, 
+            [OrGroup, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))] string employeeName, 
+            [OrGroup, ViaRelation(nameof(WorkLog) + "->" + nameof(Location), nameof(Location.Name))] string locationName);
+        IEnumerable<WorkLog.IWorkLogId> MultipleOrGroupByWithAdjacentTablesViaRelation(
+            [OrGroup("1")] DateTime startDate, 
+            [OrGroup("1"), ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))] string employeeName, 
+            [OrGroup("2"), ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Id))] int employeeId, 
+            [OrGroup("2"), ViaRelation(nameof(WorkLog) + "->" + nameof(Location), nameof(Location.Name))] string locationName);
+        IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+            [OrGroup] WorkLog.BetweenDates dates, 
+            [OrGroup] int employeeId);
+
+        IEnumerable<WorkLog.IWorkLogId> OrGroupInClassFilter(
+            WorkLog.OrColumns filter);
+
+        IEnumerable<WorkLog.IWorkLogId> OrGroupWithTwoClassFilters(
+            [OrGroup] WorkLog.BetweenDates dates,
+            [OrGroup] WorkLog.IdAndEmployeeId filter2);
+
+        IEnumerable<WorkLog.IWorkLogId> OrGroupNestedNavigationClassFilter(
+            WorkLog.NestedOrColumns filter);
+
+        IEnumerable<Employee.IEmployeeId> TwoOrGroupNestedNavigationClassFilter(
+            Employee.NestedWithTwoOrGroups filter);
+
+        IEnumerable<WorkLog.IWorkLogId> OrGroupWithColumnAndNavigationClassFilter(
+            [OrGroup] int id,
+            [OrGroup] WorkLog.GetByEmployeeNameFilter filter);
+
+        IEnumerable<WorkLog.IWorkLogId> OrGroupWithColumnAndNestedNavigationClassFilter(
+            WorkLog.NestedColumnAndNavigationClassFilter filter);
+        
+        IEnumerable<WorkLog.IWorkLogId> OrGroupClassWithColumnAndNavigationClass(
+            WorkLog.OrGroupClassWithColumnAndNavigationClass filter);
+        
+        IEnumerable<WorkLog.IWorkLogId> OrGroupForTwoNestedNavigationClassFilters(
+            WorkLog.TwoNestedNavigationClassFilters filter);
+        
+        IEnumerable<Employee.IEmployeeId> OrGroupWithParameterColumnAndNavigationManyToManyClassFilter(
+            [OrGroup] string name,
+            [OrGroup] Employee.StreetAddressFilter address);
+
+        IEnumerable<WorkLog.IWorkLogId> OrGroupInTwoClassFilters(
+            WorkLog.OrColumns filter1,
+            WorkLog.OrColumns2 filter2);
+
+        // TODO
+        // duplicate above tests and replace with ViaRelations instead of class filters
+
+
+        // NOT REQUIRED - previous ideas. use to double check test cases
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    [OrGroup] WorkLog.BetweenDates dates, 
+        //    [ViaRelation, OrGroup] int employeeId);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    [OrGroup] WorkLog.OrColumnsMixedWithOrNavigationTables dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    [OrGroup] WorkLog.ColumnsMixedWithViaRelation dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    WorkLog.WithTwoViaRelations dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    WorkLog.ColumnsWithTwoViaRelationsAndTwoNestedNavigationTables dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    [OrGroup] WorkLog.MultipleColumns1 dates,
+        //    [OrGroup] WorkLog.MultipleColumns2 dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    [OrGroup] WorkLog.ColumnsWithNestedNavigationAndViaRelation1 dates,
+        //    [OrGroup] WorkLog.ColumnsWithNestedNavigationAndViaRelation2 dates);
+        //IEnumerable<WorkLog.IWorkLogId> OrGroupWithClassFilter(
+        //    WorkLog.ColumnsWithNestedNavigationAndViaRelation1Or dates,
+        //    WorkLog.ColumnsWithNestedNavigationAndViaRelation2Or dates);
+
 
         /// <summary>
         /// This is illegal. The interface T specified in the OrderBy<T> definition must only contain one column,

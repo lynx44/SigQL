@@ -76,5 +76,15 @@ namespace SigQL.Extensions
 
             return children;
         }
+
+        public static TOut Map<TIn, TOut>(this TIn t, Func<TIn, TOut> ifNotNull, TOut defaultValue = default(TOut))
+        {
+            if (t != null)
+            {
+                return ifNotNull(t);
+            }
+
+            return defaultValue;
+        }
     }
 }

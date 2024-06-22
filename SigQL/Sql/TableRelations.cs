@@ -27,7 +27,8 @@ namespace SigQL.Sql
         public TableRelations Parent { get; set; }
         public IEnumerable<TableRelationColumnIdentifierDefinition> PrimaryKey { get; set; }
         internal TableRelations MasterRelations { get; set; }
-        
+        public bool IsManyToMany { get; set; }
+
         public TableRelations Mask(TableRelationsColumnSource source, TableRelationsFilter filter, TableRelations masterRelations = null)
         {
             var matchingColumns = this.ProjectedColumns.Where(c => c.Source == source && (!c.Arguments.All.Any() || c.Arguments.All.Any(arg => filter.IsMatch(arg, false)))).ToList();
@@ -114,6 +115,23 @@ namespace SigQL.Sql
             
             path.Reverse();
             return path;
+        }
+
+        public string GetQualifiedTablePath()
+        {
+            return GetQualifiedTablePathInternal(this, new List<string>());
+        }
+
+        private string GetQualifiedTablePathInternal(TableRelations tableRelations, List<string> path)
+        {
+            path.Add(tableRelations.TableName);
+            if (tableRelations.Parent != null)
+            {
+                this.GetQualifiedTablePathInternal(tableRelations.Parent, path);
+            }
+
+            path.Reverse();
+            return string.Join("->", path);
         }
 
         public bool RelationTreeHasAnyTableDefinedMultipleTimes()
@@ -292,6 +310,33 @@ namespace SigQL.Sql
             return relations;
         }
 
+        public IEnumerable<TableRelations> SeparateByColumn()
+        {
+            var list = new List<TableRelations>();
+            this.Traverse(tr =>
+            {
+                var separatedTableRelations = tr.ProjectedColumns.Select(c =>
+                {
+                    var tableRelations = this.PickBranch(tr).GetSingularEndpoint();
+                    var parent = tableRelations.Parent;
+                    while (parent != null)
+                    {
+                        parent.ProjectedColumns = new List<TableRelationColumnIdentifierDefinition>();
+                        parent = parent.Parent;
+                    }
+                    tableRelations.ProjectedColumns = tableRelations.ProjectedColumns.Where(p => p.Name == c.Name).ToList();
+                    foreach (var column in tableRelations.ProjectedColumns)
+                    {
+                        column.TableRelations = tableRelations;
+                    }
+                    return tableRelations;
+                }).ToList();
+                list.AddRange(separatedTableRelations);
+            });
+
+            return list;
+        }
+
         public TableRelations Copy(TableRelations parent = null)
         {
             var copy = new TableRelations()
@@ -307,6 +352,17 @@ namespace SigQL.Sql
             };
             copy.NavigationTables = this.NavigationTables.Select(t => t.Copy(copy)).ToList();
             return copy;
+        }
+
+        public TableRelations GetRootParent()
+        {
+            var final = this;
+            while (final.Parent != null)
+            {
+                final = final.Parent;
+            }
+
+            return final;
         }
     }
 

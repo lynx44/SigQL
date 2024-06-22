@@ -22,15 +22,50 @@ namespace SigQL
             TableRelationsColumnSource source,
             ConcurrentDictionary<string, IEnumerable<string>> tableKeyDefinitions)
         {
-            var columnFields = argument.ClassProperties.Where(p => !ColumnAttributes.IsDecoratedNonColumn(p)).Select(p => new ColumnField()
+            List<ColumnField> columnFields = new List<ColumnField>();
+            if (!ColumnAttributes.IsDecoratedNonColumn(argument))
             {
-                Name = this.GetColumnName(p),
-                Type = p.Type,
-                Argument = p
-            }).ToList();
+                columnFields = argument.ClassProperties.Where(p => !ColumnAttributes.IsDecoratedNonColumn(p)).Select(p => new ColumnField()
+                {
+                    Name = this.GetColumnName(p),
+                    Type = p.Type,
+                    Argument = p
+                }).ToList();
+            }
+
+            var resolvedParameterArg = false;
+            if (argument is ParameterArgument
+                && !ColumnAttributes.IsDecoratedNonColumn(argument)
+                && !this.IsTableOrTableProjection(argument.Type)
+                && FindColumnByName(tableDefinition, argument.GetCustomAttribute<ColumnAttribute>()?.ColumnName ?? argument.Name) != null)
+            {
+                columnFields.Add(new ColumnField()
+                {
+                    Argument = argument,
+                    Name = this.GetColumnName(argument),
+                    Type = argument.Type
+                });
+                resolvedParameterArg = true;
+            }
+
             var columnsWithTables =
                 columnFields.Select(p => new { Column = p, IsTable = this.IsTableOrTableProjection(p.Type) });
             var viaRelationColumns = columnsWithTables.Where(c => ColumnFilters.ViaRelation.IsMatch(c.Column.Argument, c.IsTable)).ToList();
+            
+            if (argument is ParameterArgument
+                && !ColumnAttributes.IsDecoratedNonColumn(argument)
+                && !this.IsTableOrTableProjection(argument.Type)
+                && ColumnFilters.ViaRelation.IsMatch(argument, false))
+            {
+                viaRelationColumns.Add(
+                    new { Column = new ColumnField()
+                {
+                    Argument = argument,
+                    Name = this.GetColumnName(argument),
+                    Type = argument.Type
+                }, IsTable = false });
+                resolvedParameterArg = true;
+            }
 
             columnsWithTables = columnsWithTables.Except(viaRelationColumns).ToList();
             var columnDescriptions = columnsWithTables.ToList();
@@ -64,9 +99,7 @@ namespace SigQL
                     var tableColumn = tableDefinition.Columns.FindByName(columnName);
                     if (tableColumn == null)
                     {
-                        var pluralCandidates = pluralizationHelper.AllCandidates(columnName).ToList();
-                        var pluralName = pluralCandidates.FirstOrDefault(c => tableDefinition.Columns.FindByName(c) != null);
-                        tableColumn = tableDefinition.Columns.FindByName(pluralName);
+                        tableColumn = FindColumnByName(tableDefinition, columnName);
                     }
 
                     if (tableColumn == null)
@@ -87,13 +120,25 @@ namespace SigQL
                         tableColumn.IsIdentity);
 
                 }).ToList<TableRelationColumnIdentifierDefinition>();
-            var functionParameterColumns = argument.ClassProperties.Where(a => ColumnAttributes.IsFunctionParameter(a));
+            var functionParameterColumns = argument.ClassProperties.Where(a => ColumnAttributes.IsFunctionParameter(a)).ToList();
+            if (ColumnAttributes.IsFunctionParameter(argument))
+            {
+                functionParameterColumns.Add(argument);
+            }
             var functionParameterPaths = functionParameterColumns.Select(a =>
             {
                 var parameterPath = a.ToParameterPath();
                 parameterPath.SqlParameterName = parameterPath.GenerateSuggestedSqlIdentifierName();
                 return parameterPath;
             }).ToList();
+            if (argument is ParameterArgument
+                && !ColumnAttributes.IsDecoratedNonColumn(argument)
+                && !this.IsTableOrTableProjection(argument.Type) &&
+                !resolvedParameterArg)
+            {
+                throw new InvalidIdentifierException($"Unable to identify matching database column for {argument.GetCallsiteTypeName()} {argument.FullyQualifiedTypeName()}. Column {GetColumnSpec(argument).ColumnName ?? argument.Name} does not exist in table {tableDefinition.Name}.");
+            }
+
             IEnumerable<TableRelationColumnIdentifierDefinition> primaryKey = null;
 
             if (source == TableRelationsColumnSource.ReturnType)
@@ -176,6 +221,15 @@ namespace SigQL
 
             var result = MergeTableRelations(viaTableRelations.AppendOne(tableRelations).ToArray());
             return result;
+        }
+
+        private IColumnDefinition FindColumnByName(ITableDefinition tableDefinition, string columnName)
+        {
+            IColumnDefinition tableColumn;
+            var pluralCandidates = pluralizationHelper.AllCandidates(columnName).ToList();
+            var pluralName = pluralCandidates.FirstOrDefault(c => tableDefinition.Columns.FindByName(c) != null);
+            tableColumn = tableDefinition.Columns.FindByName(pluralName);
+            return tableColumn;
         }
 
         private static IEnumerable<TableRelationColumnIdentifierDefinition> BuildPrimaryKey(ITableDefinition tableDefinition, IArgument argument,
@@ -383,6 +437,11 @@ namespace SigQL
         
         internal TableRelations MergeTableRelations(params TableRelations[] tableRelationsCollection)
         {
+            if (!tableRelationsCollection.Any())
+            {
+                return null;
+            }
+
             var merged = 
             new TableRelations()
             {
@@ -393,7 +452,8 @@ namespace SigQL
                 ProjectedColumns = tableRelationsCollection.SelectMany(t => t.ProjectedColumns).ToList(),
                 ForeignKeyToParent = tableRelationsCollection.Where(t => t.ForeignKeyToParent != null).Select(t => t.ForeignKeyToParent).Distinct(ForeignKeyDefinitionEqualityComparer.Default).FirstOrDefault(),
                 FunctionParameters = tableRelationsCollection.SelectMany(t => t.FunctionParameters).GroupBy(k => k.SqlParameterName).Select(k => k.First()).ToList(),
-                MasterRelations = tableRelationsCollection.Select(t => t.MasterRelations).Any(tr => tr != null) ? MergeTableRelations(tableRelationsCollection.Select(t => t.MasterRelations).Where(tr => tr != null).ToArray()) : null
+                MasterRelations = tableRelationsCollection.Select(t => t.MasterRelations).Any(tr => tr != null) ? MergeTableRelations(tableRelationsCollection.Select(t => t.MasterRelations).Where(tr => tr != null).ToArray()) : null,
+                IsManyToMany = tableRelationsCollection.Any(r => r.IsManyToMany)
             };
             SetParents(merged);
             return merged;
@@ -406,6 +466,9 @@ namespace SigQL
                 foreach (var navigationTable in tr.NavigationTables)
                 {
                     navigationTable.Parent = tr;
+                    var projectedColumns = navigationTable.ProjectedColumns.ToList();
+                    projectedColumns.ForEach(c => c.TableRelations = navigationTable);
+                    navigationTable.ProjectedColumns = projectedColumns;
                 }
             });
         }
@@ -487,9 +550,9 @@ namespace SigQL
         public static bool IsDynamicOrderBy(IArgument property)
         {
             return
-                (((property?.Type)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
-                  ((property?.Type)?.IsAssignableFrom(
-                      typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
+                property.GetCallsiteTypeName() != "table" && (((property?.Type)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
+                                                              ((property?.Type)?.IsAssignableFrom(
+                                                                  typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
         }
     }
 }

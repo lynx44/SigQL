@@ -58,6 +58,12 @@ namespace SigQL
                         case SetEqualOperator a:
                             sql.Add($"{string.Join($" {a.Label} ", a.Args.Select(a => Walk(a)))}");
                             break;
+                        case ConditionalOperator a:
+                            if (a.Args.Count() > 1)
+                                sql.Add($"({string.Join($" {a.Label} ", a.Args.Select(a => Walk(a)))})");
+                            else
+                                sql.Add($"{string.Join($" {a.Label} ", a.Args.Select(a => Walk(a)))}");
+                            break;
                         case LogicalOperator a:
                             sql.Add($"({string.Join($" {a.Label} ", a.Args.Select(a => Walk(a)))})");
                             break;
