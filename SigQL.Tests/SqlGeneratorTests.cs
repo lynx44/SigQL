@@ -25,7 +25,7 @@ namespace SigQL.Tests
         public void CreateSelectQuery_GeneratesExpectedSql()
         {
             var query = sqlGenerator.CreateSelectQuery(typeof(WorkLog.IWorkLogWithEmployee));
-            Assert.AreEqual("select * from (select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\" from \"WorkLog\" left outer join \"Employee\" on ((\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\"))) __generatedouterquery ",
+            Assert.AreEqual("select * from (select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\" from \"WorkLog\" left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")) __generatedouterquery ",
                 query.CommandText);
         }
 
