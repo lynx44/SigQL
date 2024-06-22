@@ -32,11 +32,11 @@ namespace SigQL
                     Argument = p
                 }).ToList();
             }
-            
-            
+
+            var resolvedParameterArg = false;
             if (argument is ParameterArgument
                 && !ColumnAttributes.IsDecoratedNonColumn(argument)
-                && !this.IsTableOrTableProjection(argument.Type) 
+                && !this.IsTableOrTableProjection(argument.Type)
                 && FindColumnByName(tableDefinition, argument.GetCustomAttribute<ColumnAttribute>()?.ColumnName ?? argument.Name) != null)
             {
                 columnFields.Add(new ColumnField()
@@ -45,6 +45,7 @@ namespace SigQL
                     Name = this.GetColumnName(argument),
                     Type = argument.Type
                 });
+                resolvedParameterArg = true;
             }
 
             var columnsWithTables =
@@ -63,6 +64,7 @@ namespace SigQL
                     Name = this.GetColumnName(argument),
                     Type = argument.Type
                 }, IsTable = false });
+                resolvedParameterArg = true;
             }
 
             columnsWithTables = columnsWithTables.Except(viaRelationColumns).ToList();
@@ -129,6 +131,14 @@ namespace SigQL
                 parameterPath.SqlParameterName = parameterPath.GenerateSuggestedSqlIdentifierName();
                 return parameterPath;
             }).ToList();
+            if (argument is ParameterArgument
+                && !ColumnAttributes.IsDecoratedNonColumn(argument)
+                && !this.IsTableOrTableProjection(argument.Type) &&
+                !resolvedParameterArg)
+            {
+                throw new InvalidIdentifierException($"Unable to identify matching database column for {argument.GetCallsiteTypeName()} {argument.FullyQualifiedTypeName()}. Column {GetColumnSpec(argument).ColumnName ?? argument.Name} does not exist in table {tableDefinition.Name}.");
+            }
+
             IEnumerable<TableRelationColumnIdentifierDefinition> primaryKey = null;
 
             if (source == TableRelationsColumnSource.ReturnType)
