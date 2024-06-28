@@ -219,7 +219,8 @@ namespace SigQL
                     viaRelationAttribute.Path, viaRelationAttribute.Column, source, tableKeyDefinitions);
             }).ToList();
 
-            var result = MergeTableRelations(viaTableRelations.AppendOne(tableRelations).ToArray());
+            var result = MergeTableRelations(new [] { tableRelations }.Concat(viaTableRelations).ToArray());
+            //var result = MergeTableRelations(viaTableRelations.AppendOne(tableRelations).ToArray());
             return result;
         }
 

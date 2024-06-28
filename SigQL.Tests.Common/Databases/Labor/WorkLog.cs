@@ -507,6 +507,19 @@ namespace SigQL.Tests.Common.Databases.Labor
             public int EmployeeId { get; set; }
         }
 
+        public class TwoOrGroupsWithViaRelation
+        {
+            [OrGroup("2")]
+            public int Id { get; set; }
+            [OrGroup("2"), ViaRelation("WorkLog->Employee", "Id")]
+            public int EmployeeId { get; set; }
+            [OrGroup("1")]
+            public DateTime StartDate { get; set; }
+            [OrGroup("1")]
+            public DateTime EndDate { get; set; }
+        }
+
+
         public class NestedColumnAndNavigationClassFilter
         {
             public Employee.ColumnOrNavigationClassFilter Employee { get; set; }

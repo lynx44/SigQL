@@ -726,6 +726,15 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Where_OrGroupWithOffsetFetch_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.TwoOrGroupsWithViaRelationAndOffsetFetch(new WorkLog.TwoOrGroupsWithViaRelation(), 1, 1));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" where (((\"WorkLog\".\"Id\" = @Id) or (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Id\" = @Employee0Id))))) and ((\"WorkLog\".\"StartDate\" = @StartDate) or (\"WorkLog\".\"EndDate\" = @EndDate))) order by (select 1) offset @skip rows fetch next @take rows only) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
+        }
+
+        [TestMethod]
         public void OrderByAttribute_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => monolithicRepository.GetOrderedWorkLogsAttribute(OrderByDirection.Ascending));

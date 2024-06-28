@@ -248,6 +248,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> SkipTakeWorkLogsViaClassFilter(WorkLog.FilterWithOffsetFetch filter);
         IEnumerable<WorkLog.IWorkLogId> TakeWorkLogsOnlyViaClassFilter(WorkLog.FilterWithFetch filter);
         IEnumerable<WorkLog.IWorkLogId> TakeWorkLogsOnlyWithFilterViaClassFilter(WorkLog.FilterWithFetchAndParameter filter);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> TwoOrGroupsWithViaRelationAndOffsetFetch(WorkLog.TwoOrGroupsWithViaRelation filter, [Offset] int skip, [Fetch] int take);
 
         IEnumerable<Labor.WorkLog.IWorkLogId> SkipTakeWorkLogsByStartDateAndEmployeeName(
             WorkLog.GetByStartDateAndEmployeeNameFilterWithOffsetFetch filter);

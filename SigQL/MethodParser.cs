@@ -592,6 +592,7 @@ namespace SigQL
         {
             var allTableRelationsGroups = 
                 whereClauseTableRelations
+                    .Where(tr => tr.ProjectedColumns.Any() || tr.NavigationTables.Any())
                     .GroupBy(g => g.Argument.GetCustomAttribute<OrGroupAttribute>()?.Group).ToList();
 
             AstNode whereClauseConditionals = new AndOperator();
