@@ -323,6 +323,8 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         [Sync]
         void SyncEmployeeWithWorkLogs(Employee.SyncFieldsWithWorkLogs employees);
+        [Sync]
+        void SyncEmployeeIdWithWorkLogIds(Employee.SyncIdsWithWorkLogIds employees);
 
         [Sync]
         void SyncManyToManyEmployeeWithAddresses(Employee.SyncFieldsWithAddresses employees);
@@ -348,6 +350,9 @@ namespace SigQL.Tests.Common.Databases.Labor
         void SyncWorkLogWithLocationWithAddress(WorkLog.UpsertWithLocationWithAddress values);
 
         IEnumerable<WorkLog.UpsertWithLocationWithAddress> GetSyncWorkLogWithLocationWithAddress();
+
+        [Sync]
+        void SyncEmployeeWithAddressId(Employee.SyncWithAddressId value);
 
         //update
         [Update(TableName = nameof(Employee))]

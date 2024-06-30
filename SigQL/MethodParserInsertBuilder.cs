@@ -168,12 +168,18 @@ namespace SigQL
                     );
 
                     builderAstCollection.RegisterReference(upsertTableRelations.TableRelations.TargetTable, InsertBuilderAstCollection.AstReferenceSource.Merge, merge);
-                    statement.Add(merge);
+                    
+                    // only insert the values if columns other than the PK are specified
+                    if ((!(upsertTableRelations.TableRelations.Argument is TypeArgument) &&
+                        !upsertTableRelations.ColumnParameters.All(c =>
+                            upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.All(
+                                pkc => ColumnEqualityComparer.Default.Equals(c.Column, pkc)))
+                        ) || (upsertTableRelations.TableRelations.Argument is TypeArgument && upsertTableRelations.TableRelations.Argument.Type == typeof(void)))
+                    {
+                        statement.Add(merge);
+                    }
 
-                    if (upsertTableRelations.TableRelations.TargetTable.PrimaryKey != null 
-                        //&& 
-                        //(FindRootArgument(upsertTableRelations.TableRelations.Argument).Type != typeof(void))
-                        )
+                    if (upsertTableRelations.TableRelations.TargetTable.PrimaryKey != null)
                     {
                         var updateLookupTablePKsStatement = BuildUpdateLookupStatement(upsertTableRelations.TableRelations);
                         if (updateLookupTablePKsStatement != null)

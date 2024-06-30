@@ -24,6 +24,11 @@ namespace SigQL.Tests.Common.Databases.Labor
             int Id { get;}
         }
 
+        public class AddressId
+        {
+            public int Id { get; set; }
+        }
+
         public interface IAddressFields
         {
             int Id { get;}
@@ -34,11 +39,6 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             public int Id { get; set; }
             public string StreetAddress { get; set; }
-        }
-
-        public interface IId
-        {
-            int Id { get;}
         }
 
         public interface IAddressWithClassification
