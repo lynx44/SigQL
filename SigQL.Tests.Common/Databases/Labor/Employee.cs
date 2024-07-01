@@ -99,6 +99,12 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<WorkLog.SyncFields> WorkLogs { get; set; }
         }
 
+        public class SyncIdsWithWorkLogIds
+        {
+            public int? Id { get; set; }
+            public IEnumerable<WorkLog.WorkLogIdPoco> WorkLogs { get; set; }
+        }
+
         public class SyncFieldsWithAddresses
         {
             public int? Id { get; set; }
@@ -111,6 +117,19 @@ namespace SigQL.Tests.Common.Databases.Labor
             public int? Id { get; set; }
             public string Name { get; set; }
             public IEnumerable<Address.UpsertWithLocation> Addresses { get; set; }
+        }
+
+        public class SyncWithAddressId
+        {
+            public int? Id { get; set; }
+            public IEnumerable<Address.AddressId> Addresses { get; set; }
+        }
+
+        public class SyncWithAddressIdViaRelationEF
+        {
+            public int? Id { get; set; }
+            [ViaRelation("Employee->EFAddressEFEmployee", "AddressesId")]
+            public IEnumerable<int> AddressIds { get; set; }
         }
 
         public interface IEmployeeWithAddresses

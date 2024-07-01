@@ -55,13 +55,21 @@ namespace SigQL
                 if (updateLookupIdsAst != null)
                 {
                     var updateLookupIdsAstIndex = builderAstCollection.Statements.IndexOf(updateLookupIdsAst);
-                    if (upsertTableRelations.TableRelations.Argument is TableArgument ||
-                        upsertTableRelations.TableRelations.Argument.Type != typeof(void))
+                    if ((upsertTableRelations.TableRelations.Argument is TableArgument ||
+                        upsertTableRelations.TableRelations.Argument.Type != typeof(void)))
                     {
-                        var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations,
-                            GetLookupTableName(upsertTableRelations.TableRelations));
-                        AppendWhereClauseToUpdateStatement(updateFromLookupStatement, targetTable, upsertTableRelations);
-                        builderAstCollection.Statements.Insert(updateLookupIdsAstIndex + 1, updateFromLookupStatement);
+                        // only update the values if columns other than the PK are specified
+                        if (!(upsertTableRelations.TableRelations.Argument is TypeArgument) && !upsertTableRelations.ColumnParameters.All(c =>
+                                upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.All(
+                                    pkc => ColumnEqualityComparer.Default.Equals(c.Column, pkc))))
+                        {
+                            var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations,
+                                GetLookupTableName(upsertTableRelations.TableRelations));
+                            AppendWhereClauseToUpdateStatement(updateFromLookupStatement, targetTable,
+                                upsertTableRelations);
+                            builderAstCollection.Statements.Insert(updateLookupIdsAstIndex + 1,
+                                updateFromLookupStatement);
+                        }
                     }
                     else
                     // many to many - no need to do an update
