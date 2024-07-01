@@ -125,6 +125,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<Address.AddressId> Addresses { get; set; }
         }
 
+        public class SyncWithAddressIdViaRelationEF
+        {
+            public int? Id { get; set; }
+            [ViaRelation("Employee->EFAddressEFEmployee", "AddressesId")]
+            public IEnumerable<int> AddressIds { get; set; }
+        }
+
         public interface IEmployeeWithAddresses
         {
             int Id { get; set; }

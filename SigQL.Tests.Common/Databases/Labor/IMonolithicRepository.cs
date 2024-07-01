@@ -353,6 +353,8 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         [Sync]
         void SyncEmployeeWithAddressId(Employee.SyncWithAddressId value);
+        [Sync]
+        void SyncEmployeeWithAddressIdViaRelation(Employee.SyncWithAddressIdViaRelationEF value);
 
         //update
         [Update(TableName = nameof(Employee))]
