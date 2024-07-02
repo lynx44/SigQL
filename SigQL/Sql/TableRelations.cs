@@ -40,7 +40,8 @@ namespace SigQL.Sql
                 TargetTable = this.TargetTable,
                 PrimaryKey = this.PrimaryKey,
                 FunctionParameters = this.FunctionParameters,
-                MasterRelations = masterRelations ?? MasterRelations ?? this
+                MasterRelations = masterRelations ?? MasterRelations ?? this,
+                IsManyToMany = this.IsManyToMany
             };
             var matchingNavigationTables = this.NavigationTables.Select(t => t.Mask(source, filter, filteredTableRelations.MasterRelations)).ToList();
             matchingNavigationTables.ForEach(t => t.Parent = filteredTableRelations);

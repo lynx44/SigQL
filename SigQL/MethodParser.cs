@@ -85,26 +85,29 @@ namespace SigQL
             var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, IEnumerable<string>>();
 
             TableRelations allTableRelations;
-            List<TableRelations> whereClauseRelations;
-            TableRelations orderbyTableRelations;
+            
+            TableRelations projectionTableRelations;
+            List<TableRelations> parameterRelations;
             {
-                var projectionTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TypeArgument(projectionType, this.databaseResolver),
+                projectionTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TypeArgument(projectionType, this.databaseResolver),
                     TableRelationsColumnSource.ReturnType, tablePrimaryKeyDefinitions);
                 //var parametersTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, arguments),
                 //    TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>());
                 
-                whereClauseRelations = arguments.Select(arg => this.databaseResolver.BuildTableRelations(tableDefinition, arg,
+                parameterRelations = arguments.Select(arg => this.databaseResolver.BuildTableRelations(tableDefinition, arg,
                     TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>())).ToList();
-
-                var orderByRelationsList = whereClauseRelations.Select(tr => tr.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.OrderBy)).ToList();
-                orderbyTableRelations = this.databaseResolver.MergeTableRelations(orderByRelationsList.ToArray());
-
+                
                 var allTrs = new List<TableRelations>();
                 allTrs.Add(projectionTableRelations);
-                allTrs.AddRange(whereClauseRelations);
+                allTrs.AddRange(parameterRelations);
                 allTableRelations = this.databaseResolver.MergeTableRelations(
                     allTrs.ToArray());
+                
             }
+
+            List<TableRelations> whereClauseRelations =
+                parameterRelations.Select(tr => tr.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause)).ToList();
+            TableRelations orderbyTableRelations = allTableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.OrderBy);
 
             var selectClauseBuilder = new SelectClauseBuilder(this.databaseResolver);
             var selectTableRelations = allTableRelations.Mask(TableRelationsColumnSource.ReturnType, ColumnFilters.SelectClause);
@@ -130,18 +133,25 @@ namespace SigQL
                 FromClause = fromClause
             };
 
-            var orderByParameters = allTableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.OrderBy);
-            
-            var orderBySpecs = ConvertToOrderBySpecs(arguments, orderByParameters, allTableRelations).ToList();
-            var dynamicOrderByParameterPaths = this.FindDynamicOrderByParameterPaths(arguments);
-            var dynamicOrderBySpecs = ConvertToOrderBySpecs(arguments, dynamicOrderByParameterPaths, primaryTable, allTableRelations);
-
-            orderBySpecs.AddRange(dynamicOrderBySpecs);
-            orderBySpecs = orderBySpecs.OrderBy(o => o.Ordinal).ToList();
-            if (orderBySpecs.Any())
+            var orderBySpecs = new List<OrderBySpec>();
+            if (orderbyTableRelations != null)
             {
-                statement.OrderByClause = BuildOrderByClause(allTableRelations, orderBySpecs, tokens, null);
+                //orderbyTableRelations.MasterRelations = null;
+                //var tableRelationsWithOrderBy = this.databaseResolver.MergeTableRelations(allTableRelations, orderbyTableRelations);
+                var orderByParameters = orderbyTableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.OrderBy);
+
+                orderBySpecs = ConvertToOrderBySpecs(arguments, orderByParameters, orderbyTableRelations).ToList();
+                var dynamicOrderByParameterPaths = this.FindDynamicOrderByParameterPaths(arguments);
+                var dynamicOrderBySpecs = ConvertToOrderBySpecs(arguments, dynamicOrderByParameterPaths, primaryTable, allTableRelations);
+
+                orderBySpecs.AddRange(dynamicOrderBySpecs);
+                orderBySpecs = orderBySpecs.OrderBy(o => o.Ordinal).ToList();
+                if (orderBySpecs.Any())
+                {
+                    statement.OrderByClause = BuildOrderByClause(allTableRelations, orderBySpecs, tokens, null);
+                }
             }
+
 
             // offset functionality
             var offsetParameter = GetParameterPathWithAttribute<OffsetAttribute>(arguments);
@@ -824,6 +834,19 @@ namespace SigQL
 
                      }).ToList()
                 );
+
+                var matchingTrGroup = tableRelationsGroups.FirstOrDefault(trg => trg.Key == columnGroup.Key);
+                if (matchingTrGroup != null)
+                {
+                    columnConditional.AppendArgs(
+                        matchingTrGroup.Select((nt, i) =>
+                        {
+                            return BuildWhereClauseForPerspective(new Alias() { Label = navigationTableAlias }, nt,
+                                $"{navigationTableAliasPostfix}{i}", parameterPaths, tokens);
+                        }).ToList());
+
+                    tableRelationsGroups.Remove(matchingTrGroup);
+                }
             }
 
             foreach (var tableRelationsGroup in tableRelationsGroups)
