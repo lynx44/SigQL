@@ -134,7 +134,7 @@ namespace SigQL
                 var methodArgs = invocation.Method.GetParameters().Select((p, i) => new ParameterArg() { Parameter = p, Value = invocation.Arguments[i] });
                 if (OutputFactory.UnwrapType(sqlStatement.ReturnType) != typeof(void))
                 {
-                    var returnValue = this.materializer.Materialize(
+                    var returnValue = this.materializer.MaterializeAsync(
                         new SqlMethodInvocation() { SqlStatement = sqlStatement },
                         methodArgs);
                     if (sqlStatement.ReturnType.IsTask())
