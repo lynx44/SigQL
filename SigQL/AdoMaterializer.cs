@@ -12,15 +12,25 @@ namespace SigQL
 {
     public interface IQueryMaterializer
     {
-        Task<object> Materialize(SqlMethodInvocation methodInvocation,
+        Task<object> MaterializeAsync(SqlMethodInvocation methodInvocation,
             IEnumerable<ParameterArg> methodArgs);
-        Task<object> Materialize(Type outputType, PreparedSqlStatement sqlStatement);
+        Task<object> MaterializeAsync(Type outputType, PreparedSqlStatement sqlStatement);
 
-        Task<object> Materialize(Type outputType, string commandText);
-        Task<T> Materialize<T>(PreparedSqlStatement sqlStatement);
-        Task<T> Materialize<T>(string commandText);
-        Task<T> Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
-        Task<T> Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
+        Task<object> MaterializeAsync(Type outputType, string commandText);
+        Task<T> MaterializeAsync<T>(PreparedSqlStatement sqlStatement);
+        Task<T> MaterializeAsync<T>(string commandText);
+        Task<T> MaterializeAsync<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
+        Task<T> MaterializeAsync<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
+
+        object Materialize(SqlMethodInvocation methodInvocation,
+            IEnumerable<ParameterArg> methodArgs);
+        object Materialize(Type outputType, PreparedSqlStatement sqlStatement);
+
+        object Materialize(Type outputType, string commandText);
+        T Materialize<T>(PreparedSqlStatement sqlStatement);
+        T Materialize<T>(string commandText);
+        T Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
+        T Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
     }
 
     public class AdoMaterializer : IQueryMaterializer
@@ -34,7 +44,7 @@ namespace SigQL
             this.sqlLogger = sqlLogger;
         }
 
-        public Task<object> Materialize(SqlMethodInvocation methodInvocation,
+        public Task<object> MaterializeAsync(SqlMethodInvocation methodInvocation,
             IEnumerable<ParameterArg> methodArgs)
         {
             var statement = methodInvocation.SqlStatement.GetPreparedStatement(methodArgs);
@@ -46,36 +56,36 @@ namespace SigQL
             return Materialize(statement, targetTablePrimaryKey, tablePrimaryKeyDefinitions, returnType);
         }
         
-        public Task<object> Materialize(Type outputType, PreparedSqlStatement sqlStatement)
+        public Task<object> MaterializeAsync(Type outputType, PreparedSqlStatement sqlStatement)
         {
             return Materialize(sqlStatement, new EmptyTableKeyDefinition(), sqlStatement.PrimaryKeyColumns?.ToGroup() ?? new ConcurrentDictionary<string, IEnumerable<string>>(), outputType);
         }
 
-        public Task<object> Materialize(Type outputType, string commandText)
+        public Task<object> MaterializeAsync(Type outputType, string commandText)
         {
-            return Materialize(outputType, new PreparedSqlStatement() {CommandText = commandText, Parameters = new Dictionary<string, object>() });
+            return MaterializeAsync(outputType, new PreparedSqlStatement() {CommandText = commandText, Parameters = new Dictionary<string, object>() });
         }
 
-        public async Task<T> Materialize<T>(PreparedSqlStatement sqlStatement)
+        public async Task<T> MaterializeAsync<T>(PreparedSqlStatement sqlStatement)
         {
-            return (T) (await Materialize(typeof(T), sqlStatement));
+            return (T) (await MaterializeAsync(typeof(T), sqlStatement));
         }
 
-        public Task<T> Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
+        public Task<T> MaterializeAsync<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
         {
             var preparedSqlStatement = new PreparedSqlStatement(commandText, parameters.ToDictionary(), primaryKeys);
-            return Materialize<T>(preparedSqlStatement);
+            return MaterializeAsync<T>(preparedSqlStatement);
         }
 
-        public Task<T> Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
+        public Task<T> MaterializeAsync<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
         {
             var preparedSqlStatement = new PreparedSqlStatement(commandText, parameters, primaryKeys);
-            return Materialize<T>(preparedSqlStatement);
+            return MaterializeAsync<T>(preparedSqlStatement);
         }
 
-        public Task<T> Materialize<T>(string commandText)
+        public Task<T> MaterializeAsync<T>(string commandText)
         {
-            return Materialize<T>(commandText, new { });
+            return MaterializeAsync<T>(commandText, new { });
         }
 
         private class EmptyTableKeyDefinition : ITableKeyDefinition
@@ -223,6 +233,41 @@ namespace SigQL
             }
 
             return result;
+        }
+
+        public object Materialize(SqlMethodInvocation methodInvocation, IEnumerable<ParameterArg> methodArgs)
+        {
+            return this.MaterializeAsync(methodInvocation, methodArgs).GetAwaiter().GetResult();
+        }
+
+        public object Materialize(Type outputType, PreparedSqlStatement sqlStatement)
+        {
+            return this.MaterializeAsync(outputType, sqlStatement).GetAwaiter().GetResult();
+        }
+
+        public object Materialize(Type outputType, string commandText)
+        {
+            return this.MaterializeAsync(outputType, commandText).GetAwaiter().GetResult();
+        }
+
+        public T Materialize<T>(PreparedSqlStatement sqlStatement)
+        {
+            return this.MaterializeAsync<T>(sqlStatement).GetAwaiter().GetResult();
+        }
+
+        public T Materialize<T>(string commandText)
+        {
+            return this.MaterializeAsync<T>(commandText).GetAwaiter().GetResult();
+        }
+
+        public T Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
+        {
+            return this.MaterializeAsync<T>(commandText, parameters, primaryKeys).GetAwaiter().GetResult();
+        }
+
+        public T Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
+        {
+            return this.MaterializeAsync<T>(commandText, parameters, primaryKeys).GetAwaiter().GetResult();
         }
     }
 }
