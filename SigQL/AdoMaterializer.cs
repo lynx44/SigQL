@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Linq;
+using System.Threading.Tasks;
 using SigQL.Extensions;
 using SigQL.Schema;
 
@@ -11,15 +12,15 @@ namespace SigQL
 {
     public interface IQueryMaterializer
     {
-        object Materialize(SqlMethodInvocation methodInvocation,
+        Task<object> Materialize(SqlMethodInvocation methodInvocation,
             IEnumerable<ParameterArg> methodArgs);
-        object Materialize(Type outputType, PreparedSqlStatement sqlStatement);
+        Task<object> Materialize(Type outputType, PreparedSqlStatement sqlStatement);
 
-        object Materialize(Type outputType, string commandText);
-        T Materialize<T>(PreparedSqlStatement sqlStatement);
-        T Materialize<T>(string commandText);
-        T Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
-        T Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
+        Task<object> Materialize(Type outputType, string commandText);
+        Task<T> Materialize<T>(PreparedSqlStatement sqlStatement);
+        Task<T> Materialize<T>(string commandText);
+        Task<T> Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
+        Task<T> Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null);
     }
 
     public class AdoMaterializer : IQueryMaterializer
@@ -33,7 +34,7 @@ namespace SigQL
             this.sqlLogger = sqlLogger;
         }
 
-        public object Materialize(SqlMethodInvocation methodInvocation,
+        public Task<object> Materialize(SqlMethodInvocation methodInvocation,
             IEnumerable<ParameterArg> methodArgs)
         {
             var statement = methodInvocation.SqlStatement.GetPreparedStatement(methodArgs);
@@ -45,34 +46,34 @@ namespace SigQL
             return Materialize(statement, targetTablePrimaryKey, tablePrimaryKeyDefinitions, returnType);
         }
         
-        public object Materialize(Type outputType, PreparedSqlStatement sqlStatement)
+        public Task<object> Materialize(Type outputType, PreparedSqlStatement sqlStatement)
         {
             return Materialize(sqlStatement, new EmptyTableKeyDefinition(), sqlStatement.PrimaryKeyColumns?.ToGroup() ?? new ConcurrentDictionary<string, IEnumerable<string>>(), outputType);
         }
 
-        public object Materialize(Type outputType, string commandText)
+        public Task<object> Materialize(Type outputType, string commandText)
         {
             return Materialize(outputType, new PreparedSqlStatement() {CommandText = commandText, Parameters = new Dictionary<string, object>() });
         }
 
-        public T Materialize<T>(PreparedSqlStatement sqlStatement)
+        public async Task<T> Materialize<T>(PreparedSqlStatement sqlStatement)
         {
-            return (T) Materialize(typeof(T), sqlStatement);
+            return (T) (await Materialize(typeof(T), sqlStatement));
         }
 
-        public T Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
+        public Task<T> Materialize<T>(string commandText, object parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
         {
             var preparedSqlStatement = new PreparedSqlStatement(commandText, parameters.ToDictionary(), primaryKeys);
             return Materialize<T>(preparedSqlStatement);
         }
 
-        public T Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
+        public Task<T> Materialize<T>(string commandText, IDictionary<string, object> parameters, PrimaryKeyQuerySpecifierCollection primaryKeys = null)
         {
             var preparedSqlStatement = new PreparedSqlStatement(commandText, parameters, primaryKeys);
             return Materialize<T>(preparedSqlStatement);
         }
 
-        public T Materialize<T>(string commandText)
+        public Task<T> Materialize<T>(string commandText)
         {
             return Materialize<T>(commandText, new { });
         }
@@ -87,7 +88,7 @@ namespace SigQL
             }
         }
 
-        private object Materialize(PreparedSqlStatement statement, ITableKeyDefinition targetTablePrimaryKey,
+        private async Task<object> Materialize(PreparedSqlStatement statement, ITableKeyDefinition targetTablePrimaryKey,
             IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions, Type returnType)
         {
             RowValueCollection rowValueCollection;
@@ -107,7 +108,7 @@ namespace SigQL
             }
             
 
-            using (var reader = queryExecutor.ExecuteReader(statement.CommandText, statement.Parameters))
+            using (var reader = await queryExecutor.ExecuteReaderAsync(statement.CommandText, statement.Parameters))
             {
                 rowValueCollection = ReadRowValues(reader, tablePrimaryKeyDefinitions.Keys.Any(k => k == string.Empty) ? tablePrimaryKeyDefinitions[""].ToList() : new List<string>(),
                     tablePrimaryKeyDefinitions);
@@ -123,6 +124,18 @@ namespace SigQL
 
             object result = outputInvocations;
 
+            if (returnType.IsTask())
+            {
+                if (returnType.IsGenericType)
+                {
+                    returnType = returnType.GetGenericArguments().First();
+                }
+                else
+                {
+                    returnType = typeof(void);
+                }
+                
+            }
             result = OutputFactory.Cast(result, returnType);
 
             return result;

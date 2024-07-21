@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using SigQL.Types;
 using SigQL.Types.Attributes;
 
@@ -10,6 +11,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeFields> GetAllEmployeeFields();
         Employee.IEmployeeFields Get(int id);
         IEnumerable<WorkLog> GetWorkLogs();
+        Task<IEnumerable<WorkLog>> GetWorkLogsAsync();
         WorkLog.IAliasedWorkLogId GetWithAliasedColumnName(int id);
         MyWorkLog GetWithSqlIdentifierAttribute();
         MyWorkLogWithEmployee GetNavigationPropertyWithSqlIdentifierAttribute();
@@ -323,6 +325,8 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         [Sync]
         void SyncEmployeeWithWorkLogs(Employee.SyncFieldsWithWorkLogs employees);
+        [Sync]
+        Task SyncEmployeeWithWorkLogsAsync(Employee.SyncFieldsWithWorkLogs employees);
         [Sync]
         void SyncEmployeeIdWithWorkLogIds(Employee.SyncIdsWithWorkLogIds employees);
 

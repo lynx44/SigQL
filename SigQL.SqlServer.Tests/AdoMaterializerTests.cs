@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -38,13 +39,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_RawSql()
+        public async Task Materialize_RawSql()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize(typeof(IEnumerable<WorkLog.IWorkLogId>), new PreparedSqlStatement()
+            var result = await materializer.Materialize(typeof(IEnumerable<WorkLog.IWorkLogId>), new PreparedSqlStatement()
             {
                 CommandText = "select Id from WorkLog"
             });
@@ -56,13 +57,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_RawSql_WithParameters()
+        public async Task Materialize_RawSql_WithParameters()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize(typeof(IEnumerable<WorkLog.IWorkLogId>), new PreparedSqlStatement(
+            var result = await materializer.Materialize(typeof(IEnumerable<WorkLog.IWorkLogId>), new PreparedSqlStatement(
                 "select Id from WorkLog where Id in (@id1, @id2)", 
                 new
                 {
@@ -77,13 +78,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_RawSql_GenericTypeArg()
+        public async Task Materialize_RawSql_GenericTypeArg()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(new PreparedSqlStatement()
+            var result = await materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(new PreparedSqlStatement()
             {
                 CommandText = "select Id from WorkLog"
             });
@@ -93,13 +94,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_RawSql_CommandTextAndArgsOverload()
+        public async Task Materialize_RawSql_CommandTextAndArgsOverload()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
+            var result = await materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
                 "select Id from WorkLog where Id in (@id1, @id2)",
                 new
                 {
@@ -112,13 +113,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_RawSql_UsingSelectListBuilder()
+        public async Task Materialize_RawSql_UsingSelectListBuilder()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
+            var result = await materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
                 $"{selectClauseBuilder.Build<IEnumerable<WorkLog.IWorkLogId>>().AsText} from WorkLog where Id in (@id1, @id2)",
                 new
                 {
@@ -131,13 +132,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_IList()
+        public async Task Materialize_IList()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize(typeof(IList<WorkLog.IWorkLogId>), new PreparedSqlStatement()
+            var result = await materializer.Materialize(typeof(IList<WorkLog.IWorkLogId>), new PreparedSqlStatement()
             {
                 CommandText = "select Id from WorkLog"
             });
@@ -149,13 +150,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_List()
+        public async Task Materialize_List()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize(typeof(List<WorkLog.IWorkLogId>), new PreparedSqlStatement()
+            var result = await materializer.Materialize(typeof(List<WorkLog.IWorkLogId>), new PreparedSqlStatement()
             {
                 CommandText = "select Id from WorkLog"
             });
@@ -167,13 +168,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_Array()
+        public async Task Materialize_Array()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize(typeof(WorkLog.IWorkLogId[]), new PreparedSqlStatement()
+            var result = await materializer.Materialize(typeof(WorkLog.IWorkLogId[]), new PreparedSqlStatement()
             {
                 CommandText = "select Id from WorkLog"
             });
@@ -185,13 +186,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_ReadOnlyCollection()
+        public async Task Materialize_ReadOnlyCollection()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize(typeof(ReadOnlyCollection<WorkLog.IWorkLogId>), new PreparedSqlStatement()
+            var result = await materializer.Materialize(typeof(ReadOnlyCollection<WorkLog.IWorkLogId>), new PreparedSqlStatement()
             {
                 CommandText = "select Id from WorkLog"
             });
@@ -203,13 +204,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_IReadOnlyCollection()
+        public async Task Materialize_IReadOnlyCollection()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize(typeof(IReadOnlyCollection<WorkLog.IWorkLogId>), new PreparedSqlStatement()
+            var result = await materializer.Materialize(typeof(IReadOnlyCollection<WorkLog.IWorkLogId>), new PreparedSqlStatement()
             {
                 CommandText = "select Id from WorkLog"
             });
@@ -221,13 +222,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_DictionaryArgument_ConvertNullToDbNull()
+        public async Task Materialize_DictionaryArgument_ConvertNullToDbNull()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize(typeof(IEnumerable<WorkLog.IWorkLogId>), new PreparedSqlStatement()
+            var result = await materializer.Materialize(typeof(IEnumerable<WorkLog.IWorkLogId>), new PreparedSqlStatement()
             {
                 CommandText = "select Id from WorkLog where StartDate is null or StartDate=@startDate",
                 Parameters = new Dictionary<string, object>()
@@ -243,13 +244,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_DynamicArgument_ConvertNullToDbNull()
+        public async Task Materialize_DynamicArgument_ConvertNullToDbNull()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
+            var result = await materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
                 "select Id from WorkLog where StartDate is null or StartDate=@startDate",
                 new
                 {
@@ -263,13 +264,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_NoParameters()
+        public async Task Materialize_NoParameters()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize(typeof(IEnumerable<WorkLog.IWorkLogId>),
+            var result = await materializer.Materialize(typeof(IEnumerable<WorkLog.IWorkLogId>),
                 "select Id from WorkLog");
 
             Assert.IsTrue(result is IEnumerable<WorkLog.IWorkLogId>);
@@ -279,13 +280,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_GenericType_NoParameters()
+        public async Task Materialize_GenericType_NoParameters()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
+            var result = await materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
                 "select Id from WorkLog");
 
             Assert.IsTrue(result is IEnumerable<WorkLog.IWorkLogId>);
@@ -295,13 +296,13 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_GenericType_DictionaryArgument()
+        public async Task Materialize_GenericType_DictionaryArgument()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
             this.laborDbContext.WorkLog.AddRange(expected);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
+            var result = await materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
                 "select Id from WorkLog where Id = @id", new Dictionary<string, object>()
                 {
                     {"id", 2}
@@ -314,7 +315,7 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_PreparedSqlStatement_SpecifyPrimaryKeys()
+        public async Task Materialize_PreparedSqlStatement_SpecifyPrimaryKeys()
         {
 
             var addresses = Enumerable.Range(1, 3).Select(i => new EFAddress() { StreetAddress = "123 fake st" }).ToList();
@@ -323,7 +324,7 @@ namespace SigQL.SqlServer.Tests
             this.laborDbContext.Employee.AddRange(employees);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize<IEnumerable<Employee.IEmployeeWithAddresses>>(new PreparedSqlStatement()
+            var result = await materializer.Materialize<IEnumerable<Employee.IEmployeeWithAddresses>>(new PreparedSqlStatement()
             {
                 CommandText = @"select Employee.Id, Address.Id ""Addresses.Id"", Address.StreetAddress ""Addresses.StreetAddress"" from Employee 
                               inner join EFAddressEFEmployee on EFAddressEFEmployee.EmployeesId=Employee.Id
@@ -338,7 +339,7 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_QueryWithEmptyDynamicParameters_SpecifyPrimaryKeys()
+        public async Task Materialize_QueryWithEmptyDynamicParameters_SpecifyPrimaryKeys()
         {
 
             var addresses = Enumerable.Range(1, 3).Select(i => new EFAddress() { StreetAddress = "123 fake st" }).ToList();
@@ -347,7 +348,7 @@ namespace SigQL.SqlServer.Tests
             this.laborDbContext.Employee.AddRange(employees);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize<IEnumerable<Employee.IEmployeeWithAddresses>>(
+            var result = await materializer.Materialize<IEnumerable<Employee.IEmployeeWithAddresses>>(
                 @"select Employee.Id, Address.Id ""Addresses.Id"", Address.StreetAddress ""Addresses.StreetAddress"" from Employee 
                               inner join EFAddressEFEmployee on EFAddressEFEmployee.EmployeesId=Employee.Id
                               inner join Address on EFAddressEFEmployee.AddressesId=Address.Id",
@@ -362,7 +363,7 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void Materialize_QueryWithEmptyDictionaryParameters_SpecifyPrimaryKeys()
+        public async Task Materialize_QueryWithEmptyDictionaryParameters_SpecifyPrimaryKeys()
         {
 
             var addresses = Enumerable.Range(1, 3).Select(i => new EFAddress() { StreetAddress = "123 fake st" }).ToList();
@@ -371,7 +372,7 @@ namespace SigQL.SqlServer.Tests
             this.laborDbContext.Employee.AddRange(employees);
             this.laborDbContext.SaveChanges();
 
-            var result = materializer.Materialize<IEnumerable<Employee.IEmployeeWithAddresses>>(
+            var result = await materializer.Materialize<IEnumerable<Employee.IEmployeeWithAddresses>>(
                 @"select Employee.Id, Address.Id ""Addresses.Id"", Address.StreetAddress ""Addresses.StreetAddress"" from Employee 
                               inner join EFAddressEFEmployee on EFAddressEFEmployee.EmployeesId=Employee.Id
                               inner join Address on EFAddressEFEmployee.AddressesId=Address.Id",

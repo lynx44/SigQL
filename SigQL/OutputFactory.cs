@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using SigQL.Extensions;
 
 namespace SigQL
@@ -12,6 +13,16 @@ namespace SigQL
         public static Type UnwrapType(Type type)
         {
             var columnOutputType = type;
+
+            if (columnOutputType.IsTask())
+            {
+                if (columnOutputType.IsGenericType)
+                {
+                    return UnwrapType(columnOutputType.GetGenericArguments().First());
+                }
+
+                return typeof(void);
+            }
 
             if (columnOutputType.IsCollectionType())
             {

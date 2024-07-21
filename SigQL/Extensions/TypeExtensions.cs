@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace SigQL.Extensions
 {
@@ -27,6 +28,11 @@ namespace SigQL.Extensions
         {
             return type.IsArray || 
                    (type.IsGenericType && (type.GetGenericTypeDefinition().IsAssignableFrom(typeof(IEnumerable<>)) || type.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>))));
+        }
+
+        public static bool IsTask(this Type type)
+        {
+            return type == typeof(Task) || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>));
         }
     }
 }

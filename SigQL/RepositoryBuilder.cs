@@ -1,7 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Castle.DynamicProxy;
+using SigQL.Extensions;
 using SigQL.Schema;
+using SigQL.Utilities;
 
 namespace SigQL
 {
@@ -128,17 +132,34 @@ namespace SigQL
                 var methodParser = new MethodParser(new SqlStatementBuilder(), databaseConfiguration, pluralizationHelper);
                 var sqlStatement = methodParser.SqlFor(invocation.Method);
                 var methodArgs = invocation.Method.GetParameters().Select((p, i) => new ParameterArg() { Parameter = p, Value = invocation.Arguments[i] });
-                if (sqlStatement.ReturnType != typeof(void))
+                if (OutputFactory.UnwrapType(sqlStatement.ReturnType) != typeof(void))
                 {
-                    invocation.ReturnValue = this.materializer.Materialize(
-                            new SqlMethodInvocation() { SqlStatement = sqlStatement },
-                            methodArgs);
+                    var returnValue = this.materializer.Materialize(
+                        new SqlMethodInvocation() { SqlStatement = sqlStatement },
+                        methodArgs);
+                    if (sqlStatement.ReturnType.IsTask())
+                    {
+                        var convertedTaskReturnValue = new TaskConverter(sqlStatement.ReturnType.GetGenericArguments().FirstOrDefault()).ConvertReturnType(returnValue);
+                        invocation.ReturnValue = convertedTaskReturnValue;
+                    }
+                    else
+                    {
+                        invocation.ReturnValue = returnValue.GetAwaiter().GetResult();
+                    }
                 }
                 else
                 {
                     var statement = sqlStatement.GetPreparedStatement(methodArgs);
                     this.sqlLogger?.Invoke(statement);
-                    this.queryExecutor.ExecuteNonQuery(statement.CommandText, statement.Parameters);
+                    var taskResult = this.queryExecutor.ExecuteNonQueryAsync(statement.CommandText, statement.Parameters);
+                    if (sqlStatement.ReturnType.IsTask())
+                    {
+                        invocation.ReturnValue = taskResult;
+                    }
+                    else
+                    {
+                        taskResult.GetAwaiter().GetResult();
+                    }
                 }
             }
         }

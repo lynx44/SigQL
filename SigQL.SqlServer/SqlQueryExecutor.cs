@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
 namespace SigQL.SqlServer
@@ -14,24 +15,24 @@ namespace SigQL.SqlServer
             this.connectionFactory = connectionFactory;
         }
 
-        public IDataReader ExecuteReader(string commandText)
+        public async Task<IDataReader> ExecuteReaderAsync(string commandText)
         {
             var sqlConnection = (SqlConnection) this.connectionFactory();
             sqlConnection.Open();
             var command = new SqlCommand(commandText, sqlConnection);
-            return command.ExecuteReader(CommandBehavior.CloseConnection);
+            return await command.ExecuteReaderAsync(CommandBehavior.CloseConnection);
         }
 
-        public IDataReader ExecuteReader(string commandText, IDictionary<string, object> parameters)
+        public async Task<IDataReader> ExecuteReaderAsync(string commandText, IDictionary<string, object> parameters)
         {
             var sqlConnection = (SqlConnection) this.connectionFactory();
             sqlConnection.Open();
             var command = GetSqlCommand(sqlConnection, commandText, parameters);
 
-            return command.ExecuteReader(CommandBehavior.CloseConnection);
+            return await command.ExecuteReaderAsync(CommandBehavior.CloseConnection);
         }
 
-        public void ExecuteNonQuery(string commandText, IDictionary<string, object> parameters)
+        public async Task<int> ExecuteNonQueryAsync(string commandText, IDictionary<string, object> parameters)
         {
             var sqlConnection = (SqlConnection) this.connectionFactory();
             try
@@ -39,7 +40,7 @@ namespace SigQL.SqlServer
                 sqlConnection.Open();
                 var command = GetSqlCommand(sqlConnection, commandText, parameters);
 
-                command.ExecuteNonQuery();
+                return await command.ExecuteNonQueryAsync();
             }
             finally
             {

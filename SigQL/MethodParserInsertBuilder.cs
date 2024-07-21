@@ -1128,9 +1128,9 @@ namespace SigQL
                 }
                 else
                 {
-                    if (methodInfo.ReturnType != typeof(void))
+                    if (OutputFactory.UnwrapType(methodInfo.ReturnType) != typeof(void))
                     {
-                        insertSpec.Table = this.databaseResolver.DetectTable(methodInfo.ReturnType);
+                        insertSpec.Table = this.databaseResolver.DetectTable(OutputFactory.UnwrapType(methodInfo.ReturnType));
                     }
                     else if(this.databaseResolver.IsTableOrTableProjection(methodInfo.GetParameters().First().ParameterType))
                     {
