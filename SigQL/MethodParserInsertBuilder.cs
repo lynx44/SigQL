@@ -583,29 +583,46 @@ namespace SigQL
                                 var min = Math.Min(orderedParametersForInsert.MinOrDefault(p => p.Index, 0), parentIndexMappings.MinOrDefault(p => p.InsertedIndex, 0));
                                 var max = Math.Max(orderedParametersForInsert.MaxOrDefault(p => p.Index, 0), parentIndexMappings.MaxOrDefault(p => p.InsertedIndex, 0));
                                 indexRange = Enumerable.Range(min, max + 1);
+                                mergeValuesParametersList.SetArgs(indexRange.Select(i =>
+                                {
+                                    return new ValuesList().SetArgs(
+
+                                        GetForeignKeyColumns(insertTableRelations)
+                                            .Select(cp =>
+                                            {
+                                                var sqlParameterName = $"{insertTableRelations.TableRelations.TableName}_{cp.Name}{i}";
+                                                var parameterValue = orderedParametersForInsert.FirstOrDefault(p => p.Argument.Name == cp.Name && p.Index == i);
+                                                sqlParameters[sqlParameterName] = parameterValue?.Value ?? DBNull.Value;
+                                                return new NamedParameterIdentifier()
+                                                {
+                                                    Name = sqlParameterName
+                                                };
+                                            }).Cast<AstNode>().AppendOne(new Literal() { Value = i.ToString() })
+                                            .Concat<AstNode>(
+                                                OrderIndexReferences(insertTableRelations, parentIndexMappings)
+                                                    .Where(p => p.InsertedIndex == i)
+                                                    .Select(p =>
+                                                        new Literal() { Value = p.PrimaryTableIndex.ToString() }).ToList()));
+                                }));
+                            }
+                            else
+                            {
+                                lookupParameterTableInsert.ValuesList = null;
+                                lookupParameterTableInsert.SetArgs(new Select()
+                                {
+                                    SelectClause = new SelectClause().SetArgs(
+                                        lookupParameterTableInsert.ColumnList.Select(c => new Literal() { Value = "null" }).ToList()
+                                    ),
+                                    WhereClause = new WhereClause().SetArgs(
+                                        new EqualsOperator().SetArgs(
+                                            new Literal() { Value = "1" },
+                                            new Literal() { Value = "0" }
+                                        )
+                                    )
+                                });
                             }
                             
-                            mergeValuesParametersList.SetArgs(indexRange.Select(i =>
-                            {
-                                return new ValuesList().SetArgs(
-
-                                    GetForeignKeyColumns(insertTableRelations)
-                                        .Select(cp =>
-                                        {
-                                            var sqlParameterName = $"{insertTableRelations.TableRelations.TableName}_{cp.Name}{i}";
-                                            var parameterValue = orderedParametersForInsert.FirstOrDefault(p => p.Argument.Name == cp.Name && p.Index == i);
-                                            sqlParameters[sqlParameterName] = parameterValue?.Value ?? DBNull.Value;
-                                            return new NamedParameterIdentifier()
-                                            {
-                                                Name = sqlParameterName
-                                            };
-                                        }).Cast<AstNode>().AppendOne(new Literal() { Value = i.ToString() })
-                                        .Concat<AstNode>(
-                                            OrderIndexReferences(insertTableRelations, parentIndexMappings)
-                                                .Where(p => p.InsertedIndex == i)
-                                                .Select(p =>
-                                                    new Literal() { Value = p.PrimaryTableIndex.ToString() }).ToList()));
-                            }));
+                            
                         }
 
                         return sqlParameters;

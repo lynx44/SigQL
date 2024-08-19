@@ -5299,6 +5299,42 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Sync_ManyToMany_EmptyCollection_ClearsRows()
+        {
+            var sqlCommand = new SqlCommand(@"ALTER TABLE EFAddressEFEmployee DROP CONSTRAINT PK_EFAddressEFEmployee;", (this.laborDbConnection as SqlConnection));
+            DatabaseHelpers.RunCommand(sqlCommand);
+            ConfigureSigQL();
+
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                        new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                    }
+                }
+            };
+
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncManyToManyEmployeeWithAddresses(
+                    new Employee.SyncFieldsWithAddresses()
+                    {
+                        Id = 1,
+                        Name = "Kyle",
+                        Addresses = new List<Address.UpsertFields>()
+                    });
+            
+            var actual = this.monolithicRepository.GetSyncManyToManyEmployeeWithAddresses();
+
+            Assert.AreEqual(0, actual.Single().Addresses.Count());
+        }
+
+        [TestMethod]
         public void Sync_IdClassesOnly_ManyToManyPrimaryKeyFromForeignKeyNavigationProperty()
         {
             var insertFields = new EFEmployee[]
