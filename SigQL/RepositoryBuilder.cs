@@ -134,31 +134,35 @@ namespace SigQL
                 var methodArgs = invocation.Method.GetParameters().Select((p, i) => new ParameterArg() { Parameter = p, Value = invocation.Arguments[i] });
                 if (OutputFactory.UnwrapType(sqlStatement.ReturnType) != typeof(void))
                 {
-                    var returnValue = this.materializer.MaterializeAsync(
-                        new SqlMethodInvocation() { SqlStatement = sqlStatement },
-                        methodArgs);
+                    
                     if (sqlStatement.ReturnType.IsTask())
                     {
+                        var returnValue = this.materializer.MaterializeAsync(
+                            new SqlMethodInvocation() { SqlStatement = sqlStatement },
+                            methodArgs);
                         var convertedTaskReturnValue = new TaskConverter(sqlStatement.ReturnType.GetGenericArguments().FirstOrDefault()).ConvertReturnType(returnValue);
                         invocation.ReturnValue = convertedTaskReturnValue;
                     }
                     else
                     {
-                        invocation.ReturnValue = returnValue.GetAwaiter().GetResult();
+                        invocation.ReturnValue = this.materializer.Materialize(
+                            new SqlMethodInvocation() { SqlStatement = sqlStatement },
+                            methodArgs); ;
                     }
                 }
                 else
                 {
                     var statement = sqlStatement.GetPreparedStatement(methodArgs);
                     this.sqlLogger?.Invoke(statement);
-                    var taskResult = this.queryExecutor.ExecuteNonQueryAsync(statement.CommandText, statement.Parameters);
+                    
                     if (sqlStatement.ReturnType.IsTask())
                     {
+                        var taskResult = this.queryExecutor.ExecuteNonQueryAsync(statement.CommandText, statement.Parameters);
                         invocation.ReturnValue = taskResult;
                     }
                     else
                     {
-                        taskResult.GetAwaiter().GetResult();
+                        this.queryExecutor.ExecuteNonQuery(statement.CommandText, statement.Parameters);
                     }
                 }
             }

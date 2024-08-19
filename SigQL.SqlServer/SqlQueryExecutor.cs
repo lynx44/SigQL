@@ -32,6 +32,15 @@ namespace SigQL.SqlServer
             return await command.ExecuteReaderAsync(CommandBehavior.CloseConnection);
         }
 
+        public IDataReader ExecuteReader(string commandText, IDictionary<string, object> parameters)
+        {
+            var sqlConnection = (SqlConnection)this.connectionFactory();
+            sqlConnection.Open();
+            var command = GetSqlCommand(sqlConnection, commandText, parameters);
+
+            return command.ExecuteReader(CommandBehavior.CloseConnection);
+        }
+
         public async Task<int> ExecuteNonQueryAsync(string commandText, IDictionary<string, object> parameters)
         {
             var sqlConnection = (SqlConnection) this.connectionFactory();
@@ -41,6 +50,22 @@ namespace SigQL.SqlServer
                 var command = GetSqlCommand(sqlConnection, commandText, parameters);
 
                 return await command.ExecuteNonQueryAsync();
+            }
+            finally
+            {
+                sqlConnection.Close();
+            }
+        }
+
+        public int ExecuteNonQuery(string commandText, IDictionary<string, object> parameters)
+        {
+            var sqlConnection = (SqlConnection)this.connectionFactory();
+            try
+            {
+                sqlConnection.Open();
+                var command = GetSqlCommand(sqlConnection, commandText, parameters);
+
+                return command.ExecuteNonQuery();
             }
             finally
             {
