@@ -9,10 +9,16 @@ namespace SigQL.SqlServer
     public class SqlQueryExecutor : IQueryExecutor
     {
         private readonly Func<IDbConnection> connectionFactory;
+        private readonly Func<SqlCommand, SqlCommand> commandAction;
 
         public SqlQueryExecutor(Func<IDbConnection> connectionFactory)
         {
             this.connectionFactory = connectionFactory;
+        }
+        public SqlQueryExecutor(Func<IDbConnection> connectionFactory, Func<SqlCommand, SqlCommand> commandAction)
+        {
+            this.connectionFactory = connectionFactory;
+            this.commandAction = commandAction;
         }
 
         public async Task<IDataReader> ExecuteReaderAsync(string commandText)
@@ -81,6 +87,11 @@ namespace SigQL.SqlServer
                 {
                     command.Parameters.AddWithValue($"@{parameterKey}", parameters[parameterKey]);
                 }
+
+            if (commandAction != null)
+            {
+                command = commandAction(command);
+            }
 
             return command;
         }
