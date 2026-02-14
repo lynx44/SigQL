@@ -6023,6 +6023,74 @@ namespace SigQL.SqlServer.Tests
 
         #endregion
 
+        #region KeyColumns
+
+        [TestMethod]
+        public void Upsert_WithKeyColumns_MatchesByName()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Lester" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeeByName(
+                new Employee.UpsertFieldsByName[]
+                {
+                    new Employee.UpsertFieldsByName() { Name = "Mike" },
+                    new Employee.UpsertFieldsByName() { Name = "NewGuy" }
+                });
+
+            var actual = laborDbContext.Employee.AsNoTracking().ToList();
+            Assert.AreEqual(3, actual.Count);
+            Assert.IsTrue(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            Assert.IsTrue(actual.Any(e => e.Name == "NewGuy"));
+        }
+
+        [TestMethod]
+        public void UpdateByKey_WithKeyColumns_MatchesByName()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Lester" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyEmployeeByName(
+                new Employee.UpdateByKeyFieldsByName[]
+                {
+                    new Employee.UpdateByKeyFieldsByName() { Id = 999, Name = "Mike" },
+                });
+
+            var actual = laborDbContext.Employee.AsNoTracking().ToList();
+            var mike = actual.Single(e => e.Name == "Mike");
+            Assert.AreEqual(999, mike.Id);
+        }
+
+        [TestMethod]
+        public void Sync_WithKeyColumns_MatchesByName()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Kyle" });
+            laborDbContext.SaveChanges();
+            laborDbContext.WorkLog.Add(new EFWorkLog() { EmployeeId = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) });
+            laborDbContext.WorkLog.Add(new EFWorkLog() { EmployeeId = 1, StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeeByNameWithWorkLogs(
+                new Employee.SyncFieldsByNameWithWorkLogs()
+                {
+                    Name = "Kyle",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.SyncFields() { Id = 1, StartDate = new DateTime(2022, 1, 1), EndDate = new DateTime(2022, 1, 2) }
+                    }
+                });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Include(e => e.WorkLogs).Single();
+            Assert.AreEqual("Kyle", actual.Name);
+            Assert.AreEqual(1, actual.WorkLogs.Count);
+            Assert.AreEqual(new DateTime(2022, 1, 1), actual.WorkLogs.First().StartDate);
+        }
+
+        #endregion
+
         #region Abstract Class
 
         [TestMethod]

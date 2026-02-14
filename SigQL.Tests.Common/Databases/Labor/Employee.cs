@@ -280,6 +280,25 @@ namespace SigQL.Tests.Common.Databases.Labor
             [OrGroup]
             public Address.AddressStreetAddress Address { get; set; }
         }
+
+        public class UpsertFieldsByName
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+        }
+
+        public class UpdateByKeyFieldsByName
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+        }
+
+        public class SyncFieldsByNameWithWorkLogs
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public IEnumerable<WorkLog.SyncFields> WorkLogs { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(Employee))]

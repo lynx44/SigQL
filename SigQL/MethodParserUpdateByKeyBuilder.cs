@@ -121,7 +121,7 @@ namespace SigQL
         private Update BuildUpdateFromLookupStatement(UpsertTableRelations upsertTableRelations, string lookupTableName)
         {
             var targetTable = upsertTableRelations.TableRelations.TargetTable;
-            var primaryKeyColumns = targetTable.PrimaryKey.Columns;
+            var primaryKeyColumns = upsertTableRelations.KeyColumns ?? targetTable.PrimaryKey.Columns;
             var foreignValueLookupStatements = BuildForeignValueLookupStatements(upsertTableRelations, lookupTableName);
             var ast = new Update()
             {

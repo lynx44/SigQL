@@ -169,10 +169,11 @@ namespace SigQL
 
                     builderAstCollection.RegisterReference(upsertTableRelations.TableRelations.TargetTable, InsertBuilderAstCollection.AstReferenceSource.Merge, merge);
                     
-                    // only insert the values if columns other than the PK are specified
+                    // only insert the values if columns other than the key columns are specified
+                    var insertKeyColumns = upsertTableRelations.KeyColumns ?? upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns;
                     if ((!(upsertTableRelations.TableRelations.Argument is TypeArgument) &&
                         !upsertTableRelations.ColumnParameters.All(c =>
-                            upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.All(
+                            insertKeyColumns.All(
                                 pkc => ColumnEqualityComparer.Default.Equals(c.Column, pkc)))
                         ) || (upsertTableRelations.TableRelations.Argument is TypeArgument && upsertTableRelations.TableRelations.Argument.Type == typeof(void)))
                     {
@@ -1168,9 +1169,29 @@ namespace SigQL
                     TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>());
 
 
+                if (!string.IsNullOrEmpty(upsertAttribute.KeyColumns))
+                {
+                    var keyColumnNames = upsertAttribute.KeyColumns.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+                    var resolvedKeyColumns = new List<IColumnDefinition>();
+                    foreach (var colName in keyColumnNames)
+                    {
+                        var col = insertSpec.Table.Columns.FirstOrDefault(c => string.Equals(c.Name, colName, StringComparison.OrdinalIgnoreCase));
+                        if (col == null)
+                        {
+                            throw new InvalidOperationException($"KeyColumns: column '{colName}' not found on table '{insertSpec.Table.Name}'.");
+                        }
+                        resolvedKeyColumns.Add(col);
+                    }
+                    insertSpec.KeyColumns = resolvedKeyColumns;
+                }
+                else
+                {
+                    insertSpec.KeyColumns = insertSpec.Table.PrimaryKey?.Columns;
+                }
+
                 var dependencyOrderedTableRelations = GetInsertTableRelationsOrderedByDependencies(parameterTableRelations).ToList();
-                insertSpec.UpsertTableRelationsCollection = dependencyOrderedTableRelations.Select(tr => ToInsertTableRelations(tr, dependencyOrderedTableRelations)).ToList();
-                
+                insertSpec.UpsertTableRelationsCollection = dependencyOrderedTableRelations.Select(tr => ToInsertTableRelations(tr, dependencyOrderedTableRelations, insertSpec)).ToList();
+
                 insertSpec.ReturnType = methodInfo.ReturnType;
                 insertSpec.UnwrappedReturnType = OutputFactory.UnwrapType(methodInfo.ReturnType);
                 insertSpec.RootMethodInfo = methodInfo;
@@ -1202,7 +1223,7 @@ namespace SigQL
             return null;
         }
 
-        private UpsertTableRelations ToInsertTableRelations(TableRelations parameterTableRelations, List<TableRelations> dependencyList)
+        private UpsertTableRelations ToInsertTableRelations(TableRelations parameterTableRelations, List<TableRelations> dependencyList, UpsertSpec upsertSpec)
         {
             var insertRelations = new UpsertTableRelations();
             insertRelations.ColumnParameters = parameterTableRelations.ProjectedColumns.SelectMany(pc =>
@@ -1220,6 +1241,16 @@ namespace SigQL
             ).ToList();
             insertRelations.ForeignTableColumns = GetRequiredForeignKeys(parameterTableRelations, dependencyList);
             insertRelations.TableRelations = parameterTableRelations;
+
+            // Only apply custom KeyColumns to the root table; child tables use their own PK
+            if (TableEqualityComparer.Default.Equals(parameterTableRelations.TargetTable, upsertSpec.Table))
+            {
+                insertRelations.KeyColumns = upsertSpec.KeyColumns;
+            }
+            else
+            {
+                insertRelations.KeyColumns = parameterTableRelations.TargetTable.PrimaryKey?.Columns;
+            }
 
             return insertRelations;
         }
@@ -1305,9 +1336,9 @@ namespace SigQL
         {
             public IList<UpsertColumnParameter> ColumnParameters { get; set; }
             public TableRelations TableRelations { get; set; }
-            
+
             public IEnumerable<ForeignTableColumn> ForeignTableColumns { get; set; }
-            
+            public IEnumerable<IColumnDefinition> KeyColumns { get; set; }
         }
 
         private static string GetLookupTableName(TableRelations tableRelations)
@@ -1346,7 +1377,8 @@ namespace SigQL
             public Type UnwrappedReturnType { get; set; }
             public MethodInfo RootMethodInfo { get; set; }
             public bool IsSingular { get; set; }
-            
+            public IEnumerable<IColumnDefinition> KeyColumns { get; set; }
+
             public List<UpsertTableRelations> UpsertTableRelationsCollection { get; set; }
         }
         

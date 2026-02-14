@@ -58,9 +58,10 @@ namespace SigQL
                     if ((upsertTableRelations.TableRelations.Argument is TableArgument ||
                         upsertTableRelations.TableRelations.Argument.Type != typeof(void)))
                     {
-                        // only update the values if columns other than the PK are specified
+                        // only update the values if columns other than the key columns are specified
+                        var upsertKeyColumns = upsertTableRelations.KeyColumns ?? upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns;
                         if (!(upsertTableRelations.TableRelations.Argument is TypeArgument) && !upsertTableRelations.ColumnParameters.All(c =>
-                                upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.All(
+                                upsertKeyColumns.All(
                                     pkc => ColumnEqualityComparer.Default.Equals(c.Column, pkc))))
                         {
                             var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations,
@@ -86,15 +87,11 @@ namespace SigQL
         private static void AppendWhereClauseToUpdateStatement(Update updateFromLookupStatement, ITableDefinition targetTable,
             UpsertTableRelations upsertTableRelations)
         {
-            if ((targetTable.PrimaryKey?.Columns?.Any()).GetValueOrDefault(false))
+            var keyColumns = upsertTableRelations.KeyColumns ?? targetTable.PrimaryKey?.Columns;
+            if (keyColumns?.Any() == true)
             {
                 updateFromLookupStatement.WhereClause ??= new WhereClause();
                 updateFromLookupStatement.WhereClause.Args ??= new List<AstNode>();
-                // where not exists
-                // (select 1 from "Employee"
-                // inner join @insertedEmployee "insertedEmployee"
-                // on "Employee"."Id" = "insertedEmployee"."Id"
-                // where "EmployeeLookup"."Id" = "insertedEmployee"."Id")
                 updateFromLookupStatement.WhereClause.Args =
                     updateFromLookupStatement.WhereClause.Args.AppendOne(
                         new NotExists().SetArgs(
@@ -119,7 +116,7 @@ namespace SigQL
                                                     )
                                             }.SetArgs(
                                                 new AndOperator().SetArgs(
-                                                    targetTable.PrimaryKey.Columns.Select(c =>
+                                                    keyColumns.Select(c =>
                                                         new EqualsOperator().SetArgs(
                                                             new ColumnIdentifier().SetArgs(
                                                                 new RelationalTable()
@@ -150,7 +147,7 @@ namespace SigQL
                                     ),
                                 WhereClause = new WhereClause().SetArgs(
                                     new AndOperator().SetArgs(
-                                        targetTable.PrimaryKey.Columns.Select(c =>
+                                        keyColumns.Select(c =>
                                             new EqualsOperator().SetArgs(
                                                 new ColumnIdentifier().SetArgs(
                                                     new RelationalTable()
@@ -552,19 +549,15 @@ namespace SigQL
         private static void ModifyOneToManyMergeSelectStatement(ITableDefinition targetTable,
             UpsertTableRelations upsertTableRelations, Select mergeSelectStatement)
         {
-            //where("Id" is null /* and "CompositeId2" is null */)
-            //or not exists(
-            //  select 1 from "Employee"
-            //  where "Employee"."Id" = "EmployeeLookup"."Id" /*
-            //  and "Employee"."CompositeId2" = "EmployeeLookup"."CompositeId2" */)
-            if ((targetTable.PrimaryKey?.Columns?.Any()).GetValueOrDefault(false))
+            var keyColumns = upsertTableRelations.KeyColumns ?? targetTable.PrimaryKey?.Columns;
+            if (keyColumns?.Any() == true)
             {
                 mergeSelectStatement.WhereClause ??= new WhereClause();
                 mergeSelectStatement.WhereClause.Args ??= new List<AstNode>();
                 mergeSelectStatement.WhereClause.Args =
                     mergeSelectStatement.WhereClause.Args.AppendOne(
                         new OrOperator().SetArgs(
-                            targetTable.PrimaryKey.Columns.Select(c =>
+                            keyColumns.Select(c =>
                                 (AstNode)
                                 new AndOperator().SetArgs(
                                     new IsOperator().SetArgs(
@@ -594,7 +587,7 @@ namespace SigQL
                                         ),
                                         WhereClause = new WhereClause().SetArgs(
                                             new AndOperator().SetArgs(
-                                                targetTable.PrimaryKey.Columns.Select(c =>
+                                                keyColumns.Select(c =>
                                                     new EqualsOperator().SetArgs(
                                                         new ColumnIdentifier().SetArgs(
                                                             new RelationalTable()

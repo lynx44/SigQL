@@ -384,6 +384,16 @@ namespace SigQL.Tests.Common.Databases.Labor
         [UpdateByKey]
         void UpdateByKeyMultipleEmployeesWithWorkLogs(IEnumerable<Employee.UpdateByKeyFieldsWithWorkLogs> employees);
 
+        // KeyColumns
+        [Upsert(TableName = nameof(Employee), KeyColumns = "Name")]
+        void UpsertEmployeeByName(IEnumerable<Employee.UpsertFieldsByName> employees);
+
+        [UpdateByKey(TableName = nameof(Employee), KeyColumns = "Name")]
+        void UpdateByKeyEmployeeByName(IEnumerable<Employee.UpdateByKeyFieldsByName> employees);
+
+        [Sync(KeyColumns = "Name")]
+        void SyncEmployeeByNameWithWorkLogs(Employee.SyncFieldsByNameWithWorkLogs employees);
+
         // delete
         [Delete(TableName = nameof(Employee))]
         void DeleteEmployeeWithAttributeTableNameWithValuesByParams(string name);

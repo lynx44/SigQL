@@ -36,9 +36,9 @@ namespace SigQL
                                 TableEqualityComparer.Default.Equals(nt.ForeignKeyToParent.PrimaryKeyTable,
                                     tableRelations.TargetTable)).ToList();
                             var dependentDeletes = dependentTables.Select(dt =>
-                                BuildOneToManyDeleteStatement(tableRelations, parentRelations, dt)).ToList();
+                                BuildOneToManyDeleteStatement(tableRelations, parentRelations, upsertRelation.KeyColumns, dt)).ToList();
                             builderAstCollection.Statements.AddRange(dependentDeletes);
-                            var deleteStatement = BuildOneToManyDeleteStatement(tableRelations, parentRelations);
+                            var deleteStatement = BuildOneToManyDeleteStatement(tableRelations, parentRelations, upsertRelation.KeyColumns);
                             builderAstCollection.Statements.Add(deleteStatement);
                         }
                         else
@@ -291,7 +291,7 @@ namespace SigQL
         }
 
         private static AstNode BuildOneToManyDeleteStatement(TableRelations tableRelations, TableRelations parentRelations,
-            TableRelations joinSubject = null)
+            IEnumerable<IColumnDefinition> keyColumns, TableRelations joinSubject = null)
         {
             // if this is the one side of a one-to-many relationship, then don't delete
             if (TableEqualityComparer.Default.Equals(tableRelations.TargetTable,
@@ -403,7 +403,7 @@ namespace SigQL
                                     )),
                                 WhereClause = new WhereClause().SetArgs(
                                     new AndOperator().SetArgs(
-                                        tableRelations.TargetTable.PrimaryKey.Columns.Select(pk =>
+                                        (keyColumns ?? tableRelations.TargetTable.PrimaryKey.Columns).Select(pk =>
                                             new EqualsOperator().SetArgs(
                                                 new ColumnIdentifier().SetArgs(
                                                     new RelationalTable()
