@@ -4405,6 +4405,66 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Update_IgnoreIfNull_WithNonNullValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateEmployeeNameIgnoreIfNull("Bob", 1);
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Update_IgnoreIfNull_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateEmployeeNameIgnoreIfNull(null, 1);
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Update_IgnoreIfNullOrEmpty_WithNonEmptyValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateEmployeeNameIgnoreIfNullOrEmpty("Bob", 1);
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Update_IgnoreIfNullOrEmpty_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateEmployeeNameIgnoreIfNullOrEmpty(null, 1);
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Update_IgnoreIfNullOrEmpty_WithEmptyValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateEmployeeNameIgnoreIfNullOrEmpty("", 1);
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
         public void Upsert_Multiple()
         {
             var insertFields = new Employee.InsertFieldsWithWorkLogs[]
