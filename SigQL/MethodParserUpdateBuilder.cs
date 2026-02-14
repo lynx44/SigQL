@@ -39,10 +39,7 @@ namespace SigQL
                                 {
                                     Label = c.Column.Name
                                 }),
-                            new NamedParameterIdentifier()
-                            {
-                                Name = c.ParameterPath.SqlParameterName
-                            }
+                            BuildSetValueExpression(c)
                         )),
                 FromClause = new FromClause().SetArgs(new TableIdentifier().SetArgs(new RelationalTable()
                 { Label = primaryTable.Name })),
@@ -66,6 +63,35 @@ namespace SigQL
             return sqlStatement;
         }
 
+        private AstNode BuildSetValueExpression(UpdateColumnParameter c)
+        {
+            var paramNode = new NamedParameterIdentifier()
+            {
+                Name = c.ParameterPath.SqlParameterName
+            };
+
+            if (c.IgnoreIfNullOrEmpty)
+            {
+                return new Function() { Name = "IsNull" }.SetArgs(
+                    new Function() { Name = "NullIf" }.SetArgs(
+                        paramNode,
+                        new Literal() { Value = "''" }
+                    ),
+                    new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Column.Name })
+                );
+            }
+
+            if (c.IgnoreIfNull)
+            {
+                return new Function() { Name = "IsNull" }.SetArgs(
+                    paramNode,
+                    new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Column.Name })
+                );
+            }
+
+            return paramNode;
+        }
+
         private UpdateSpec GetUpdateSpec(MethodInfo methodInfo)
         {
             var updateAttribute = methodInfo.GetCustomAttributes(typeof(UpdateAttribute), false).Cast<UpdateAttribute>().FirstOrDefault();
@@ -82,6 +108,8 @@ namespace SigQL
                 
                 updateSpec.SetColumnParameters = setParameters.SelectMany(c =>
                 {
+                    var parentIgnoreIfNull = c.GetCustomAttribute<IgnoreIfNullAttribute>() != null;
+                    var parentIgnoreIfNullOrEmpty = c.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null;
                     if (this.databaseResolver.IsTableOrTableProjection(c.Type))
                     {
                         return c.ClassProperties.Select(pr => new UpdateColumnParameter()
@@ -90,7 +118,9 @@ namespace SigQL
                             ParameterPath = new ParameterPath(pr)
                             {
                                 SqlParameterName = $"{c.Name}{pr.Name}"
-                            }
+                            },
+                            IgnoreIfNull = parentIgnoreIfNull || pr.GetCustomAttribute<IgnoreIfNullAttribute>() != null,
+                            IgnoreIfNullOrEmpty = parentIgnoreIfNullOrEmpty || pr.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null
                         });
                     }
                     return new UpdateColumnParameter()
@@ -99,7 +129,9 @@ namespace SigQL
                         ParameterPath = new ParameterPath(c)
                         {
                             SqlParameterName = c.Name
-                        }
+                        },
+                        IgnoreIfNull = parentIgnoreIfNull,
+                        IgnoreIfNullOrEmpty = parentIgnoreIfNullOrEmpty
                     }.AsEnumerable();
                 }).ToList();
 
@@ -126,6 +158,8 @@ namespace SigQL
         {
             public IColumnDefinition Column { get; set; }
             public ParameterPath ParameterPath { get; set; }
+            public bool IgnoreIfNull { get; set; }
+            public bool IgnoreIfNullOrEmpty { get; set; }
         }
     }
 }

@@ -2155,6 +2155,22 @@ update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDat
         }
 
         [TestMethod]
+        public void Update_Void_WithIgnoreIfNull_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateEmployeeNameIgnoreIfNull("bob", 1));
+
+            AssertSqlEqual("update \"Employee\" set \"Name\" = IsNull(@name,\"Name\") from \"Employee\" where (\"Employee\".\"Id\" = @id);", sql);
+        }
+
+        [TestMethod]
+        public void Update_Void_WithIgnoreIfNullOrEmpty_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateEmployeeNameIgnoreIfNullOrEmpty("bob", 1));
+
+            AssertSqlEqual("update \"Employee\" set \"Name\" = IsNull(NullIf(@name,''),\"Name\") from \"Employee\" where (\"Employee\".\"Id\" = @id);", sql);
+        }
+
+        [TestMethod]
         public void Update_Void_WithMultipleSetFields_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.UpdateAllWorkLogsStartDateAndEndDate(DateTime.Today, DateTime.Today));

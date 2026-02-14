@@ -372,6 +372,10 @@ namespace SigQL.Tests.Common.Databases.Labor
         //void UpdateAllWorkLogsStartDateAndEndDateSetAndFilterClass(WorkLog.SetDatesWithIdFilter workLog);
         [Update(TableName = nameof(Employee))]
         void UpdateEmployeeById([Set] string name, int id);
+        [Update(TableName = nameof(Employee))]
+        void UpdateEmployeeNameIgnoreIfNull([Set][IgnoreIfNull] string name, int id);
+        [Update(TableName = nameof(Employee))]
+        void UpdateEmployeeNameIgnoreIfNullOrEmpty([Set][IgnoreIfNullOrEmpty] string name, int id);
 
         // UpdateByKey
 
