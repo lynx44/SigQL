@@ -2702,19 +2702,18 @@ insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @empl
 merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where ((""Name"" is null) or not exists (select 1 from ""Employee"" where (""Employee"".""Name"" = ""EmployeeLookup"".""Name"")))) as i (""Id"",""Name"",""_index"") on (1 = 0)
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
-update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
-update ""Employee"" set ""Id"" = ""EmployeeLookup"".""Id"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Name"" = ""Employee"".""Name"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Name"" = ""insertedEmployee"".""Name"") where (""EmployeeLookup"".""Name"" = ""insertedEmployee"".""Name""));", sql);
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");", sql);
         }
 
         [TestMethod]
         public void UpdateByKey_WithKeyColumns_UsesSpecifiedKeyColumnsInSql()
         {
-            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateByKeyEmployeeByName(
-                new Employee.UpdateByKeyFieldsByName[] { new Employee.UpdateByKeyFieldsByName() { Id = 1, Name = "bob" } }));
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateByKeyWorkLogByStartDate(
+                new WorkLog.UpdateByKeyFieldsByStartDate[] { new WorkLog.UpdateByKeyFieldsByStartDate() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) } }));
 
-            AssertSqlEqual(@"declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
-insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
-update ""Employee"" set ""Id"" = ""EmployeeLookup"".""Id"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Name"" = ""Employee"".""Name"");", sql);
+            AssertSqlEqual(@"declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int)
+insert @WorkLogLookup(""StartDate"", ""EndDate"", ""_index"") values(@workLogsStartDate0, @workLogsEndDate0, 0)
+update ""WorkLog"" set ""EndDate"" = ""WorkLogLookup"".""EndDate"" from ""WorkLog"" inner join @WorkLogLookup ""WorkLogLookup"" on (""WorkLogLookup"".""StartDate"" = ""WorkLog"".""StartDate"");", sql);
         }
 
         [TestMethod]
@@ -2723,7 +2722,6 @@ update ""Employee"" set ""Id"" = ""EmployeeLookup"".""Id"" from ""Employee"" inn
             var sql = GetSqlForCall(() => this.monolithicRepository.SyncEmployeeByNameWithWorkLogs(
                 new Employee.SyncFieldsByNameWithWorkLogs()
                 {
-                    Id = 1,
                     Name = "Kyle",
                     WorkLogs = new[]
                     {
@@ -2739,7 +2737,6 @@ merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLook
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
-update ""Employee"" set ""Id"" = ""EmployeeLookup"".""Id"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Name"" = ""Employee"".""Name"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Name"" = ""insertedEmployee"".""Name"") where (""EmployeeLookup"".""Name"" = ""insertedEmployee"".""Name""));
 declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
 insert @WorkLogLookup(""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") values(@employeesWorkLogs_Id0, @employeesWorkLogs_StartDate0, @employeesWorkLogs_EndDate0, 0, 0)
 merge ""WorkLog"" using (select ""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"" from @WorkLogLookup ""WorkLogLookup"" where ((""Id"" is null) or not exists (select 1 from ""WorkLog"" where (""WorkLog"".""Id"" = ""WorkLogLookup"".""Id"")))) as i (""Id"",""StartDate"",""EndDate"",""_index"",""EmployeeId_index"") on (1 = 0)

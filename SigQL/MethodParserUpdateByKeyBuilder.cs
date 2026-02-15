@@ -125,12 +125,12 @@ namespace SigQL
             var foreignValueLookupStatements = BuildForeignValueLookupStatements(upsertTableRelations, lookupTableName);
             var ast = new Update()
             {
-                SetClause = 
+                SetClause =
                     upsertTableRelations.ColumnParameters
                         .Where(c =>
                         {
-                            
-                            return !primaryKeyColumns.Any(pkc =>
+                            return !c.Column.IsIdentity &&
+                                !primaryKeyColumns.Any(pkc =>
                                     ColumnEqualityComparer.Default.Equals(c.Column, pkc));
                         })
                         .Select(c => new SetEqualOperator()

@@ -540,6 +540,12 @@ namespace SigQL.Tests.Common.Databases.Labor
             [OrGroup]
             public Location.LocationName Location { get; set; }
         }
+
+        public class UpdateByKeyFieldsByStartDate
+        {
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

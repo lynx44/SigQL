@@ -6355,7 +6355,8 @@ namespace SigQL.SqlServer.Tests
                 {
                     new Employee.UpsertFieldsByName() { Name = "Mike" },
                     new Employee.UpsertFieldsByName() { Name = "NewGuy" }
-                });
+                }
+            );
 
             var actual = laborDbContext.Employee.AsNoTracking().ToList();
             Assert.AreEqual(3, actual.Count);
@@ -6365,21 +6366,25 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
-        public void UpdateByKey_WithKeyColumns_MatchesByName()
+        public void UpdateByKey_WithKeyColumns_MatchesByStartDate()
         {
             laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
-            laborDbContext.Employee.Add(new EFEmployee() { Name = "Lester" });
+            laborDbContext.SaveChanges();
+            laborDbContext.WorkLog.Add(new EFWorkLog() { EmployeeId = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) });
+            laborDbContext.WorkLog.Add(new EFWorkLog() { EmployeeId = 1, StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) });
             laborDbContext.SaveChanges();
 
-            this.monolithicRepository.UpdateByKeyEmployeeByName(
-                new Employee.UpdateByKeyFieldsByName[]
+            this.monolithicRepository.UpdateByKeyWorkLogByStartDate(
+                new WorkLog.UpdateByKeyFieldsByStartDate[]
                 {
-                    new Employee.UpdateByKeyFieldsByName() { Id = 999, Name = "Mike" },
+                    new WorkLog.UpdateByKeyFieldsByStartDate() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2099, 12, 31) },
                 });
 
-            var actual = laborDbContext.Employee.AsNoTracking().ToList();
-            var mike = actual.Single(e => e.Name == "Mike");
-            Assert.AreEqual(999, mike.Id);
+            var actual = laborDbContext.WorkLog.AsNoTracking().ToList();
+            var updated = actual.Single(w => w.StartDate == new DateTime(2021, 1, 1));
+            Assert.AreEqual(new DateTime(2099, 12, 31), updated.EndDate);
+            var unchanged = actual.Single(w => w.StartDate == new DateTime(2021, 2, 1));
+            Assert.AreEqual(new DateTime(2021, 2, 2), unchanged.EndDate);
         }
 
         [TestMethod]

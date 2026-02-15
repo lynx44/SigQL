@@ -58,10 +58,10 @@ namespace SigQL
                     if ((upsertTableRelations.TableRelations.Argument is TableArgument ||
                         upsertTableRelations.TableRelations.Argument.Type != typeof(void)))
                     {
-                        // only update the values if columns other than the key columns are specified
+                        // only update the values if columns other than the key columns and identity columns are specified
                         var upsertKeyColumns = upsertTableRelations.KeyColumns ?? upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns;
-                        if (!(upsertTableRelations.TableRelations.Argument is TypeArgument) && !upsertTableRelations.ColumnParameters.All(c =>
-                                upsertKeyColumns.All(
+                        if (!(upsertTableRelations.TableRelations.Argument is TypeArgument) && upsertTableRelations.ColumnParameters.Any(c =>
+                                !c.Column.IsIdentity && !upsertKeyColumns.Any(
                                     pkc => ColumnEqualityComparer.Default.Equals(c.Column, pkc))))
                         {
                             var updateFromLookupStatement = BuildUpdateFromLookupStatement(upsertTableRelations,
@@ -88,7 +88,10 @@ namespace SigQL
             UpsertTableRelations upsertTableRelations)
         {
             var keyColumns = upsertTableRelations.KeyColumns ?? targetTable.PrimaryKey?.Columns;
-            if (keyColumns?.Any() == true)
+            // The @inserted table only contains the primary key columns (from OUTPUT inserted),
+            // so the not-exists subquery must always join on PK columns, not custom key columns.
+            var insertedTableColumns = targetTable.PrimaryKey?.Columns;
+            if (keyColumns?.Any() == true && insertedTableColumns?.Any() == true)
             {
                 updateFromLookupStatement.WhereClause ??= new WhereClause();
                 updateFromLookupStatement.WhereClause.Args ??= new List<AstNode>();
@@ -116,7 +119,7 @@ namespace SigQL
                                                     )
                                             }.SetArgs(
                                                 new AndOperator().SetArgs(
-                                                    keyColumns.Select(c =>
+                                                    insertedTableColumns.Select(c =>
                                                         new EqualsOperator().SetArgs(
                                                             new ColumnIdentifier().SetArgs(
                                                                 new RelationalTable()
@@ -147,7 +150,7 @@ namespace SigQL
                                     ),
                                 WhereClause = new WhereClause().SetArgs(
                                     new AndOperator().SetArgs(
-                                        keyColumns.Select(c =>
+                                        insertedTableColumns.Select(c =>
                                             new EqualsOperator().SetArgs(
                                                 new ColumnIdentifier().SetArgs(
                                                     new RelationalTable()

@@ -393,8 +393,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         [Upsert(TableName = nameof(Employee), KeyColumns = "Name")]
         void UpsertEmployeeByName(IEnumerable<Employee.UpsertFieldsByName> employees);
 
-        [UpdateByKey(TableName = nameof(Employee), KeyColumns = "Name")]
-        void UpdateByKeyEmployeeByName(IEnumerable<Employee.UpdateByKeyFieldsByName> employees);
+        [UpdateByKey(TableName = nameof(WorkLog), KeyColumns = "StartDate")]
+        void UpdateByKeyWorkLogByStartDate(IEnumerable<WorkLog.UpdateByKeyFieldsByStartDate> workLogs);
 
         [Sync(KeyColumns = "Name")]
         void SyncEmployeeByNameWithWorkLogs(Employee.SyncFieldsByNameWithWorkLogs employees);
