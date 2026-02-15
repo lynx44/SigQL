@@ -39,7 +39,7 @@ namespace SigQL
                                 {
                                     Label = c.Column.Name
                                 }),
-                            BuildSetValueExpression(c)
+                            BuildSetValueExpression(c, primaryTable.Name)
                         )),
                 FromClause = new FromClause().SetArgs(new TableIdentifier().SetArgs(new RelationalTable()
                 { Label = primaryTable.Name })),
@@ -63,7 +63,7 @@ namespace SigQL
             return sqlStatement;
         }
 
-        private AstNode BuildSetValueExpression(UpdateColumnParameter c)
+        private AstNode BuildSetValueExpression(UpdateColumnParameter c, string targetTableName)
         {
             var paramNode = new NamedParameterIdentifier()
             {
@@ -77,7 +77,7 @@ namespace SigQL
                         paramNode,
                         new Literal() { Value = "''" }
                     ),
-                    new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Column.Name })
+                    new ColumnIdentifier().SetArgs(new RelationalTable() { Label = targetTableName }, new RelationalColumn() { Label = c.Column.Name })
                 );
             }
 
@@ -85,7 +85,7 @@ namespace SigQL
             {
                 return new Function() { Name = "IsNull" }.SetArgs(
                     paramNode,
-                    new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Column.Name })
+                    new ColumnIdentifier().SetArgs(new RelationalTable() { Label = targetTableName }, new RelationalColumn() { Label = c.Column.Name })
                 );
             }
 

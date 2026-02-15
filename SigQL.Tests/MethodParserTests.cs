@@ -1993,7 +1993,7 @@ merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLook
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
-update ""Employee"" set ""Name"" = IsNull(""EmployeeLookup"".""Name"",""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
+update ""Employee"" set ""Name"" = IsNull(""EmployeeLookup"".""Name"",""Employee"".""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
         }
 
         [TestMethod]
@@ -2009,7 +2009,7 @@ merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLook
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
-update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",''),""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
+update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",''),""Employee"".""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
         }
 
         #endregion
@@ -2164,7 +2164,7 @@ merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLook
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
-update ""Employee"" set ""Name"" = IsNull(""EmployeeLookup"".""Name"",""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
+update ""Employee"" set ""Name"" = IsNull(""EmployeeLookup"".""Name"",""Employee"".""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
         }
 
         [TestMethod]
@@ -2180,7 +2180,7 @@ merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLook
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
-update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",''),""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
+update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",''),""Employee"".""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
         }
 
         #endregion Sync
@@ -2241,7 +2241,7 @@ update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDat
 
             AssertSqlEqual(@"declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
 insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
-update ""Employee"" set ""Name"" = IsNull(""EmployeeLookup"".""Name"",""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"");", sql);
+update ""Employee"" set ""Name"" = IsNull(""EmployeeLookup"".""Name"",""Employee"".""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"");", sql);
         }
 
         [TestMethod]
@@ -2252,7 +2252,7 @@ update ""Employee"" set ""Name"" = IsNull(""EmployeeLookup"".""Name"",""Name"") 
 
             AssertSqlEqual(@"declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
 insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
-update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",''),""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"");", sql);
+update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",''),""Employee"".""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"");", sql);
         }
 
         #endregion UpdateByKey
@@ -2280,7 +2280,7 @@ update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",'')
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.UpdateEmployeeNameIgnoreIfNull("bob", 1));
 
-            AssertSqlEqual("update \"Employee\" set \"Name\" = IsNull(@name,\"Name\") from \"Employee\" where (\"Employee\".\"Id\" = @id);", sql);
+            AssertSqlEqual("update \"Employee\" set \"Name\" = IsNull(@name,\"Employee\".\"Name\") from \"Employee\" where (\"Employee\".\"Id\" = @id);", sql);
         }
 
         [TestMethod]
@@ -2288,7 +2288,7 @@ update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",'')
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.UpdateEmployeeNameIgnoreIfNullOrEmpty("bob", 1));
 
-            AssertSqlEqual("update \"Employee\" set \"Name\" = IsNull(NullIf(@name,''),\"Name\") from \"Employee\" where (\"Employee\".\"Id\" = @id);", sql);
+            AssertSqlEqual("update \"Employee\" set \"Name\" = IsNull(NullIf(@name,''),\"Employee\".\"Name\") from \"Employee\" where (\"Employee\".\"Id\" = @id);", sql);
         }
 
         [TestMethod]

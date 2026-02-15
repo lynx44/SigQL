@@ -140,7 +140,7 @@ namespace SigQL
                                     {
                                         Label = c.Column.Name
                                     }),
-                                BuildUpsertSetValueExpression(c, lookupTableName)
+                                BuildUpsertSetValueExpression(c, lookupTableName, targetTable.Name)
                             )).ToList()
                         .Concat(foreignValueLookupStatements.Select(c => 
                             new SetEqualOperator()
@@ -200,7 +200,7 @@ namespace SigQL
             return ast;
         }
 
-        private AstNode BuildUpsertSetValueExpression(UpsertColumnParameter c, string lookupTableName)
+        private AstNode BuildUpsertSetValueExpression(UpsertColumnParameter c, string lookupTableName, string targetTableName)
         {
             var lookupColumnRef = new ColumnIdentifier().SetArgs(
                 new RelationalTable() { Label = lookupTableName },
@@ -213,6 +213,7 @@ namespace SigQL
                         lookupColumnRef,
                         new Literal() { Value = "''" }),
                     new ColumnIdentifier().SetArgs(
+                        new RelationalTable() { Label = targetTableName },
                         new RelationalColumn() { Label = c.Column.Name }));
             }
 
@@ -221,6 +222,7 @@ namespace SigQL
                 return new Function() { Name = "IsNull" }.SetArgs(
                     lookupColumnRef,
                     new ColumnIdentifier().SetArgs(
+                        new RelationalTable() { Label = targetTableName },
                         new RelationalColumn() { Label = c.Column.Name }));
             }
 
