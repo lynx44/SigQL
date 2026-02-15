@@ -1234,7 +1234,9 @@ namespace SigQL
                         return new UpsertColumnParameter()
                         {
                             Column = pc,
-                            ParameterPath = parameterPath
+                            ParameterPath = parameterPath,
+                            IgnoreIfNull = arg.GetCustomAttribute<IgnoreIfNullAttribute>() != null,
+                            IgnoreIfNullOrEmpty = arg.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null
                         };
                     }
                 )
@@ -1387,6 +1389,8 @@ namespace SigQL
         {
             public IColumnDefinition Column { get; set; }
             public ParameterPath ParameterPath { get; set; }
+            public bool IgnoreIfNull { get; set; }
+            public bool IgnoreIfNullOrEmpty { get; set; }
         }
 
         private class FuncEqualityComparer<T> : IEqualityComparer<T>

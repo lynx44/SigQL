@@ -140,15 +140,7 @@ namespace SigQL
                                     {
                                         Label = c.Column.Name
                                     }),
-                                new ColumnIdentifier().SetArgs(
-                                    new RelationalTable()
-                                    {
-                                        Label = lookupTableName
-                                    },
-                                    new RelationalColumn()
-                                    {
-                                        Label = c.Column.Name
-                                    })
+                                BuildUpsertSetValueExpression(c, lookupTableName)
                             )).ToList()
                         .Concat(foreignValueLookupStatements.Select(c => 
                             new SetEqualOperator()
@@ -206,6 +198,33 @@ namespace SigQL
             }.SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = targetTable.Name }));
 
             return ast;
+        }
+
+        private AstNode BuildUpsertSetValueExpression(UpsertColumnParameter c, string lookupTableName)
+        {
+            var lookupColumnRef = new ColumnIdentifier().SetArgs(
+                new RelationalTable() { Label = lookupTableName },
+                new RelationalColumn() { Label = c.Column.Name });
+
+            if (c.IgnoreIfNullOrEmpty)
+            {
+                return new Function() { Name = "IsNull" }.SetArgs(
+                    new Function() { Name = "NullIf" }.SetArgs(
+                        lookupColumnRef,
+                        new Literal() { Value = "''" }),
+                    new ColumnIdentifier().SetArgs(
+                        new RelationalColumn() { Label = c.Column.Name }));
+            }
+
+            if (c.IgnoreIfNull)
+            {
+                return new Function() { Name = "IsNull" }.SetArgs(
+                    lookupColumnRef,
+                    new ColumnIdentifier().SetArgs(
+                        new RelationalColumn() { Label = c.Column.Name }));
+            }
+
+            return lookupColumnRef;
         }
     }
 }

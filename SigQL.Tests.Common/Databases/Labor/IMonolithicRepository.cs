@@ -394,6 +394,20 @@ namespace SigQL.Tests.Common.Databases.Labor
         [Sync(KeyColumns = "Name")]
         void SyncEmployeeByNameWithWorkLogs(Employee.SyncFieldsByNameWithWorkLogs employees);
 
+        // IgnoreIfNull / IgnoreIfNullOrEmpty
+        [Upsert(TableName = nameof(Employee))]
+        void UpsertEmployeesIgnoreIfNull(IEnumerable<Employee.UpsertFieldsIgnoreIfNull> employees);
+        [Upsert(TableName = nameof(Employee))]
+        void UpsertEmployeesIgnoreIfNullOrEmpty(IEnumerable<Employee.UpsertFieldsIgnoreIfNullOrEmpty> employees);
+        [UpdateByKey(TableName = nameof(Employee))]
+        void UpdateByKeyEmployeesIgnoreIfNull(IEnumerable<Employee.UpdateByKeyFieldsIgnoreIfNull> employees);
+        [UpdateByKey(TableName = nameof(Employee))]
+        void UpdateByKeyEmployeesIgnoreIfNullOrEmpty(IEnumerable<Employee.UpdateByKeyFieldsIgnoreIfNullOrEmpty> employees);
+        [Sync(TableName = nameof(Employee))]
+        void SyncEmployeesIgnoreIfNull(Employee.SyncFieldsIgnoreIfNull employees);
+        [Sync(TableName = nameof(Employee))]
+        void SyncEmployeesIgnoreIfNullOrEmpty(Employee.SyncFieldsIgnoreIfNullOrEmpty employees);
+
         // delete
         [Delete(TableName = nameof(Employee))]
         void DeleteEmployeeWithAttributeTableNameWithValuesByParams(string name);

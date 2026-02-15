@@ -4465,6 +4465,206 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Upsert_IgnoreIfNull_WithNonNullValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNull(new[] { new Employee.UpsertFieldsIgnoreIfNull() { Id = 1, Name = "Bob" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNull_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNull(new[] { new Employee.UpsertFieldsIgnoreIfNull() { Id = 1, Name = null } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNullOrEmpty_WithNonEmptyValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpsertFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "Bob" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNullOrEmpty_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpsertFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = null } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNullOrEmpty_WithEmptyValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpsertFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNull_WithNonNullValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNull(new[] { new Employee.UpdateByKeyFieldsIgnoreIfNull() { Id = 1, Name = "Bob" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNull_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNull(new[] { new Employee.UpdateByKeyFieldsIgnoreIfNull() { Id = 1, Name = null } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNullOrEmpty_WithNonEmptyValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpdateByKeyFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "Bob" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNullOrEmpty_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpdateByKeyFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = null } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNullOrEmpty_WithEmptyValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpdateByKeyFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Sync_IgnoreIfNull_WithNonNullValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeesIgnoreIfNull(new Employee.SyncFieldsIgnoreIfNull() { Id = 1, Name = "Bob" });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Sync_IgnoreIfNull_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeesIgnoreIfNull(new Employee.SyncFieldsIgnoreIfNull() { Id = 1, Name = null });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Sync_IgnoreIfNullOrEmpty_WithNonEmptyValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeesIgnoreIfNullOrEmpty(new Employee.SyncFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "Bob" });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Sync_IgnoreIfNullOrEmpty_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeesIgnoreIfNullOrEmpty(new Employee.SyncFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = null });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Sync_IgnoreIfNullOrEmpty_WithEmptyValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeesIgnoreIfNullOrEmpty(new Employee.SyncFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "" });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNull_MixedNullAndNonNull_UpdatesCorrectly()
+        {
+            laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Mike" },
+                new EFEmployee() { Name = "Jane" }
+            );
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNull(new[]
+            {
+                new Employee.UpsertFieldsIgnoreIfNull() { Id = 1, Name = "Bob" },
+                new Employee.UpsertFieldsIgnoreIfNull() { Id = 2, Name = null }
+            });
+
+            var actual = laborDbContext.Employee.AsNoTracking().OrderBy(e => e.Id).ToList();
+            Assert.AreEqual("Bob", actual[0].Name);
+            Assert.AreEqual("Jane", actual[1].Name);
+        }
+
+        [TestMethod]
         public void Upsert_Multiple()
         {
             var insertFields = new Employee.InsertFieldsWithWorkLogs[]

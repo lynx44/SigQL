@@ -1946,10 +1946,42 @@ merge ""EmployeeAddress"" using (select ""_index"", ""AddressId_index"", ""Emplo
 update ""EmployeeAddressLookup"" set ""AddressId"" = ""insertedEmployeeAddress"".""AddressId"", ""EmployeeId"" = ""insertedEmployeeAddress"".""EmployeeId"" from @EmployeeAddressLookup ""EmployeeAddressLookup"" inner join @insertedEmployeeAddress ""insertedEmployeeAddress"" on (""EmployeeAddressLookup"".""_index"" = ""insertedEmployeeAddress"".""_index"");", sql);
         }
 
+        [TestMethod]
+        public void Upsert_IgnoreIfNull_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpsertEmployeesIgnoreIfNull(
+                new Employee.UpsertFieldsIgnoreIfNull[] { new Employee.UpsertFieldsIgnoreIfNull() { Id = 1, Name = "bob" } }));
+
+            AssertSqlEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where ((""Id"" is null) or not exists (select 1 from ""Employee"" where (""Employee"".""Id"" = ""EmployeeLookup"".""Id"")))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+update ""Employee"" set ""Name"" = IsNull(""EmployeeLookup"".""Name"",""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNullOrEmpty_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpsertEmployeesIgnoreIfNullOrEmpty(
+                new Employee.UpsertFieldsIgnoreIfNullOrEmpty[] { new Employee.UpsertFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "bob" } }));
+
+            AssertSqlEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where ((""Id"" is null) or not exists (select 1 from ""Employee"" where (""Employee"".""Id"" = ""EmployeeLookup"".""Id"")))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",''),""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
+        }
+
         #endregion
 
         #region Sync
-        
+
         [TestMethod]
         public void SyncOneToManyNavigationProperty_Void_ReturnsExpectedSql()
         {
@@ -2085,6 +2117,38 @@ delete ""WorkLog"" from ""Location"" inner join ""WorkLog"" on (""Location"".""I
 delete ""Location"" from ""Location"" where (exists (select 1 from @AddressLookup ""AddressLookup"" where (""AddressLookup"".""Id"" = ""Location"".""AddressId"")) and not exists (select 1 from @LocationLookup ""LocationLookup"" where (""LocationLookup"".""Id"" = ""Location"".""Id"")))", sql);
         }
 
+        [TestMethod]
+        public void Sync_IgnoreIfNull_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SyncEmployeesIgnoreIfNull(
+                new Employee.SyncFieldsIgnoreIfNull() { Id = 1, Name = "bob" }));
+
+            AssertSqlEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where ((""Id"" is null) or not exists (select 1 from ""Employee"" where (""Employee"".""Id"" = ""EmployeeLookup"".""Id"")))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+update ""Employee"" set ""Name"" = IsNull(""EmployeeLookup"".""Name"",""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
+        }
+
+        [TestMethod]
+        public void Sync_IgnoreIfNullOrEmpty_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SyncEmployeesIgnoreIfNullOrEmpty(
+                new Employee.SyncFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "bob" }));
+
+            AssertSqlEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
+merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where ((""Id"" is null) or not exists (select 1 from ""Employee"" where (""Employee"".""Id"" = ""EmployeeLookup"".""Id"")))) as i (""Id"",""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",''),""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"") where not exists (select 1 from ""Employee"" inner join @insertedEmployee ""insertedEmployee"" on (""Employee"".""Id"" = ""insertedEmployee"".""Id"") where (""EmployeeLookup"".""Id"" = ""insertedEmployee"".""Id""));", sql);
+        }
+
         #endregion Sync
 
         #region UpdateByKey
@@ -2135,9 +2199,31 @@ insert @WorkLogLookup(""Id"", ""StartDate"", ""EndDate"", ""_index"", ""Employee
 update ""WorkLog"" set ""StartDate"" = ""WorkLogLookup"".""StartDate"", ""EndDate"" = ""WorkLogLookup"".""EndDate"", ""EmployeeId"" = (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""WorkLogLookup"".""EmployeeId_index"")) from ""WorkLog"" inner join @WorkLogLookup ""WorkLogLookup"" on (""WorkLogLookup"".""Id"" = ""WorkLog"".""Id"");", sql);
         }
 
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNull_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNull(
+                new Employee.UpdateByKeyFieldsIgnoreIfNull[] { new Employee.UpdateByKeyFieldsIgnoreIfNull() { Id = 1, Name = "bob" } }));
+
+            AssertSqlEqual(@"declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
+update ""Employee"" set ""Name"" = IsNull(""EmployeeLookup"".""Name"",""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"");", sql);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNullOrEmpty_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNullOrEmpty(
+                new Employee.UpdateByKeyFieldsIgnoreIfNullOrEmpty[] { new Employee.UpdateByKeyFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "bob" } }));
+
+            AssertSqlEqual(@"declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @employeesName0, 0)
+update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",''),""Name"") from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""EmployeeLookup"".""Id"" = ""Employee"".""Id"");", sql);
+        }
+
         #endregion UpdateByKey
 
-        #region Update 
+        #region Update
 
         [TestMethod]
         public void Update_Void_WithNoFilter_ReturnsExpectedSql()

@@ -287,6 +287,42 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string Name { get; set; }
         }
 
+        public class UpsertFieldsIgnoreIfNull
+        {
+            public int? Id { get; set; }
+            [IgnoreIfNull] public string Name { get; set; }
+        }
+
+        public class UpsertFieldsIgnoreIfNullOrEmpty
+        {
+            public int? Id { get; set; }
+            [IgnoreIfNullOrEmpty] public string Name { get; set; }
+        }
+
+        public class UpdateByKeyFieldsIgnoreIfNull
+        {
+            public int Id { get; set; }
+            [IgnoreIfNull] public string Name { get; set; }
+        }
+
+        public class UpdateByKeyFieldsIgnoreIfNullOrEmpty
+        {
+            public int Id { get; set; }
+            [IgnoreIfNullOrEmpty] public string Name { get; set; }
+        }
+
+        public class SyncFieldsIgnoreIfNull
+        {
+            public int? Id { get; set; }
+            [IgnoreIfNull] public string Name { get; set; }
+        }
+
+        public class SyncFieldsIgnoreIfNullOrEmpty
+        {
+            public int? Id { get; set; }
+            [IgnoreIfNullOrEmpty] public string Name { get; set; }
+        }
+
         public class UpdateByKeyFieldsByName
         {
             public int Id { get; set; }
