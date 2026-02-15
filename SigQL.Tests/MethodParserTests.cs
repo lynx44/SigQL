@@ -1266,6 +1266,40 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void TotalCount_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.TotalCountWorkLogs());
+
+            Assert.AreEqual("select count(1) \"TotalCount\" from (select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\") Subquery", sql);
+        }
+
+        [TestMethod]
+        public void TotalCount_WithOffsetFetch_IgnoresOffsetFetch_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.TotalCountWorkLogsWithOffsetFetch(10, 0));
+
+            Assert.AreEqual("select count(1) \"TotalCount\" from (select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\") Subquery", sql);
+        }
+
+        [TestMethod]
+        public void TotalCountWithResult_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.TotalCountWithResultWorkLogs());
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\"\r\nselect count(1) \"TotalCount\" from (select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\") Subquery", sql);
+        }
+
+        [TestMethod]
+        public void TotalCountWithResult_WithOffsetFetch_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.TotalCountWithResultWorkLogsWithOffsetFetch(10, 0));
+
+            Assert.IsTrue(sql.Contains("offset @offset rows fetch next @fetch rows only"), "Data query should contain offset/fetch");
+            Assert.IsTrue(sql.Contains("select count(1) \"TotalCount\" from"), "Should contain count query");
+            Assert.IsFalse(sql.Substring(sql.IndexOf("select count(1)")).Contains("offset"), "Count query should not contain offset");
+        }
+
+        [TestMethod]
         public void Get_MismatchingPKCase()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeeMismatchingPKCase(1));

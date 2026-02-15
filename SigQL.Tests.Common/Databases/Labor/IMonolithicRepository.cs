@@ -255,6 +255,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Labor.WorkLog.IWorkLogId> SkipTakeWorkLogsByStartDateAndEmployeeName(
             WorkLog.GetByStartDateAndEmployeeNameFilterWithOffsetFetch filter);
         ICountResult<WorkLog.IWorkLogId> CountWorkLogs();
+        ITotalCount<WorkLog.IWorkLogId> TotalCountWorkLogs();
+        ITotalCount<WorkLog.IWorkLogId> TotalCountWorkLogsWithOffsetFetch([Fetch] int fetch, [Offset] int offset);
+        ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> TotalCountWithResultWorkLogs();
+        ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> TotalCountWithResultWorkLogsWithOffsetFetch([Fetch] int fetch, [Offset] int offset);
+        ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> TotalCountWithResultWorkLogsByFilter(WorkLog.FilterWithOffsetFetch filter);
         IEnumerable<DiagnosticLog.IFields> FetchDiagnosticLogs([Fetch] int take);
 
         IEnumerable<WorkLog.IWorkLogToView> GetWithJoinRelationAttribute();

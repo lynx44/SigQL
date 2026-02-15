@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using SigQL.Extensions;
+using SigQL.Types;
 
 namespace SigQL
 {
@@ -22,6 +23,11 @@ namespace SigQL
                 }
 
                 return typeof(void);
+            }
+
+            if (columnOutputType.IsGenericType && columnOutputType.GetGenericTypeDefinition() == typeof(ITotalCountResult<>))
+            {
+                return UnwrapType(columnOutputType.GetGenericArguments().First());
             }
 
             if (columnOutputType.IsCollectionType())

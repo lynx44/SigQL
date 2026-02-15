@@ -81,7 +81,65 @@ namespace SigQL.SqlServer.Tests
 
             Assert.AreEqual(expected.Count, actual.Count);
         }
-        
+
+        [TestMethod]
+        public void TotalCount_ReturnsExpectedCount()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.TotalCountWorkLogs();
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+        }
+
+        [TestMethod]
+        public void TotalCount_IgnoresOffsetFetch()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.TotalCountWorkLogsWithOffsetFetch(2, 1);
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+        }
+
+        [TestMethod]
+        public void TotalCountWithResult_ReturnsDataAndTotalCount()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.TotalCountWithResultWorkLogs();
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+            Assert.AreEqual(expected.Count, actual.Result.Count());
+        }
+
+        [TestMethod]
+        public void TotalCountWithResult_WithOffsetFetch_ReturnsPageAndTotalCount()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.TotalCountWithResultWorkLogsWithOffsetFetch(2, 1);
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+            Assert.AreEqual(2, actual.Result.Count());
+        }
+
+        [TestMethod]
+        public void TotalCountWithResult_WithFilterOffsetFetch()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.TotalCountWithResultWorkLogsByFilter(new WorkLog.FilterWithOffsetFetch() { Offset = 1, Fetch = 2 });
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+            Assert.AreEqual(2, actual.Result.Count());
+        }
+
         [TestMethod]
         public void GetWorkLogs_AvoidsStackOverflow()
         {

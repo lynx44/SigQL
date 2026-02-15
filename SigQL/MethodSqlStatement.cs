@@ -45,6 +45,7 @@ namespace SigQL
         public ITableKeyDefinition TargetTablePrimaryKey { get; set; }
         public IDictionary<string, IEnumerable<string>> TablePrimaryKeyDefinitions { get; set; }
         internal SqlStatementBuilder SqlBuilder { get; set; }
+        internal bool IsTotalCountWithResult { get; set; }
 
         public IDictionary<string, object> GetParameters(IEnumerable<ParameterArg> methodArgs)
         {
