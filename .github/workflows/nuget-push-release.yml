@@ -16,7 +16,7 @@ jobs:
       id: vars
       run: echo "::set-output name=version::$(cat version.txt)"
     - name: Setup .NET
-      uses: actions/setup-dotnet@v1
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
     - name: Restore dependencies
