@@ -1234,6 +1234,33 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void GetViaRelationOnOutputProjection_OneHop_ReturnsExpectedSql()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetEmployeesWithWorkLogFlattened));
+            var sql = GetSqlFor(methodInfo);
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\", \"WorkLog\".\"StartDate\" \"StartDate\", \"WorkLog\".\"EndDate\" \"EndDate\", \"WorkLog\".\"Id\" \"_vr_WorkLog_Id\" from \"Employee\" left outer join \"WorkLog\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
+        }
+
+        [TestMethod]
+        public void GetViaRelationOnOutputProjection_OneHop_Interface_ReturnsExpectedSql()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetEmployeesWithWorkLogFlattenedInterface));
+            var sql = GetSqlFor(methodInfo);
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\", \"WorkLog\".\"StartDate\" \"StartDate\", \"WorkLog\".\"EndDate\" \"EndDate\", \"WorkLog\".\"Id\" \"_vr_WorkLog_Id\" from \"Employee\" left outer join \"WorkLog\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
+        }
+
+        [TestMethod]
+        public void GetViaRelationOnOutputProjection_MultiHop_ReturnsExpectedSql()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetEmployeesWithAddressCityFlattened));
+            var sql = GetSqlFor(methodInfo);
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\", \"Address\".\"City\" \"City\", \"Address\".\"Id\" \"_vr_Address_Id\" from \"Employee\" left outer join \"EmployeeAddress\" on (\"EmployeeAddress\".\"EmployeeId\" = \"Employee\".\"Id\") left outer join \"Address\" on (\"EmployeeAddress\".\"AddressId\" = \"Address\".\"Id\")", sql);
+        }
+
+        [TestMethod]
         public void TableValuedFunction_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.itvf_GetWorkLogsByEmployeeId(2));

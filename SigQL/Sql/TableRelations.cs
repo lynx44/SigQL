@@ -374,6 +374,8 @@ namespace SigQL.Sql
         {
             this.DataTypeDeclaration = dataTypeDeclaration;
         }
+
+        public bool IsFlattenedViaRelationOutput { get; set; }
     }
 
     internal class TableRelationColumnIdentifierDefinition : IColumnDefinition

@@ -336,6 +336,34 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string Name { get; set; }
             public IEnumerable<WorkLog.SyncFields> WorkLogs { get; set; }
         }
+
+        public class EmployeeWithWorkLogFlattened
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            [ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), nameof(WorkLog.StartDate))]
+            public DateTime? StartDate { get; set; }
+            [ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), nameof(WorkLog.EndDate))]
+            public DateTime? EndDate { get; set; }
+        }
+
+        public interface IEmployeeWithWorkLogFlattened
+        {
+            int Id { get; }
+            string Name { get; }
+            [ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), nameof(WorkLog.StartDate))]
+            DateTime? StartDate { get; }
+            [ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), nameof(WorkLog.EndDate))]
+            DateTime? EndDate { get; }
+        }
+
+        public class EmployeeWithAddressCityFlattened
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            [ViaRelation(nameof(Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address), nameof(Address.City))]
+            public string City { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(Employee))]

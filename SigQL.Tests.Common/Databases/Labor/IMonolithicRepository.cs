@@ -123,7 +123,12 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddressViaClassFilter(Employee.StreetAddressFilterViaRelation filter);
         IEnumerable<Employee.IEmployeeId> EF_GetEmployeeIdsForStreetAddressViaClassFilter(Employee.EFStreetAddressFilterViaRelation filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameWithDifferingParameterNameViaClassFilter(WorkLog.EmployeeNameFilterWithAliasViaRelation filter);
-        
+
+        // ViaRelation on output projection
+        IEnumerable<Employee.EmployeeWithWorkLogFlattened> GetEmployeesWithWorkLogFlattened();
+        IEnumerable<Employee.IEmployeeWithWorkLogFlattened> GetEmployeesWithWorkLogFlattenedInterface();
+        IEnumerable<Employee.EmployeeWithAddressCityFlattened> GetEmployeesWithAddressCityFlattened();
+
         // or
         IEnumerable<WorkLog.IWorkLogId> OrGroupByTwoColumnsOfSameTable([OrGroup] DateTime startDate, [OrGroup] DateTime endDate);
         IEnumerable<WorkLog.IWorkLogId> OrGroupByTwoGroupsForColumnsOfSameTable([OrGroup("dates")] DateTime startDate, [OrGroup("dates")] DateTime endDate, [OrGroup("ids")] int id, [OrGroup("ids")] int employeeId);

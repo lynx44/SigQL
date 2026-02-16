@@ -3708,7 +3708,64 @@ namespace SigQL.SqlServer.Tests
             AreSame(expected, actual);
         }
 
-        #region View 
+        [TestMethod]
+        public void ViaRelationOnOutputProjection_OneHop_ReturnsFlattenedResults()
+        {
+            var employee1 = new EFEmployee() { Name = "Alice" };
+            var employee2 = new EFEmployee() { Name = "Bob" };
+            var workLog1 = new EFWorkLog() { Employee = employee1, StartDate = new DateTime(2022, 1, 1), EndDate = new DateTime(2022, 1, 2) };
+            var workLog2 = new EFWorkLog() { Employee = employee1, StartDate = new DateTime(2022, 2, 1), EndDate = new DateTime(2022, 2, 2) };
+            var workLog3 = new EFWorkLog() { Employee = employee2, StartDate = new DateTime(2022, 3, 1), EndDate = new DateTime(2022, 3, 2) };
+            this.laborDbContext.WorkLog.AddRange(workLog1, workLog2, workLog3);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetEmployeesWithWorkLogFlattened().ToList();
+
+            Assert.IsTrue(actual.Count >= 3);
+            Assert.IsTrue(actual.Any(a => a.Name == "Alice" && a.StartDate == new DateTime(2022, 1, 1) && a.EndDate == new DateTime(2022, 1, 2)));
+            Assert.IsTrue(actual.Any(a => a.Name == "Alice" && a.StartDate == new DateTime(2022, 2, 1) && a.EndDate == new DateTime(2022, 2, 2)));
+            Assert.IsTrue(actual.Any(a => a.Name == "Bob" && a.StartDate == new DateTime(2022, 3, 1) && a.EndDate == new DateTime(2022, 3, 2)));
+        }
+
+        [TestMethod]
+        public void ViaRelationOnOutputProjection_OneHop_Interface_ReturnsFlattenedResults()
+        {
+            var employee1 = new EFEmployee() { Name = "Charlie" };
+            var workLog1 = new EFWorkLog() { Employee = employee1, StartDate = new DateTime(2022, 5, 1), EndDate = new DateTime(2022, 5, 2) };
+            var workLog2 = new EFWorkLog() { Employee = employee1, StartDate = new DateTime(2022, 6, 1), EndDate = new DateTime(2022, 6, 2) };
+            this.laborDbContext.WorkLog.AddRange(workLog1, workLog2);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetEmployeesWithWorkLogFlattenedInterface().ToList();
+
+            // Validates dedup fix: same employee with 2 work logs must produce 2 rows
+            var charlieRows = actual.Where(a => a.Name == "Charlie").ToList();
+            Assert.AreEqual(2, charlieRows.Count);
+            Assert.IsTrue(charlieRows.Any(a => a.StartDate == new DateTime(2022, 5, 1) && a.EndDate == new DateTime(2022, 5, 2)));
+            Assert.IsTrue(charlieRows.Any(a => a.StartDate == new DateTime(2022, 6, 1) && a.EndDate == new DateTime(2022, 6, 2)));
+        }
+
+        [TestMethod]
+        public void ViaRelationOnOutputProjection_MultiHop_ReturnsFlattenedResults()
+        {
+            var employee1 = new EFEmployee() { Name = "Dave" };
+            var address1 = new EFAddress() { City = "Springfield" };
+            var address2 = new EFAddress() { City = "Shelbyville" };
+            address1.Employees = new List<EFEmployee>() { employee1 };
+            address2.Employees = new List<EFEmployee>() { employee1 };
+            this.laborDbContext.Address.AddRange(address1, address2);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetEmployeesWithAddressCityFlattened().ToList();
+
+            // Validates dedup fix: same employee with 2 addresses must produce 2 rows
+            var daveRows = actual.Where(a => a.Name == "Dave").ToList();
+            Assert.AreEqual(2, daveRows.Count);
+            Assert.IsTrue(daveRows.Any(a => a.City == "Springfield"));
+            Assert.IsTrue(daveRows.Any(a => a.City == "Shelbyville"));
+        }
+
+        #region View
 
         [TestMethod]
         public void GetView()

@@ -365,7 +365,8 @@ namespace SigQL
                     {
                         new TableRelationColumnDefinition(column.Name, column.DataTypeDeclaration, column.Table, argument, source, column.IsIdentity)
                         {
-                            TableRelations = tableRelations
+                            TableRelations = tableRelations,
+                            IsFlattenedViaRelationOutput = source == TableRelationsColumnSource.ReturnType
                         }
                     };
                 }
