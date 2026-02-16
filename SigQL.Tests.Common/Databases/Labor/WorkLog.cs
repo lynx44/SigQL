@@ -388,6 +388,12 @@ namespace SigQL.Tests.Common.Databases.Labor
             WorkLogEmployeeView.IFields View { get; }
         }
 
+        public interface IWorkLogToViewViaAddForeignKey
+        {
+            int Id { get; }
+            WorkLogEmployeeView.IFields View { get; }
+        }
+
         public interface IWorkLogToViewMismatchingCase
         {
             int Id { get; }

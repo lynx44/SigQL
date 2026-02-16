@@ -7,6 +7,8 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SigQL.Exceptions;
+using SigQL.Schema;
+using SigQL.SqlServer;
 using SigQL.SqlServer.Tests.Data;
 using SigQL.SqlServer.Tests.Infrastructure;
 using SigQL.Tests.Common.Databases.Labor;
@@ -6593,6 +6595,41 @@ namespace SigQL.SqlServer.Tests
         //     this.laborDbContext.CompositeKeyTable.Where(c => c.EFCompositeForeignKeyTables.Any(b => b.Id == 1)).Skip(1)
         //         .ToList();
         // }
+
+        [TestMethod]
+        public void GetWithAddForeignKey_NavigationPropertyResolvesWithoutJoinRelationAttribute()
+        {
+            var employee = new EFEmployee() { Name = "Name" };
+            var workLog = new EFWorkLog()
+            {
+                Employee = employee,
+                StartDate = new DateTime(2022, 1, 1),
+                EndDate = new DateTime(2022, 2, 2)
+            };
+            this.laborDbContext.WorkLog.Add(workLog);
+            this.laborDbContext.SaveChanges();
+
+            // Build a new repository with a programmatically-added foreign key
+            var sqlConnection = (laborDbConnection as SqlConnection);
+            var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.ConnectionString);
+            var workLogTableDef = sqlDatabaseConfiguration.Tables.FindByName("WorkLog");
+            var viewTableDef = sqlDatabaseConfiguration.Tables.FindByName("WorkLogEmployeeView");
+            workLogTableDef.AddForeignKey(
+                t => t.Columns.FindByName("EmployeeId"),
+                viewTableDef.Columns.FindByName("EmployeeId"));
+
+            var builder = new RepositoryBuilder(new SqlQueryExecutor(() => laborDbConnection), sqlDatabaseConfiguration);
+            var repo = builder.Build<IMonolithicRepository>();
+
+            var actual = repo.GetWithAddForeignKey().First();
+
+            Assert.AreEqual(workLog.Id, actual.Id);
+            Assert.AreEqual(employee.Id, actual.View.EmployeeId);
+            Assert.AreEqual(employee.Name, actual.View.EmployeeName);
+            Assert.AreEqual(workLog.StartDate, actual.View.StartDate);
+            Assert.AreEqual(workLog.EndDate, actual.View.EndDate);
+            Assert.AreEqual(workLog.Id, actual.View.WorkLogId);
+        }
 
         private void AreEquivalent<T>(IEnumerable<T> expected, IEnumerable<T> actual)
         {
