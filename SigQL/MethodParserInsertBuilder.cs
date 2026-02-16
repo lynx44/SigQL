@@ -188,6 +188,20 @@ namespace SigQL
                             statement.Add(updateLookupTablePKsStatement);
                             builderAstCollection.RegisterReference(upsertTableRelations.TableRelations.TargetTable, InsertBuilderAstCollection.AstReferenceSource.UpdateLookupIds, updateLookupTablePKsStatement);
                         }
+
+                        // When using custom key columns that differ from the PK, populate the lookup table's PK
+                        // from the actual table for existing records (the insertedTable update only covers newly inserted rows).
+                        var pkColumns = upsertTableRelations.TableRelations.TargetTable.PrimaryKey?.Columns;
+                        if (upsertTableRelations.KeyColumns != null && pkColumns != null &&
+                            !upsertTableRelations.KeyColumns.SequenceEqual(pkColumns, ColumnEqualityComparer.Default))
+                        {
+                            var updateLookupFromExistingStatement = BuildUpdateLookupFromExistingStatement(
+                                upsertTableRelations.TableRelations, upsertTableRelations.KeyColumns);
+                            if (updateLookupFromExistingStatement != null)
+                            {
+                                statement.Add(updateLookupFromExistingStatement);
+                            }
+                        }
                             
                         var outputParameterTableName = GetInsertedTableName(upsertTableRelations.TableRelations);
                         var declareOutputParameterStatement = BuildDeclareInsertedTableParameterStatement(outputParameterTableName, upsertTableRelations);
@@ -972,6 +986,85 @@ namespace SigQL
             }
             
             return null;
+        }
+
+        private AstNode BuildUpdateLookupFromExistingStatement(TableRelations tableRelations, IEnumerable<IColumnDefinition> keyColumns)
+        {
+            var primaryKeyColumns = tableRelations.TargetTable.PrimaryKey?.Columns.ToList();
+            if (primaryKeyColumns == null || !primaryKeyColumns.Any() || keyColumns == null || !keyColumns.Any())
+                return null;
+
+            var lookupTableName = GetLookupTableName(tableRelations);
+            var targetTableName = tableRelations.TargetTable.Name;
+
+            var ast = new Update()
+            {
+                SetClause =
+                    primaryKeyColumns.Select(pk =>
+                        new SetEqualOperator()
+                            .SetArgs(
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalColumn()
+                                    {
+                                        Label = pk.Name
+                                    }),
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalTable()
+                                    {
+                                        Label = targetTableName
+                                    },
+                                    new RelationalColumn()
+                                    {
+                                        Label = pk.Name
+                                    })
+                                )).ToList(),
+                FromClause = new FromClause().SetArgs(
+                        new FromClauseNode().SetArgs(
+                                new Alias()
+                                {
+                                    Label = lookupTableName
+                                }.SetArgs(
+                                    new NamedParameterIdentifier()
+                                    {
+                                        Name = lookupTableName
+                                    }),
+                                new InnerJoin()
+                                {
+                                    RightNode = new TableIdentifier().SetArgs(
+                                        new RelationalTable() { Label = targetTableName })
+                                }.SetArgs(
+                                    new AndOperator().SetArgs(
+                                        keyColumns.Select(kc =>
+                                            new EqualsOperator().SetArgs(
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = targetTableName
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = kc.Name
+                                                    }),
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = lookupTableName
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = kc.Name
+                                                    }))
+                                        ).ToList()
+                                    )
+                                )
+                         )
+                 )
+            }.SetArgs(new Alias()
+            {
+                Label = lookupTableName
+            });
+
+            return ast;
         }
 
         private static IEnumerable<TableIndexReference> OrderIndexReferences(UpsertTableRelations insertTableRelations, IEnumerable<TableIndexReference> parentIndexMappings)

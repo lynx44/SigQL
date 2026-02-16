@@ -2702,7 +2702,8 @@ insert @EmployeeLookup(""Id"", ""Name"", ""_index"") values(@employeesId0, @empl
 merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"" where ((""Name"" is null) or not exists (select 1 from ""Employee"" where (""Employee"".""Name"" = ""EmployeeLookup"".""Name"")))) as i (""Id"",""Name"",""_index"") on (1 = 0)
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
-update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");", sql);
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""Employee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join ""Employee"" on (""Employee"".""Name"" = ""EmployeeLookup"".""Name"");", sql);
         }
 
         [TestMethod]
@@ -2737,6 +2738,7 @@ merge ""Employee"" using (select ""Id"", ""Name"", ""_index"" from @EmployeeLook
  when not matched then
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""Employee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join ""Employee"" on (""Employee"".""Name"" = ""EmployeeLookup"".""Name"");
 declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
 insert @WorkLogLookup(""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") values(@employeesWorkLogs_Id0, @employeesWorkLogs_StartDate0, @employeesWorkLogs_EndDate0, 0, 0)
 merge ""WorkLog"" using (select ""Id"", ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"" from @WorkLogLookup ""WorkLogLookup"" where ((""Id"" is null) or not exists (select 1 from ""WorkLog"" where (""WorkLog"".""Id"" = ""WorkLogLookup"".""Id"")))) as i (""Id"",""StartDate"",""EndDate"",""_index"",""EmployeeId_index"") on (1 = 0)
