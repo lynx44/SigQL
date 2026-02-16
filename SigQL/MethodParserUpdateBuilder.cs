@@ -25,7 +25,7 @@ namespace SigQL
                 var tableRelations = this.databaseResolver.BuildTableRelations(primaryTable, new TableArgument(primaryTable, updateSpec.FilterParameters.AsArguments(this.databaseResolver)), TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>());
 
                 whereClause = BuildWhereClauseFromTargetTablePerspective(
-                    new RelationalTable() { Label = primaryTable.Name }, tableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause).AsEnumerable(), parameterPaths,
+                    new RelationalTable() { Label = primaryTable.Name }, tableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClauseExcludingSet).AsEnumerable(), parameterPaths,
                     tokens);
             }
 
@@ -105,7 +105,7 @@ namespace SigQL
 
                 var arguments = methodInfo.GetParameters().AsArguments(this.databaseResolver);
                 var setParameters = arguments.Where(p => p.GetCustomAttribute<SetAttribute>() != null).ToList();
-                
+
                 updateSpec.SetColumnParameters = setParameters.SelectMany(c =>
                 {
                     var parentIgnoreIfNull = c.GetCustomAttribute<IgnoreIfNullAttribute>() != null;
@@ -136,6 +136,38 @@ namespace SigQL
                 }).ToList();
 
                 var filterParameters = arguments.Except(setParameters).ToList();
+
+                // Handle mixed class parameters: classes containing both [Set] and non-[Set] properties
+                foreach (var filterParam in filterParameters)
+                {
+                    if (this.databaseResolver.IsTableOrTableProjection(filterParam.Type))
+                    {
+                        var setProperties = filterParam.ClassProperties
+                            .Where(cp => cp.GetCustomAttribute<SetAttribute>() != null)
+                            .ToList();
+
+                        if (setProperties.Any())
+                        {
+                            var parentIgnoreIfNull = filterParam.GetCustomAttribute<IgnoreIfNullAttribute>() != null;
+                            var parentIgnoreIfNullOrEmpty = filterParam.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null;
+
+                            foreach (var setProp in setProperties)
+                            {
+                                updateSpec.SetColumnParameters.Add(new UpdateColumnParameter()
+                                {
+                                    Column = updateSpec.Table.Columns.FindByName(setProp.Name),
+                                    ParameterPath = new ParameterPath(setProp)
+                                    {
+                                        SqlParameterName = $"{filterParam.Name}{setProp.Name}"
+                                    },
+                                    IgnoreIfNull = parentIgnoreIfNull || setProp.GetCustomAttribute<IgnoreIfNullAttribute>() != null,
+                                    IgnoreIfNullOrEmpty = parentIgnoreIfNullOrEmpty || setProp.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null
+                                });
+                            }
+                        }
+                    }
+                }
+
                 updateSpec.FilterParameters = filterParameters.Select(c => c.GetParameterInfo()).ToList();
 
                 updateSpec.RootMethodInfo = methodInfo;

@@ -4525,6 +4525,115 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void Update_MixedSetAndFilterClass_OnlyUpdatesFilteredRow()
+        {
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) },
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 3), EndDate = new DateTime(2021, 1, 4) }
+            );
+            this.laborDbContext.SaveChanges();
+            var targetId = laborDbContext.WorkLog.OrderBy(w => w.StartDate).First().Id;
+
+            this.monolithicRepository.UpdateAllWorkLogsStartDateAndEndDateSetAndFilterClass(new WorkLog.SetDatesWithIdFilter()
+            {
+                StartDate = new DateTime(2022, 2, 2),
+                EndDate = new DateTime(2022, 2, 3),
+                Id = targetId
+            });
+
+            var updated = laborDbContext.WorkLog.AsNoTracking().Single(w => w.Id == targetId);
+            Assert.AreEqual(new DateTime(2022, 2, 2), updated.StartDate);
+            Assert.AreEqual(new DateTime(2022, 2, 3), updated.EndDate);
+
+            var untouched = laborDbContext.WorkLog.AsNoTracking().Single(w => w.Id != targetId);
+            Assert.AreEqual(new DateTime(2021, 1, 3), untouched.StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 4), untouched.EndDate);
+        }
+
+        [TestMethod]
+        public void Update_MixedSetAndFilterClassWithScalarFilter_OnlyUpdatesMatchingRow()
+        {
+            var employee = new EFEmployee() { Name = "Mike" };
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.SaveChanges();
+
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2), EmployeeId = employee.Id },
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 3), EndDate = new DateTime(2021, 1, 4), EmployeeId = employee.Id }
+            );
+            this.laborDbContext.SaveChanges();
+            var targetId = laborDbContext.WorkLog.OrderBy(w => w.StartDate).First().Id;
+
+            this.monolithicRepository.UpdateWorkLogDatesWithIdFilterAndScalarFilter(new WorkLog.SetDatesWithIdFilter()
+            {
+                StartDate = new DateTime(2022, 2, 2),
+                EndDate = new DateTime(2022, 2, 3),
+                Id = targetId
+            }, employee.Id);
+
+            var updated = laborDbContext.WorkLog.AsNoTracking().Single(w => w.Id == targetId);
+            Assert.AreEqual(new DateTime(2022, 2, 2), updated.StartDate);
+            Assert.AreEqual(new DateTime(2022, 2, 3), updated.EndDate);
+        }
+
+        [TestMethod]
+        public void Update_MixedSetAndIgnoreIfNullFilter_NullMeansNoFilter()
+        {
+            var employee1 = new EFEmployee() { Name = "Mike" };
+            var employee2 = new EFEmployee() { Name = "Jane" };
+            this.laborDbContext.Employee.AddRange(employee1, employee2);
+            this.laborDbContext.SaveChanges();
+
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2), EmployeeId = employee1.Id },
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 3), EndDate = new DateTime(2021, 1, 4), EmployeeId = employee2.Id }
+            );
+            this.laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateWorkLogDatesWithIgnoreIfNullFilter(new WorkLog.SetDatesWithIgnoreIfNullFilter()
+            {
+                StartDate = new DateTime(2022, 2, 2),
+                EndDate = new DateTime(2022, 2, 3),
+                EmployeeId = null
+            });
+
+            var all = laborDbContext.WorkLog.AsNoTracking().ToList();
+            Assert.IsTrue(all.All(w => w.StartDate == new DateTime(2022, 2, 2) && w.EndDate == new DateTime(2022, 2, 3)));
+        }
+
+        [TestMethod]
+        public void Update_MixedSetAndOrFilter_UpdatesMatchingRows()
+        {
+            var employee = new EFEmployee() { Name = "Mike" };
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.SaveChanges();
+
+            var location = new EFLocation() { Name = "Office" };
+            this.laborDbContext.Location.Add(location);
+            this.laborDbContext.SaveChanges();
+
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2), EmployeeId = employee.Id, LocationId = null },
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 3), EndDate = new DateTime(2021, 1, 4), EmployeeId = null, LocationId = location.Id },
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 5), EndDate = new DateTime(2021, 1, 6), EmployeeId = null, LocationId = null }
+            );
+            this.laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateWorkLogDatesWithOrFilter(new WorkLog.SetDatesWithOrFilter()
+            {
+                StartDate = new DateTime(2022, 2, 2),
+                EndDate = new DateTime(2022, 2, 3),
+                EmployeeId = employee.Id,
+                LocationId = location.Id
+            });
+
+            var all = laborDbContext.WorkLog.AsNoTracking().OrderBy(w => w.Id).ToList();
+            Assert.AreEqual(new DateTime(2022, 2, 2), all[0].StartDate);
+            Assert.AreEqual(new DateTime(2022, 2, 2), all[1].StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 5), all[2].StartDate);
+        }
+
+        [TestMethod]
         public void Upsert_IgnoreIfNull_WithNonNullValue_UpdatesValue()
         {
             laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });

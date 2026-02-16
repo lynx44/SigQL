@@ -48,6 +48,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             string Name { get; set; }
         }
 
+        public class SetNameWithIdFilter
+        {
+            [Set]
+            public string Name { get; set; }
+            public int Id { get; set; }
+        }
+
         public class InsertFields
         {
             public string Name { get; set; }

@@ -498,6 +498,10 @@ namespace SigQL
             new TableRelationsFilter((column, isTable) =>
                 !ColumnAttributes.IsDecoratedNonColumn(column) && !ColumnAttributes.IsOrderBy(column));
 
+        public static TableRelationsFilter WhereClauseExcludingSet =
+            new TableRelationsFilter((column, isTable) =>
+                !ColumnAttributes.IsDecoratedNonColumn(column) && !ColumnAttributes.IsOrderBy(column) && !ColumnAttributes.IsSetArgument(column));
+
         public static TableRelationsFilter SelectClause =
             new TableRelationsFilter((column, isTable) =>
                 !ColumnAttributes.IsDecoratedNonColumn(column) ||
@@ -554,6 +558,13 @@ namespace SigQL
                 property.GetCallsiteTypeName() != "table" && (((property?.Type)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
                                                               ((property?.Type)?.IsAssignableFrom(
                                                                   typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
+        }
+
+        public static bool IsSetArgument(IArgument argument)
+        {
+            if (argument?.GetCustomAttribute<SetAttribute>() != null) return true;
+            if (argument?.Parent != null) return IsSetArgument(argument.Parent);
+            return false;
         }
     }
 }

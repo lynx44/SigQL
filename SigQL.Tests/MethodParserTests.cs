@@ -2311,21 +2311,96 @@ update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",'')
             AssertSqlEqual("update \"WorkLog\" set \"StartDate\" = @workLogDatesStartDate, \"EndDate\" = @workLogDatesEndDate from \"WorkLog\";", sql);
         }
 
-        // todo
-        //[TestMethod]
-        //public void Update_Void_WithSetAndFilterFieldsClass_ReturnsExpectedSql()
-        //{
-        //    var sql = GetSqlForCall(() => this.monolithicRepository.UpdateAllWorkLogsStartDateAndEndDateSetAndFilterClass(new WorkLog.SetDatesWithIdFilter()
-        //    {
-        //        StartDate = DateTime.Today,
-        //        EndDate = DateTime.Today,
-        //        Id = 1
-        //    }));
+        [TestMethod]
+        public void Update_Void_WithSetAndFilterFieldsClass_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateAllWorkLogsStartDateAndEndDateSetAndFilterClass(new WorkLog.SetDatesWithIdFilter()
+            {
+                StartDate = DateTime.Today,
+                EndDate = DateTime.Today,
+                Id = 1
+            }));
 
-        //    AssertSqlEqual("update \"WorkLog\" set \"StartDate\" = @workLogStartDate, \"EndDate\" = @workLogEndDate from \"WorkLog\" where ((\"WorkLog\".\"Id\" = @workLogId))", sql);
-        //}
+            AssertSqlEqual("update \"WorkLog\" set \"StartDate\" = @workLogStartDate, \"EndDate\" = @workLogEndDate from \"WorkLog\" where (\"WorkLog\".\"Id\" = @Id);", sql);
+        }
 
+        [TestMethod]
+        public void Update_Void_WithSetAndFilterFieldsClassAndScalarFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateWorkLogDatesWithIdFilterAndScalarFilter(new WorkLog.SetDatesWithIdFilter()
+            {
+                StartDate = DateTime.Today,
+                EndDate = DateTime.Today,
+                Id = 1
+            }, 5));
 
+            AssertSqlEqual("update \"WorkLog\" set \"StartDate\" = @workLogStartDate, \"EndDate\" = @workLogEndDate from \"WorkLog\" where ((\"WorkLog\".\"EmployeeId\" = @employeeId) and (\"WorkLog\".\"Id\" = @Id));", sql);
+        }
+
+        [TestMethod]
+        public void Update_Void_WithSetAndIgnoreIfNullFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateWorkLogDatesWithIgnoreIfNullFilter(new WorkLog.SetDatesWithIgnoreIfNullFilter()
+            {
+                StartDate = DateTime.Today,
+                EndDate = DateTime.Today,
+                EmployeeId = 1
+            }));
+
+            AssertSqlEqual("update \"WorkLog\" set \"StartDate\" = @workLogStartDate, \"EndDate\" = @workLogEndDate from \"WorkLog\" where (\"WorkLog\".\"EmployeeId\" = @EmployeeId);", sql);
+        }
+
+        [TestMethod]
+        public void Update_Void_WithIgnoreIfNullSetAndFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateWorkLogDatesIgnoreIfNullWithIdFilter(new WorkLog.SetDatesIgnoreIfNullWithIdFilter()
+            {
+                StartDate = DateTime.Today,
+                EndDate = DateTime.Today,
+                Id = 1
+            }));
+
+            AssertSqlEqual("update \"WorkLog\" set \"StartDate\" = IsNull(@workLogStartDate,\"WorkLog\".\"StartDate\"), \"EndDate\" = IsNull(@workLogEndDate,\"WorkLog\".\"EndDate\") from \"WorkLog\" where (\"WorkLog\".\"Id\" = @Id);", sql);
+        }
+
+        [TestMethod]
+        public void Update_Void_WithSetAndOrFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateWorkLogDatesWithOrFilter(new WorkLog.SetDatesWithOrFilter()
+            {
+                StartDate = DateTime.Today,
+                EndDate = DateTime.Today,
+                EmployeeId = 1,
+                LocationId = 2
+            }));
+
+            AssertSqlEqual("update \"WorkLog\" set \"StartDate\" = @workLogStartDate, \"EndDate\" = @workLogEndDate from \"WorkLog\" where ((\"WorkLog\".\"EmployeeId\" = @EmployeeId) or (\"WorkLog\".\"LocationId\" = @LocationId));", sql);
+        }
+
+        [TestMethod]
+        public void Update_Void_WithSetAndGreaterThanFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateWorkLogDatesWithGreaterThanFilter(new WorkLog.SetDatesWithGreaterThanFilter()
+            {
+                StartDate = DateTime.Today,
+                EndDate = DateTime.Today,
+                Id = 5
+            }));
+
+            AssertSqlEqual("update \"WorkLog\" set \"StartDate\" = @workLogStartDate, \"EndDate\" = @workLogEndDate from \"WorkLog\" where (\"WorkLog\".\"Id\" > @Id);", sql);
+        }
+
+        [TestMethod]
+        public void Update_Void_WithEmployeeSetAndFilterFieldsClass_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateEmployeeByIdMixed(new Employee.SetNameWithIdFilter()
+            {
+                Name = "test",
+                Id = 1
+            }));
+
+            AssertSqlEqual("update \"Employee\" set \"Name\" = @employeeName from \"Employee\" where (\"Employee\".\"Id\" = @Id);", sql);
+        }
 
         #endregion Update
 

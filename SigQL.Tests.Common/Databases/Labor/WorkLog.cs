@@ -258,6 +258,47 @@ namespace SigQL.Tests.Common.Databases.Labor
             public int Id { get; set; }
         }
 
+        public class SetDatesWithIgnoreIfNullFilter
+        {
+            [Set]
+            public DateTime StartDate { get; set; }
+            [Set]
+            public DateTime EndDate { get; set; }
+            [IgnoreIfNull]
+            public int? EmployeeId { get; set; }
+        }
+
+        public class SetDatesIgnoreIfNullWithIdFilter
+        {
+            [Set, IgnoreIfNull]
+            public DateTime? StartDate { get; set; }
+            [Set, IgnoreIfNull]
+            public DateTime? EndDate { get; set; }
+            public int Id { get; set; }
+        }
+
+        public class SetDatesWithOrFilter
+        {
+            [Set]
+            public DateTime StartDate { get; set; }
+            [Set]
+            public DateTime EndDate { get; set; }
+            [OrGroup]
+            public int? EmployeeId { get; set; }
+            [OrGroup]
+            public int? LocationId { get; set; }
+        }
+
+        public class SetDatesWithGreaterThanFilter
+        {
+            [Set]
+            public DateTime StartDate { get; set; }
+            [Set]
+            public DateTime EndDate { get; set; }
+            [GreaterThan]
+            public int Id { get; set; }
+        }
+
         public interface IInvalidColumn
         {
             int WorkLogId { get; set; }

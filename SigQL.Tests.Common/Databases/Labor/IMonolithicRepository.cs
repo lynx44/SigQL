@@ -373,9 +373,20 @@ namespace SigQL.Tests.Common.Databases.Labor
         void UpdateAllWorkLogsStartDateAndEndDate([Set] DateTime startDate, [Set] DateTime endDate);
         [Update(TableName = nameof(WorkLog))]
         void UpdateAllWorkLogsStartDateAndEndDateSetClass([Set] WorkLog.SetDateFields workLogDates);
-        // todo
-        //[Update(TableName = nameof(WorkLog))]
-        //void UpdateAllWorkLogsStartDateAndEndDateSetAndFilterClass(WorkLog.SetDatesWithIdFilter workLog);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateAllWorkLogsStartDateAndEndDateSetAndFilterClass(WorkLog.SetDatesWithIdFilter workLog);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateWorkLogDatesWithIgnoreIfNullFilter(WorkLog.SetDatesWithIgnoreIfNullFilter workLog);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateWorkLogDatesIgnoreIfNullWithIdFilter(WorkLog.SetDatesIgnoreIfNullWithIdFilter workLog);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateWorkLogDatesWithOrFilter(WorkLog.SetDatesWithOrFilter workLog);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateWorkLogDatesWithGreaterThanFilter(WorkLog.SetDatesWithGreaterThanFilter workLog);
+        [Update(TableName = nameof(Employee))]
+        void UpdateEmployeeByIdMixed(Employee.SetNameWithIdFilter employee);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateWorkLogDatesWithIdFilterAndScalarFilter(WorkLog.SetDatesWithIdFilter workLog, int employeeId);
         [Update(TableName = nameof(Employee))]
         void UpdateEmployeeById([Set] string name, int id);
         [Update(TableName = nameof(Employee))]
