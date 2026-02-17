@@ -128,6 +128,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.EmployeeWithWorkLogFlattened> GetEmployeesWithWorkLogFlattened();
         IEnumerable<Employee.IEmployeeWithWorkLogFlattened> GetEmployeesWithWorkLogFlattenedInterface();
         IEnumerable<Employee.EmployeeWithAddressCityFlattened> GetEmployeesWithAddressCityFlattened();
+        IEnumerable<Employee.EmployeeWithAddressCityFlattenedEF> GetEmployeesWithAddressCityFlattenedEF();
 
         // or
         IEnumerable<WorkLog.IWorkLogId> OrGroupByTwoColumnsOfSameTable([OrGroup] DateTime startDate, [OrGroup] DateTime endDate);

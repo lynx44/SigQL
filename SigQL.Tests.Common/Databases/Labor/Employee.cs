@@ -364,6 +364,14 @@ namespace SigQL.Tests.Common.Databases.Labor
             [ViaRelation(nameof(Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address), nameof(Address.City))]
             public string City { get; set; }
         }
+
+        public class EmployeeWithAddressCityFlattenedEF
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            [ViaRelation(nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address), nameof(Address.City))]
+            public string City { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(Employee))]

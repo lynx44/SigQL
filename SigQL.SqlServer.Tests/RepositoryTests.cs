@@ -3756,7 +3756,7 @@ namespace SigQL.SqlServer.Tests
             this.laborDbContext.Address.AddRange(address1, address2);
             this.laborDbContext.SaveChanges();
 
-            var actual = this.monolithicRepository.GetEmployeesWithAddressCityFlattened().ToList();
+            var actual = this.monolithicRepository.GetEmployeesWithAddressCityFlattenedEF().ToList();
 
             // Validates dedup fix: same employee with 2 addresses must produce 2 rows
             var daveRows = actual.Where(a => a.Name == "Dave").ToList();
