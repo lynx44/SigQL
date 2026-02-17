@@ -42,10 +42,14 @@ The goal of SigQL is to enable developers precise and concise access to data by 
    - [Ignoring null or empty parameters](#ignoring-null-or-empty-parameters)
  - [Offset and Fetch](#offset-and-fetch)
  - [Order By](#order-by)
+   - [Static Order By](#static-order-by)
+   - [Order By with ViaRelation](#order-by-with-viarelation)
+   - [Dynamic Order By](#dynamic-order-by)
  - [Single Result](#single-result)
  - [Collection Results](#collection-results)
  - [Filtering by related tables](#filtering-by-related-tables)
  - [Returning Relations](#returning-relations)
+   - [Flattening Relations with ViaRelation](#flattening-relations-with-viarelation)
    - [JoinRelation Attribute](#joinrelation-attribute)
    - [Circular References](#circular-references)
  - [Perspective](#perspective)
@@ -60,9 +64,17 @@ The goal of SigQL is to enable developers precise and concise access to data by 
 
  - [Insert](#insert)
  - [Update](#update)
+   - [Mixed Set and Filter Properties](#mixed-set-and-filter-properties)
+   - [IgnoreIfNull on Update](#ignoreifnull-on-update)
  - [UpdateByKey](#updatebykey)
+   - [Alternate Keys on UpdateByKey](#alternate-keys-on-updatebykey)
+   - [IgnoreIfNull on UpdateByKey](#ignoreifnull-on-updatebykey)
  - [Upsert](#upsert)
+   - [Alternate Keys on Upsert](#alternate-keys-on-upsert)
+   - [IgnoreIfNull on Upsert](#ignoreifnull-on-upsert)
  - [Sync](#sync)
+   - [Alternate Keys on Sync](#alternate-keys-on-sync)
+   - [IgnoreIfNull on Sync](#ignoreifnull-on-sync)
  - [Delete](#delete)
  
 **Custom SQL**
@@ -73,6 +85,7 @@ The goal of SigQL is to enable developers precise and concise access to data by 
   **Configuration**
   
  - [Installation](#installation)
+ - [Adding Foreign Keys](#adding-foreign-keys)
  - [Logging](#logging)
 
 **More Information**
@@ -346,14 +359,132 @@ Offset and Fetch are also supported, which is often used for paging:
 
 #### Order By
 
-Sort direction can also be specified via parameters:
+##### Static Order By
+
+Sort direction can be specified via parameters using the `OrderByDirection` enum:
 
     IEnumerable<Employee.IName> Search(
-	    [IgnoreIfNullOrEmpty] IEnumerable<int> id, 
-	    [IgnoreIfNull, StartsWith, Column("Name")] string nameFilter, 
-	    [Offset] int offset, 
-	    [Fetch] int, 
+	    [IgnoreIfNullOrEmpty] IEnumerable<int> id,
+	    [IgnoreIfNull, StartsWith, Column("Name")] string nameFilter,
+	    [Offset] int offset,
+	    [Fetch] int,
 	    OrderByDirection name = OrderByDirection.Ascending);
+
+Multiple sort directions can be specified:
+
+    IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogs(
+        OrderByDirection startDate = OrderByDirection.Ascending,
+        OrderByDirection endDate = OrderByDirection.Ascending,
+        OrderByDirection employeeId = OrderByDirection.Ascending);
+
+Order By can also be specified via class filter properties:
+
+    public class WorkLog
+    {
+        public class OrderByDirectionStartDate
+        {
+            public OrderByDirection StartDate { get; set; }
+            public OrderByDirection EndDate { get; set; }
+        }
+    }
+    ...
+    IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogs(WorkLog.OrderByDirectionStartDate filter);
+
+##### Order By with ViaRelation
+
+Ordering by columns in related tables is supported using the `[ViaRelation]` attribute on an `OrderByDirection` parameter:
+
+    IEnumerable<WorkLog.IWorkLogWithEmployee> GetOrderedWorkLogs(
+        [ViaRelation("WorkLog->Employee", "Name")] OrderByDirection employeeName);
+
+This can be combined with other Order By parameters:
+
+    IEnumerable<WorkLog.IWorkLogWithEmployee> GetOrderedWorkLogs(
+        [ViaRelation("WorkLog->Employee", "Name")] OrderByDirection employeeName,
+        [Column("StartDate")] OrderByDirection direction,
+        IOrderBy dynamicOrderBy);
+
+Multi-hop relation paths are also supported:
+
+    IEnumerable<WorkLog.IWorkLogWithEmployeeWithAddress> GetWorkLogsOrderedByAddressId(
+        [ViaRelation("WorkLog->Employee->EFAddressEFEmployee->Address", "Id")] OrderByDirection addressIdSortOrder = OrderByDirection.Ascending);
+
+Order By with ViaRelation can also be specified via a class filter with a nested navigation property:
+
+    public class Employee
+    {
+        public class EmployeeNameOrder
+        {
+            public OrderByDirection Name { get; set; }
+        }
+    }
+    public class WorkLog
+    {
+        public class OrderByDirectionEmployeeName
+        {
+            public Employee.EmployeeNameOrder Employee { get; set; }
+        }
+    }
+    ...
+    IEnumerable<WorkLog.IWorkLogWithEmployee> GetOrderedWorkLogs(WorkLog.OrderByDirectionEmployeeName filter);
+
+##### Dynamic Order By
+
+For cases where the sort column needs to be determined at runtime, SigQL provides the `IOrderBy` interface with two implementations: `OrderBy` and `OrderByRelation`.
+
+**Single dynamic order:**
+
+    IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogs(IOrderBy order);
+    ...
+    // at call site
+    var workLogs = repository.GetOrderedWorkLogs(
+        new OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate), OrderByDirection.Descending));
+
+**Multiple dynamic orders:**
+
+    IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogs(IEnumerable<IOrderBy> orders);
+    ...
+    var workLogs = repository.GetOrderedWorkLogs(new List<IOrderBy>()
+    {
+        new OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate), OrderByDirection.Ascending),
+        new OrderBy(nameof(WorkLog), nameof(WorkLog.Id), OrderByDirection.Descending)
+    });
+
+**Dynamic order with ViaRelation (OrderByRelation):**
+
+To dynamically order by a column in a related table, use the `OrderByRelation` class:
+
+    IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetOrderedWorkLogs(IOrderBy order);
+    ...
+    var workLogs = repository.GetOrderedWorkLogs(
+        new OrderByRelation("WorkLog->Employee", "Name", OrderByDirection.Ascending));
+
+**Dynamic order in class filters:**
+
+    public class WorkLog
+    {
+        public class DynamicOrderByEnumerable
+        {
+            public IEnumerable<IOrderBy> OrderBys { get; set; }
+        }
+    }
+    ...
+    IEnumerable<WorkLog.IWorkLogId> GetOrderedWorkLogs(WorkLog.DynamicOrderByEnumerable filter);
+
+**Combining static and dynamic orders:**
+
+Static and dynamic order parameters can be mixed in the same method signature:
+
+    IEnumerable<WorkLog.IWorkLogWithEmployee> GetOrderedWorkLogs(
+        [ViaRelation("WorkLog->Employee", "Name")] OrderByDirection employeeName,
+        [Column("StartDate")] OrderByDirection direction,
+        IOrderBy dynamicOrderBy);
+
+Dynamic order also works with Offset and Fetch:
+
+    IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogs(
+        [Offset] int skip,
+        IEnumerable<IOrderBy> order);
 
 #### Single Result
 
@@ -456,6 +587,57 @@ Returning related tables is supported:
 *Note that the name of the property WorkLogs is not important. SigQL understands to use the WorkLog table because IWorkLogWithStartDate is an inner class of WorkLog.*
 
 *Note also that joined rows are de-duplicated into a single instance based on their primary key.*
+
+##### Flattening Relations with ViaRelation
+
+The `[ViaRelation]` attribute can be used on output projection properties to flatten related table columns into a single result. Instead of returning nested objects, the related columns appear directly on the output type:
+
+    public class Employee
+    {
+        public class EmployeeWithWorkLogFlattened
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            [ViaRelation("Employee->WorkLog", "StartDate")]
+            public DateTime? StartDate { get; set; }
+            [ViaRelation("Employee->WorkLog", "EndDate")]
+            public DateTime? EndDate { get; set; }
+        }
+    }
+    ...
+    IEnumerable<Employee.EmployeeWithWorkLogFlattened> GetEmployeesWithWorkLogFlattened();
+
+This generates a LEFT OUTER JOIN and returns one row per related record. For example, an Employee with two WorkLogs produces two result rows, each with the same Employee fields but different StartDate/EndDate values.
+
+Both classes and interfaces are supported:
+
+    public class Employee
+    {
+        public interface IEmployeeWithWorkLogFlattened
+        {
+            int Id { get; }
+            string Name { get; }
+            [ViaRelation("Employee->WorkLog", "StartDate")]
+            DateTime? StartDate { get; }
+            [ViaRelation("Employee->WorkLog", "EndDate")]
+            DateTime? EndDate { get; }
+        }
+    }
+
+Multi-hop relation paths are also supported:
+
+    public class Employee
+    {
+        public class EmployeeWithAddressCityFlattened
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            [ViaRelation("Employee->EmployeeAddress->Address", "City")]
+            public string City { get; set; }
+        }
+    }
+
+*Note that ViaRelation properties should be nullable types when the relationship is optional, since a LEFT OUTER JOIN is used.*
 
 ##### JoinRelation Attribute
 
@@ -658,9 +840,10 @@ The below list documents all features applicable to input parameters (WHERE clau
 | [Not] | Yes | Yes | Yes |
 | [Offset] | Yes | Yes | No |
 | [Parameter] | Yes | No (planned) | No |
-| [Set] | Yes | Yes (cannot mix with filter properties) | No |
+| [Set] | Yes | Yes (can mix with filter properties) | No |
 | [ViaRelation] | Yes| Yes | No |
 | OrderByDirection | Yes | Yes | No |
+| IOrderBy (Dynamic Order By) | Yes | Yes | No |
 | IEnumerable<> (IN clause) | Yes | Yes | Yes |
 
 #### Output Matrix
@@ -672,6 +855,7 @@ The below list documents all features applicable to return types. All other feat
 | [ClrOnly] | Yes | Yes |
 | [Column] | Yes | Yes |
 | [JoinRelation] | Yes | Yes |
+| [ViaRelation] | Yes | Yes |
 
 ### Insert, Update, Upsert, Sync, and Delete
 
@@ -740,6 +924,31 @@ Update by one or multiple classes and relations:
 
 *Note that all relations will be updated. If inserting new relations is desired, use the [Upsert] attribute*
 
+##### Alternate Keys on UpdateByKey
+
+By default, UpdateByKey matches rows using the table's primary key. The `KeyColumns` property allows matching by an alternate column instead:
+
+    [UpdateByKey(TableName = nameof(WorkLog), KeyColumns = "StartDate")]
+    void UpdateByKeyWorkLogByStartDate(IEnumerable<WorkLog.UpdateByKeyFieldsByStartDate> workLogs);
+
+In this example, rows are matched by `StartDate` instead of `Id`.
+
+##### IgnoreIfNull on UpdateByKey
+
+`[IgnoreIfNull]` and `[IgnoreIfNullOrEmpty]` can be used on UpdateByKey fields to skip updating a column when the value is null (or empty). The existing database value is preserved:
+
+    public class Employee
+    {
+        public class UpdateByKeyFieldsIgnoreIfNull
+        {
+            public int Id { get; set; }
+            [IgnoreIfNull] public string Name { get; set; }
+        }
+    }
+    ...
+    [UpdateByKey(TableName = nameof(Employee))]
+    void UpdateByKeyEmployees(IEnumerable<Employee.UpdateByKeyFieldsIgnoreIfNull> employees);
+
 #### Upsert
 
 Upsert will insert or update one or multiple rows, including relations, based on the existence of a primary key.
@@ -755,6 +964,31 @@ Upsert by one or multiple classes and relations:
     IEnumerable<Employee> UpsertEmployees(IEnumerable<Employee.UpsertWithWorkLogs> employeesWithWorkLogs);
 
 *Note that all relations will be inserted or updated. Removing items from a collection will not delete the row. To delete relations, use [Sync]*
+
+##### Alternate Keys on Upsert
+
+By default, Upsert determines whether to insert or update based on the table's primary key. The `KeyColumns` property allows matching by an alternate column instead:
+
+    [Upsert(TableName = nameof(Employee), KeyColumns = "Name")]
+    void UpsertEmployeeByName(IEnumerable<Employee.UpsertFieldsByName> employees);
+
+In this example, if an Employee with the specified Name already exists, it will be updated. Otherwise, a new Employee will be inserted.
+
+##### IgnoreIfNull on Upsert
+
+`[IgnoreIfNull]` and `[IgnoreIfNullOrEmpty]` can be used on Upsert fields to skip updating a column when the value is null (or empty). When a row is being updated (not inserted), the existing database value is preserved:
+
+    public class Employee
+    {
+        public class UpsertFieldsIgnoreIfNull
+        {
+            public int? Id { get; set; }
+            [IgnoreIfNull] public string Name { get; set; }
+        }
+    }
+    ...
+    [Upsert(TableName = nameof(Employee))]
+    void UpsertEmployees(IEnumerable<Employee.UpsertFieldsIgnoreIfNull> employees);
 
 #### Sync
 
@@ -776,6 +1010,29 @@ Depending on the type of relationship to an adjacent table, the relationship wil
  - For *Many-To-Many* relationships, the row in the Many-To-Many table will be deleted, but all other data will remain in-tact.
  - For *Many-To-One* relationships, the *One* side of the relationship will remain, but it will be disassociated from the *Many* side.
  - In all instances, no rows of the root table (Employee, in the above example) will be deleted.
+
+##### Alternate Keys on Sync
+
+By default, Sync determines whether to insert or update based on the table's primary key. The `KeyColumns` property allows matching by an alternate column:
+
+    [Sync(KeyColumns = "Name")]
+    void SyncEmployeeByNameWithWorkLogs(Employee.SyncFieldsByNameWithWorkLogs employees);
+
+##### IgnoreIfNull on Sync
+
+`[IgnoreIfNull]` and `[IgnoreIfNullOrEmpty]` can be used on Sync fields to skip updating a column when the value is null (or empty):
+
+    public class Employee
+    {
+        public class SyncFieldsIgnoreIfNull
+        {
+            public int? Id { get; set; }
+            [IgnoreIfNull] public string Name { get; set; }
+        }
+    }
+    ...
+    [Sync(TableName = nameof(Employee))]
+    void SyncEmployees(Employee.SyncFieldsIgnoreIfNull employees);
 
 #### Update
 
@@ -809,16 +1066,92 @@ Complex objects can be passed:
 		[Update(TableName = nameof(Employee))]
 		void Update([Set] Employee.UpdateName values, int id);
     
-However, Set and and query filters currently cannot be combined in the same class (although this feature is planned):
+##### Mixed Set and Filter Properties
 
-    public class Employee
+Set and filter properties can be combined in the same class. Properties decorated with `[Set]` will be used in the SET clause, while undecorated properties will be used as WHERE clause filters:
+
+    public class WorkLog
     {
-			public class INVALID_UpdateName 
-			{
-				[Set] public string Name { get; set; }
-				public int Id { get; set; }
-			}
-		}
+        public class SetDatesWithIdFilter
+        {
+            [Set]
+            public DateTime StartDate { get; set; }
+            [Set]
+            public DateTime EndDate { get; set; }
+            public int Id { get; set; }
+        }
+    }
+    ...
+    [Update(TableName = nameof(WorkLog))]
+    void UpdateWorkLogDates(WorkLog.SetDatesWithIdFilter workLog);
+
+Filter properties in a mixed class support the same attributes as standard query filters, such as `[IgnoreIfNull]`, `[OrGroup]`, and `[GreaterThan]`:
+
+    public class WorkLog
+    {
+        public class SetDatesWithIgnoreIfNullFilter
+        {
+            [Set]
+            public DateTime StartDate { get; set; }
+            [Set]
+            public DateTime EndDate { get; set; }
+            [IgnoreIfNull]
+            public int? EmployeeId { get; set; }
+        }
+
+        public class SetDatesWithOrFilter
+        {
+            [Set]
+            public DateTime StartDate { get; set; }
+            [Set]
+            public DateTime EndDate { get; set; }
+            [OrGroup]
+            public int? EmployeeId { get; set; }
+            [OrGroup]
+            public int? LocationId { get; set; }
+        }
+
+        public class SetDatesWithGreaterThanFilter
+        {
+            [Set]
+            public DateTime StartDate { get; set; }
+            [Set]
+            public DateTime EndDate { get; set; }
+            [GreaterThan]
+            public int Id { get; set; }
+        }
+    }
+
+A mixed class can also be combined with additional scalar filter parameters:
+
+    [Update(TableName = nameof(WorkLog))]
+    void UpdateWorkLogDates(WorkLog.SetDatesWithIdFilter workLog, int employeeId);
+
+##### IgnoreIfNull on Update
+
+The `[IgnoreIfNull]` and `[IgnoreIfNullOrEmpty]` attributes can be used on `[Set]` properties to retain the original database value when the provided value is null (or empty). This is useful for partial updates where only some fields should be modified:
+
+    [Update(TableName = nameof(Employee))]
+    void UpdateEmployee([Set][IgnoreIfNull] string name, int id);
+
+    [Update(TableName = nameof(Employee))]
+    void UpdateEmployee([Set][IgnoreIfNullOrEmpty] string name, int id);
+
+When used via a class:
+
+    public class WorkLog
+    {
+        public class SetDatesIgnoreIfNullWithIdFilter
+        {
+            [Set, IgnoreIfNull]
+            public DateTime? StartDate { get; set; }
+            [Set, IgnoreIfNull]
+            public DateTime? EndDate { get; set; }
+            public int Id { get; set; }
+        }
+    }
+
+When `name` is null (or empty for `IgnoreIfNullOrEmpty`), the existing database value is preserved rather than being overwritten.
 
 Currently, update statements cannot return a return value:
 
@@ -1021,6 +1354,48 @@ For a more generic approach, this code can be adapted to scan and register all i
             registeredInterfaces.Add(type);
         }
     }
+
+### Adding Foreign Keys
+
+SigQL reads foreign key relationships from the database schema by default. However, in some cases you may need to add foreign key relationships programmatically (e.g. when the database does not define them, or when working with views or custom relationships).
+
+Foreign keys can be added to a table using the `AddForeignKey` extension method on `ITableDefinition`:
+
+    var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(connectionString);
+
+    // single column foreign key
+    var workLogTable = sqlDatabaseConfiguration.Tables.FindByName("WorkLog");
+    var employeeTable = sqlDatabaseConfiguration.Tables.FindByName("Employee");
+
+    workLogTable.AddForeignKey(
+        t => t.Columns.FindByName("EmployeeId"),
+        employeeTable.Columns.FindByName("Id"));
+
+Multiple foreign keys can be chained:
+
+    workLogTable
+        .AddForeignKey(
+            t => t.Columns.FindByName("EmployeeId"),
+            employeeTable.Columns.FindByName("Id"))
+        .AddForeignKey(
+            t => t.Columns.FindByName("LocationId"),
+            addressTable.Columns.FindByName("Id"));
+
+Composite (multi-column) foreign keys are also supported:
+
+    streetAddressCoordinateTable.AddForeignKey(
+        t => new[]
+        {
+            t.Columns.FindByName("StreetAddress"),
+            t.Columns.FindByName("City"),
+            t.Columns.FindByName("State")
+        },
+        new[]
+        {
+            addressTable.Columns.FindByName("StreetAddress"),
+            addressTable.Columns.FindByName("City"),
+            addressTable.Columns.FindByName("State")
+        });
 
 ### Logging
 
