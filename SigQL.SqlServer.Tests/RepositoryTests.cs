@@ -6623,14 +6623,14 @@ namespace SigQL.SqlServer.Tests
                     Name = "Kyle",
                     WorkLogs = new[]
                     {
-                        new WorkLog.SyncFields() { Id = 1, StartDate = new DateTime(2022, 1, 1), EndDate = new DateTime(2022, 1, 2) }
+                        new WorkLog.SyncFields() { Id = 2, StartDate = new DateTime(2022, 3, 1), EndDate = new DateTime(2022, 3, 2) }
                     }
                 });
 
             var actual = laborDbContext.Employee.AsNoTracking().Include(e => e.WorkLogs).Single();
             Assert.AreEqual("Kyle", actual.Name);
             Assert.AreEqual(1, actual.WorkLogs.Count);
-            Assert.AreEqual(new DateTime(2022, 1, 1), actual.WorkLogs.First().StartDate);
+            Assert.AreEqual(new DateTime(2022, 3, 1), actual.WorkLogs.First().StartDate);
         }
 
         #endregion
