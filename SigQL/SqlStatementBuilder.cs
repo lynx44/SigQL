@@ -175,6 +175,9 @@ namespace SigQL
                         case Predicate a: 
                             sql.Add($"({Walk(a.Args.Take(1))} {a.Keyword} {Walk(a.Args.Skip(1).Single())})".Trim());
                             break;
+                        case OpenJsonSelect a:
+                            sql.Add($"select cast(value as {a.CastType}) from openjson(@{a.ParameterName})");
+                            break;
                         case Placeholder a:
                             sql.Add(Walk(a.Args.SingleOrDefault())?.Trim());
                             break;

@@ -1055,9 +1055,16 @@ namespace SigQL
                     (comparisonSpec.Not ? (InPredicate) new NotInPredicate() : new InPredicate());
                 inPredicate.LeftComparison = columnNode;
                 placeholder.SetArgs(inPredicate);
+                var elementType = parameterType.IsArray
+                    ? parameterType.GetElementType()
+                    : parameterType.GetGenericArguments().FirstOrDefault() ?? typeof(object);
                 var token = new TokenPath(argument)
                 {
                     SqlParameterName = parameterName,
+                    InPredicate = inPredicate,
+                    ColumnNode = columnNode,
+                    ElementType = elementType,
+                    IsNot = comparisonSpec.Not,
                     UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                     {
                         var enumerable = parameterValue as IEnumerable;
@@ -1788,6 +1795,10 @@ namespace SigQL
         public string SqlParameterName { get; set; }
         internal IArgument Argument { get; set; }
         public Func<object, TokenPath, IEnumerable<ParameterArg>, IDictionary<string, object>> UpdateNodeFunc { get; set; }
+        internal InPredicate InPredicate { get; set; }
+        internal AstNode ColumnNode { get; set; }
+        internal Type ElementType { get; set; }
+        internal bool IsNot { get; set; }
     }
 
     public class ParameterArg

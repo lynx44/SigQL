@@ -540,6 +540,39 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Where_In_LargeCollection_UsesOpenJson()
+        {
+            var largeList = Enumerable.Range(1, 2100).Cast<int?>().ToList();
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyId(largeList));
+
+            Assert.IsTrue(sql.Contains("openjson"), "Expected SQL to contain openjson for large collection");
+            Assert.IsTrue(sql.Contains("cast(value as int)"), "Expected SQL to contain cast for openjson");
+        }
+
+        [TestMethod]
+        public void Where_In_SmallCollection_UsesNormalParameters()
+        {
+            var smallList = Enumerable.Range(1, 5).Cast<int?>().ToList();
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyId(smallList));
+
+            Assert.IsFalse(sql.Contains("openjson"), "Small collection should not use openjson");
+            Assert.IsTrue(sql.Contains("@id0"), "Small collection should use normal parameters");
+        }
+
+        [TestMethod]
+        public void Where_In_TwoLargeCollections_ConvertsLargestFirst()
+        {
+            var idList = Enumerable.Range(1, 1200).Cast<int?>().ToList();
+            var employeeIdList = Enumerable.Range(1, 900).Cast<int?>().ToList();
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyIdOrEmployeeId(idList, employeeIdList));
+
+            // total is 2100, over threshold. The larger collection (id, 1200 items) should be converted
+            Assert.IsTrue(sql.Contains("openjson"), "Expected SQL to contain openjson when total params exceed threshold");
+            // the smaller collection should remain as normal parameters since converting the larger one brings us under the threshold
+            Assert.IsTrue(sql.Contains("@employeeId0"), "Smaller collection should retain normal parameters");
+        }
+
+        [TestMethod]
         public void Where_GreaterThan_ReturnsExpectedSql()
         {
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsGreaterThanStartDate));

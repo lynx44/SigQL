@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using SigQL.Extensions;
 using SigQL.Schema;
 using SigQL.Types;
@@ -16,11 +17,19 @@ namespace SigQL
             this.Tokens = new List<TokenPath>();
         }
 
+        internal const int OpenJsonParameterThreshold = 2000;
+
         public PreparedSqlStatement GetPreparedStatement(IEnumerable<ParameterArg> parameterValues)
         {
             var additionalSqlParameters = this.ParseTokens(parameterValues);
             var parameters = this.GetParameters(parameterValues);
             var allParameters = MergeParameters(parameters, additionalSqlParameters);
+
+            if (allParameters.Count > OpenJsonParameterThreshold)
+            {
+                ConvertLargeCollectionsToOpenJson(allParameters);
+            }
+
             foreach (var key in allParameters.Keys.ToList())
             {
                 if (allParameters[key] == null)
@@ -34,6 +43,51 @@ namespace SigQL
                 Parameters = allParameters,
                 PrimaryKeyColumns = new PrimaryKeyQuerySpecifierCollection((this.TablePrimaryKeyDefinitions?.SelectMany(pk => pk.Value.Select(c => new PrimaryKeyQuerySpecifier(pk.Key, c)).ToList()) ?? new List<PrimaryKeyQuerySpecifier>()).ToList())
             };
+        }
+
+        private void ConvertLargeCollectionsToOpenJson(Dictionary<string, object> allParameters)
+        {
+            var collectionTokens = this.Tokens
+                .Where(t => t.InPredicate != null)
+                .Select(t =>
+                {
+                    var prefix = t.SqlParameterName;
+                    var matchingParams = allParameters.Keys
+                        .Where(k => k.StartsWith(prefix) && k.Length > prefix.Length && char.IsDigit(k[prefix.Length]))
+                        .ToList();
+                    return new { Token = t, ParamKeys = matchingParams, Count = matchingParams.Count };
+                })
+                .Where(t => t.Count > 0)
+                .OrderByDescending(t => t.Count)
+                .ToList();
+
+            foreach (var collectionToken in collectionTokens)
+            {
+                if (allParameters.Count <= OpenJsonParameterThreshold)
+                    break;
+
+                var values = collectionToken.ParamKeys
+                    .OrderBy(k => int.Parse(k.Substring(collectionToken.Token.SqlParameterName.Length)))
+                    .Select(k => allParameters[k])
+                    .ToList();
+
+                foreach (var key in collectionToken.ParamKeys)
+                {
+                    allParameters.Remove(key);
+                }
+
+                var jsonParamName = collectionToken.Token.SqlParameterName + "_json";
+                allParameters[jsonParamName] = JsonSerializer.Serialize(values);
+
+                var sqlType = collectionToken.Token.ElementType.GetSqlTypeName();
+                var openJsonNode = new OpenJsonSelect
+                {
+                    ParameterName = jsonParamName,
+                    CastType = sqlType
+                };
+
+                collectionToken.Token.InPredicate.SetArgs(openJsonNode);
+            }
         }
         internal IEnumerable<AstNode> CommandAst { get; set; }
         public Type UnwrappedReturnType { get; set; }

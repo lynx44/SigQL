@@ -1659,6 +1659,59 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void InParameter_LargeCollection_ReturnsExpectedResults()
+        {
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog(),
+                new EFWorkLog() { },
+                new EFWorkLog() { },
+                new EFWorkLog() { },
+                new EFWorkLog() { }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var allIds = laborDbContext.WorkLog.Select(wl => wl.Id).ToList();
+            // Create a large list of IDs that includes the real IDs plus many non-existent ones
+            var largeIdList = allIds.Cast<int?>().Concat(Enumerable.Range(100000, 2500).Cast<int?>()).ToList();
+            var actual = this.monolithicRepository.GetWorkLogsWithAnyId(largeIdList).Select(e => e.Id);
+
+            Assert.AreEqual(5, actual.Count());
+            AreEquivalent(allIds, actual);
+        }
+
+        [TestMethod]
+        public void InParameter_TwoLargeCollections_ReturnsExpectedResults()
+        {
+            var employee1 = new EFEmployee() { Name = "E1" };
+            var employee2 = new EFEmployee() { Name = "E2" };
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = employee1 },
+                new EFWorkLog() { Employee = employee1 },
+                new EFWorkLog() { Employee = employee2 },
+                new EFWorkLog() { Employee = employee2 },
+                new EFWorkLog() { Employee = employee2 }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var targetIds = laborDbContext.WorkLog.Take(2).Select(wl => wl.Id).ToList();
+            var targetEmployeeIds = new List<int> { employee1.Id };
+
+            // Build two large collections that exceed 2000 total params
+            var largeIdList = targetIds.Cast<int?>().Concat(Enumerable.Range(100000, 1200).Cast<int?>()).ToList();
+            var largeEmployeeIdList = targetEmployeeIds.Cast<int?>().Concat(Enumerable.Range(100000, 1200).Cast<int?>()).ToList();
+
+            var actual = this.monolithicRepository.GetWorkLogsWithAnyIdOrEmployeeId(largeIdList, largeEmployeeIdList).Select(e => e.Id).ToList();
+
+            // Should return work logs that match either condition
+            var expected = laborDbContext.WorkLog
+                .Where(wl => targetIds.Contains(wl.Id) || targetEmployeeIds.Contains(wl.EmployeeId.Value))
+                .Select(wl => wl.Id).ToList();
+
+            Assert.AreEqual(expected.Count, actual.Count);
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
         public void InParameter_WhenInNestedNavigationProperty_ReturnsExpected()
         {
             this.laborDbContext.WorkLog.AddRange(
