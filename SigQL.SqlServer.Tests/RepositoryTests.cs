@@ -490,6 +490,42 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void GetWithNullableEnumProperty()
+        {
+            var addAddress = new EFAddress() { Classification = AddressClassification.Work };
+            this.laborDbContext.Address.AddRange(addAddress);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetAddressesWithNullableEnumClassification();
+
+            Assert.AreEqual(1, actual.Count());
+            Assert.AreEqual(AddressClassification.Work, actual.First().Classification);
+        }
+
+        [TestMethod]
+        public void GetWithEnumPropertyPoco()
+        {
+            var addAddress = new EFAddress() { Classification = AddressClassification.Work };
+            this.laborDbContext.Address.AddRange(addAddress);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetAddressesWithEnumClassificationPoco();
+
+            Assert.AreEqual(1, actual.Count());
+            Assert.AreEqual(AddressClassification.Work, actual.First().Classification);
+        }
+
+        [TestMethod]
+        public void GetWithNullableEnumPropertyPoco()
+        {
+            var addAddress = new EFAddress() { Classification = AddressClassification.Work };
+            this.laborDbContext.Address.AddRange(addAddress);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetAddressesWithNullableEnumClassificationPoco();
+
+            Assert.AreEqual(1, actual.Count());
+            Assert.AreEqual(AddressClassification.Work, actual.First().Classification);
+        }
+
+        [TestMethod]
         public void GetSingle_WhenColumnIsNull_ReturnsNull()
         {
             var expected = new EFEmployee() { Name = null };

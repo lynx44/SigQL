@@ -1554,7 +1554,7 @@ In Visual Studio:
 No. However, it can be run in tandem with your preferred migration technology. Specifically, EF migrations have been tested to work alongside SigQL.
 
 **Are enums supported?**
-Yes, they are supported in return types, parameters and filter classes.
+Yes, they are supported in return types, parameters and filter classes. Nullable enum properties (e.g. `MyEnum? Status`) on POCO and interface projections are also supported.
 
 **What versions of .NET are targeted?**
 .NET Standard 2 (Core) and .NET Framework 4.6.2/4.7.2

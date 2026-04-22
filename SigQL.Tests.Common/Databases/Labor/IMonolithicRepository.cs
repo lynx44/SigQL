@@ -23,6 +23,9 @@ namespace SigQL.Tests.Common.Databases.Labor
         Employee.IEmployeeFields GetWithFilterSpecifiedColumnName(Employee.EmployeeIdFilter filter);
         Employee.IEmployeeId GetWithFilterNestedSpecifiedColumnName(Employee.EmployeeAddressWithNestedColumnAliasFilter filter);
         IEnumerable<Address.IAddressWithClassification> GetAddressesWithEnumClassification();
+        IEnumerable<Address.IAddressWithNullableClassification> GetAddressesWithNullableEnumClassification();
+        IEnumerable<Address.AddressWithClassificationPoco> GetAddressesWithEnumClassificationPoco();
+        IEnumerable<Address.AddressWithNullableClassificationPoco> GetAddressesWithNullableEnumClassificationPoco();
         Employee.IEmployeeFields GetNot([Not] int id);
         Employee.IEmployeeFields GetByNameNot([Not] string name);
         Employee.IEmployeeFields GetByNameFilter(Employee.EmployeeNameFilter filter);

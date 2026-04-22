@@ -48,5 +48,55 @@ namespace SigQL.Tests
             Assert.AreEqual(1, actual.Id);
             Assert.AreEqual("example1", actual.ClrOnlyProperty);
         }
+
+        [TestMethod]
+        public void Build_Poco_WithEnumProperty()
+        {
+            var actual = builder.Build(typeof(Address.AddressWithClassificationPoco), new RowValues() { Values = new Dictionary<string, object>()
+            {
+                { nameof(Address.AddressWithClassificationPoco.Id), 1 },
+                { nameof(Address.AddressWithClassificationPoco.Classification), (int)AddressClassification.Work }
+            }}) as Address.AddressWithClassificationPoco;
+
+            Assert.AreEqual(1, actual.Id);
+            Assert.AreEqual(AddressClassification.Work, actual.Classification);
+        }
+
+        [TestMethod]
+        public void Build_Poco_WithNullableEnumProperty()
+        {
+            var actual = builder.Build(typeof(Address.AddressWithNullableClassificationPoco), new RowValues() { Values = new Dictionary<string, object>()
+            {
+                { nameof(Address.AddressWithNullableClassificationPoco.Id), 1 },
+                { nameof(Address.AddressWithNullableClassificationPoco.Classification), (int)AddressClassification.Work }
+            }}) as Address.AddressWithNullableClassificationPoco;
+
+            Assert.AreEqual(1, actual.Id);
+            Assert.AreEqual(AddressClassification.Work, actual.Classification);
+        }
+
+        [TestMethod]
+        public void Build_Poco_WithNullableEnumProperty_WhenDbNull_ReturnsNull()
+        {
+            var actual = builder.Build(typeof(Address.AddressWithNullableClassificationPoco), new RowValues() { Values = new Dictionary<string, object>()
+            {
+                { nameof(Address.AddressWithNullableClassificationPoco.Id), 1 },
+                { nameof(Address.AddressWithNullableClassificationPoco.Classification), System.DBNull.Value }
+            }}) as Address.AddressWithNullableClassificationPoco;
+
+            Assert.AreEqual(1, actual.Id);
+            Assert.IsNull(actual.Classification);
+        }
+
+        [TestMethod]
+        public void Build_Interface_WithNullableEnumProperty()
+        {
+            var actual = builder.Build(typeof(Address.IAddressWithNullableClassification), new RowValues() { Values = new Dictionary<string, object>()
+            {
+                { nameof(Address.IAddressWithNullableClassification.Classification), (int)AddressClassification.Work }
+            }}) as Address.IAddressWithNullableClassification;
+
+            Assert.AreEqual(AddressClassification.Work, actual.Classification);
+        }
     }
 }
