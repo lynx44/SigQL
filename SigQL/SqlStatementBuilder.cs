@@ -178,6 +178,9 @@ namespace SigQL
                         case OpenJsonSelect a:
                             sql.Add($"select cast(value as {a.CastType}) from openjson(@{a.ParameterName})");
                             break;
+                        case OpenJsonTable a:
+                            sql.Add($"openjson(@{a.ParameterName}) with ({string.Join(", ", a.Columns.Select(c => $"\"{c.Name}\" {c.SqlType} '$.\"{c.Name}\"'"))})");
+                            break;
                         case Placeholder a:
                             sql.Add(Walk(a.Args.SingleOrDefault())?.Trim());
                             break;

@@ -250,6 +250,10 @@ IN clauses can be specified by passing a collection:
 
 *Note that the parameter is called names, even though the column identifier in the database is name (non-plural). Basic pluralization is supported, but the most reliable and unambiguous naming scheme would use the exact column identifier*
 
+###### Large collections
+
+SQL Server caps a single command at 2100 parameters. When a SigQL query — or a bulk `Insert`/`Upsert`/`Sync`/`UpdateByKey` — would exceed that limit, SigQL automatically serializes the offending collection to a single JSON parameter and reads it back on the server using `OPENJSON`. The behavior is transparent: the method signature and caller code are unchanged, and small inputs continue to use ordinary parameters. This means you can pass thousands of IDs to an `IN` query, or upsert thousands of rows in one call, without manually chunking the input.
+
 ##### Ignoring null or empty parameters
 
 When building search interfaces, it can be useful to omit a parameter from the WHERE clause if it is null or empty:

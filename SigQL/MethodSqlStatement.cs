@@ -30,6 +30,11 @@ namespace SigQL
                 ConvertLargeCollectionsToOpenJson(allParameters);
             }
 
+            if (allParameters.Count > OpenJsonParameterThreshold)
+            {
+                ConvertLargeLookupInsertsToOpenJson(allParameters);
+            }
+
             foreach (var key in allParameters.Keys.ToList())
             {
                 if (allParameters[key] == null)
@@ -89,6 +94,165 @@ namespace SigQL
                 collectionToken.Token.InPredicate.SetArgs(openJsonNode);
             }
         }
+
+        private void ConvertLargeLookupInsertsToOpenJson(Dictionary<string, object> allParameters)
+        {
+            if (this.CommandAst == null) return;
+
+            var statements = this.CommandAst.ToList();
+            var declaresByName = statements.OfType<DeclareStatement>()
+                .Where(d => d.Parameter?.Name != null && d.DataType?.Type?.Value == "table")
+                .ToDictionary(d => d.Parameter.Name, d => d);
+
+            var candidates = statements.OfType<Insert>()
+                .Select(ins => new { Insert = ins, TableVar = GetInsertTargetParameterName(ins) })
+                .Where(c => c.TableVar != null && declaresByName.ContainsKey(c.TableVar))
+                .Where(c => c.Insert.ValuesList?.Args != null && c.Insert.ValuesList.Args.Any())
+                .Select(c => new
+                {
+                    c.Insert,
+                    c.TableVar,
+                    Declare = declaresByName[c.TableVar],
+                    ParamCount = CountInsertParameters(c.Insert)
+                })
+                .Where(c => c.ParamCount > 0)
+                .OrderByDescending(c => c.ParamCount)
+                .ToList();
+
+            foreach (var candidate in candidates)
+            {
+                if (allParameters.Count <= OpenJsonParameterThreshold)
+                    break;
+
+                RewriteLookupInsertAsOpenJson(candidate.Insert, candidate.TableVar, candidate.Declare, allParameters);
+            }
+        }
+
+        private static string GetInsertTargetParameterName(Insert insert)
+        {
+            var tableIdentifier = insert.Object as TableIdentifier;
+            var namedParam = tableIdentifier?.Args?.OfType<NamedParameterIdentifier>().FirstOrDefault();
+            return namedParam?.Name;
+        }
+
+        private static int CountInsertParameters(Insert insert)
+        {
+            return insert.ValuesList.Args
+                .OfType<ValuesList>()
+                .Sum(row => row.Args?.OfType<NamedParameterIdentifier>().Count() ?? 0);
+        }
+
+        private static Dictionary<string, string> GetColumnSqlTypes(DeclareStatement declare)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (declare?.DataType?.Args == null) return result;
+            foreach (var colDecl in declare.DataType.Args.OfType<ColumnDeclaration>())
+            {
+                var colArgs = colDecl.Args?.ToList();
+                if (colArgs == null || colArgs.Count < 2) continue;
+                var col = colArgs[0] as RelationalColumn;
+                var dataType = colArgs[1] as DataType;
+                var typeLiteral = dataType?.Type?.Value;
+                if (col?.Label != null && typeLiteral != null)
+                {
+                    result[col.Label] = typeLiteral;
+                }
+            }
+            return result;
+        }
+
+        private static List<string> GetInsertColumnNames(Insert insert)
+        {
+            var names = new List<string>();
+            foreach (var col in insert.ColumnList)
+            {
+                var ci = col as ColumnIdentifier;
+                var rc = ci?.Args?.OfType<RelationalColumn>().FirstOrDefault();
+                names.Add(rc?.Label);
+            }
+            return names;
+        }
+
+        private void RewriteLookupInsertAsOpenJson(Insert insert, string tableVar, DeclareStatement declare,
+            Dictionary<string, object> allParameters)
+        {
+            var columnNames = GetInsertColumnNames(insert);
+            var columnTypes = GetColumnSqlTypes(declare);
+
+            // Build JSON payload: one object per row, keyed by column name.
+            var rows = new List<Dictionary<string, object>>();
+            foreach (var row in insert.ValuesList.Args.OfType<ValuesList>())
+            {
+                var cells = row.Args.ToList();
+                var rowDict = new Dictionary<string, object>();
+                for (var i = 0; i < columnNames.Count && i < cells.Count; i++)
+                {
+                    var name = columnNames[i];
+                    if (name == null) continue;
+                    rowDict[name] = ExtractCellValue(cells[i], allParameters);
+                }
+                rows.Add(rowDict);
+            }
+
+            // Remove old per-cell parameters that belonged to this insert.
+            foreach (var row in insert.ValuesList.Args.OfType<ValuesList>())
+            {
+                foreach (var np in row.Args.OfType<NamedParameterIdentifier>())
+                {
+                    allParameters.Remove(np.Name);
+                }
+            }
+
+            var jsonParamName = tableVar + "_json";
+            allParameters[jsonParamName] = JsonSerializer.Serialize(rows);
+
+            var openJsonColumns = columnNames
+                .Where(n => n != null)
+                .Select(n => new OpenJsonTableColumn
+                {
+                    Name = n,
+                    SqlType = columnTypes.TryGetValue(n, out var t) ? t : "nvarchar(max)"
+                })
+                .ToList();
+
+            var openJsonTable = new OpenJsonTable
+            {
+                ParameterName = jsonParamName,
+                Columns = openJsonColumns
+            };
+
+            // Replace the VALUES (...) body with: SELECT col1, col2, ... FROM openjson(@json) WITH (...)
+            insert.ValuesList = null;
+            insert.SetArgs(new Select()
+            {
+                SelectClause = new SelectClause().SetArgs(
+                    columnNames.Where(n => n != null).Select(n =>
+                        (AstNode)new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = n })
+                    ).ToList()
+                ),
+                FromClause = new FromClause().SetArgs(
+                    new FromClauseNode().SetArgs(openJsonTable)
+                )
+            });
+        }
+
+        private static object ExtractCellValue(AstNode cell, Dictionary<string, object> allParameters)
+        {
+            switch (cell)
+            {
+                case NamedParameterIdentifier np:
+                    if (!allParameters.TryGetValue(np.Name, out var v)) return null;
+                    return v is DBNull ? null : v;
+                case Literal lit:
+                    if (lit.Value == null) return null;
+                    if (int.TryParse(lit.Value, out var i)) return i;
+                    if (string.Equals(lit.Value, "null", StringComparison.OrdinalIgnoreCase)) return null;
+                    return lit.Value;
+                default:
+                    return null;
+            }
+        }
+
         internal IEnumerable<AstNode> CommandAst { get; set; }
         public Type UnwrappedReturnType { get; set; }
         public Type ReturnType { get; set; }

@@ -6601,6 +6601,75 @@ namespace SigQL.SqlServer.Tests
         #region KeyColumns
 
         [TestMethod]
+        public void Upsert_LargeCollection_RoundTripsCorrectly()
+        {
+            // each row has 2 params (Id, Name). 1200 rows -> 2400 params, exceeds the 2100 SQL Server limit.
+            var rows = Enumerable.Range(1, 1200)
+                .Select(i => new Employee.UpsertFieldsByName() { Name = "Emp_" + i })
+                .ToArray();
+
+            this.monolithicRepository.UpsertEmployeeByName(rows);
+
+            var actual = laborDbContext.Employee.AsNoTracking().ToList();
+            Assert.AreEqual(1200, actual.Count);
+            Assert.IsTrue(actual.Any(e => e.Name == "Emp_1"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Emp_600"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Emp_1200"));
+        }
+
+        [TestMethod]
+        public void Upsert_LargeCollection_UpdatesExistingAndInsertsNew()
+        {
+            for (var i = 1; i <= 5; i++)
+            {
+                laborDbContext.Employee.Add(new EFEmployee() { Name = "Existing_" + i });
+            }
+            laborDbContext.SaveChanges();
+
+            var rows = new List<Employee.UpsertFieldsByName>();
+            for (var i = 1; i <= 5; i++) rows.Add(new Employee.UpsertFieldsByName() { Name = "Existing_" + i });
+            for (var i = 1; i <= 1200; i++) rows.Add(new Employee.UpsertFieldsByName() { Name = "New_" + i });
+
+            this.monolithicRepository.UpsertEmployeeByName(rows.ToArray());
+
+            var actual = laborDbContext.Employee.AsNoTracking().ToList();
+            Assert.AreEqual(1205, actual.Count);
+            Assert.IsTrue(actual.Any(e => e.Name == "Existing_1"));
+            Assert.IsTrue(actual.Any(e => e.Name == "New_1"));
+            Assert.IsTrue(actual.Any(e => e.Name == "New_1200"));
+        }
+
+        [TestMethod]
+        public void Upsert_NestedRelations_BothListsExceedParameterLimit_RoundTripsCorrectly()
+        {
+            // 1200 employees × 2 params = 2400 parent params (over threshold)
+            // 1200 × 2 worklogs × 3 params = 7200 child params (over threshold)
+            // Both lookup inserts must be rewritten to openjson for the query to execute.
+            var employees = Enumerable.Range(1, 1200).Select(i => new Employee.UpsertFieldsWithWorkLogs()
+            {
+                Name = "Emp_" + i,
+                WorkLogs = new[]
+                {
+                    new WorkLog.UpsertFields() { StartDate = new DateTime(2024, 1, 1).AddDays(i), EndDate = new DateTime(2024, 1, 2).AddDays(i) },
+                    new WorkLog.UpsertFields() { StartDate = new DateTime(2024, 6, 1).AddDays(i), EndDate = new DateTime(2024, 6, 2).AddDays(i) }
+                }
+            }).ToArray();
+
+            this.monolithicRepository.UpsertMultipleEmployeesWithWorkLogs(employees);
+
+            var actualEmployees = laborDbContext.Employee.AsNoTracking().Include(e => e.WorkLogs).ToList();
+            Assert.AreEqual(1200, actualEmployees.Count);
+            Assert.AreEqual(2400, actualEmployees.Sum(e => e.WorkLogs.Count));
+
+            var first = actualEmployees.Single(e => e.Name == "Emp_1");
+            Assert.AreEqual(2, first.WorkLogs.Count);
+            Assert.IsTrue(first.WorkLogs.Any(wl => wl.StartDate == new DateTime(2024, 1, 2)));
+
+            var last = actualEmployees.Single(e => e.Name == "Emp_1200");
+            Assert.AreEqual(2, last.WorkLogs.Count);
+        }
+
+        [TestMethod]
         public void Upsert_WithKeyColumns_MatchesByName()
         {
             laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });

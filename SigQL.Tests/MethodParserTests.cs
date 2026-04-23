@@ -573,6 +573,48 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Upsert_LargeCollection_UsesOpenJsonForLookupInsert()
+        {
+            var employees = Enumerable.Range(1, 1500)
+                .Select(i => new Employee.UpsertFieldsByName() { Id = i, Name = "Name" + i })
+                .ToList();
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpsertEmployeeByName(employees));
+
+            Assert.IsTrue(sql.Contains("openjson(@"),
+                $"Expected SQL to rewrite large lookup insert as openjson. SQL: {sql}");
+            // should not carry the per-row named parameters in the insert anymore
+            Assert.IsFalse(sql.Contains("@employeesName0"),
+                $"Per-row parameters should be removed after openjson rewrite. SQL: {sql}");
+        }
+
+        [TestMethod]
+        public void Upsert_LargeCollection_OpenJsonParameterContainsRowPayload()
+        {
+            var employees = Enumerable.Range(1, 1500)
+                .Select(i => new Employee.UpsertFieldsByName() { Id = i, Name = "Name" + i })
+                .ToList();
+            this.monolithicRepository.UpsertEmployeeByName(employees);
+            var prepared = this.preparedSqlStatements.First();
+            var jsonParam = prepared.Parameters.FirstOrDefault(p => p.Key.EndsWith("_json"));
+            Assert.IsNotNull(jsonParam.Key, "Expected a _json parameter");
+            var json = (string)jsonParam.Value;
+            Assert.IsTrue(json.Contains("\"Name\":\"Name1\""),
+                $"JSON payload should contain row values. Payload: {json.Substring(0, Math.Min(200, json.Length))}");
+        }
+
+        [TestMethod]
+        public void Upsert_SmallCollection_DoesNotUseOpenJson()
+        {
+            var employees = Enumerable.Range(1, 5)
+                .Select(i => new Employee.UpsertFieldsByName() { Id = i, Name = "Name" + i })
+                .ToList();
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpsertEmployeeByName(employees));
+
+            Assert.IsFalse(sql.Contains("openjson"),
+                $"Small upserts should continue to use VALUES lists. SQL: {sql}");
+        }
+
+        [TestMethod]
         public void Where_GreaterThan_ReturnsExpectedSql()
         {
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogsGreaterThanStartDate));

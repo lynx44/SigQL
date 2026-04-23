@@ -309,6 +309,10 @@ IEnumerable<Employee> ExcludeStartsWith([Not][StartsWith] string name);
 
 Pass `IEnumerable<T>` — SigQL generates `IN (...)`.
 For large lists (>2100 params) SigQL automatically switches to `OPENJSON`.
+The same auto-switch also covers bulk inserts/upserts/sync/updateByKey —
+row data is serialized to a single JSON parameter and unpacked server-side
+via `INSERT @Lookup SELECT ... FROM openjson(@rows) WITH (...)`, so large
+bulk writes never hit SQL Server's 2100-parameter limit.
 
 ```csharp
 IEnumerable<Employee> GetByIds(IEnumerable<int> ids);
