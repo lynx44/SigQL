@@ -191,6 +191,31 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<string> Name { get; set; }
         }
 
+        public class EmployeeNamesStartsWithFilter
+        {
+            [Column(nameof(Name)), StartsWith] public List<string> NameStartsWith { get; set; }
+        }
+
+        public class EmployeeNamesContainsFilter
+        {
+            [Column(nameof(Name)), Contains] public List<string> NameContains { get; set; }
+        }
+
+        public class EmployeeNamesEndsWithFilter
+        {
+            [Column(nameof(Name)), EndsWith] public List<string> NameEndsWith { get; set; }
+        }
+
+        public class EmployeeNamesNotContainsFilter
+        {
+            [Column(nameof(Name)), Not, Contains] public List<string> NameContains { get; set; }
+        }
+
+        public class EmployeeNamesContainsIgnoreIfNullOrEmptyFilter
+        {
+            [Column(nameof(Name)), Contains, IgnoreIfNullOrEmpty] public List<string> NameContains { get; set; }
+        }
+
         public class IdFilter
         {
             public int Id { get; set; }

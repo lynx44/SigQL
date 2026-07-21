@@ -980,7 +980,76 @@ namespace SigQL
             var parameterType = comparisonSpec.ComparisonType;
 
             var placeholder = new Placeholder();
-            if (typeof(Like).IsAssignableFrom(parameterType) || 
+            if (comparisonSpec.IsAnyLike && parameterType.IsCollectionType())
+            {
+                // startswith/contains/endswith applied to a collection parameter.
+                // build a like predicate per element, combined with OR (or AND for NOT):
+                //   (col like @p0 or col like @p1 or ...)
+                var likeContainer = comparisonSpec.Not ? (AstNode) new AndOperator() : new OrOperator();
+                placeholder.SetArgs(likeContainer);
+                var token = new TokenPath(argument)
+                {
+                    SqlParameterName = parameterName,
+                    UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
+                    {
+                        var sqlParameters = new Dictionary<string, object>();
+                        var allItems = (parameterValue as IEnumerable)?.Cast<object>().ToList();
+                        if (allItems != null && allItems.Any())
+                        {
+                            var hasNullItem = allItems.Any(i => i == null);
+                            var itemsList = allItems.Where(i => i != null).ToList();
+                            var predicates = new List<AstNode>();
+                            for (var i = 0; i < itemsList.Count; i++)
+                            {
+                                var pname = parameterName + i;
+                                sqlParameters[pname] = ConvertToLikeValue(itemsList[i], comparisonSpec);
+                                AstNode likePredicate =
+                                    (comparisonSpec.Not ? (LikePredicate) new NotLikePredicate() : new LikePredicate())
+                                    .SetArgs(columnNode, new NamedParameterIdentifier() { Name = pname });
+                                predicates.Add(likePredicate);
+                            }
+
+                            if (hasNullItem)
+                            {
+                                // if a null item is passed, also check if the column is null
+                                AstNode isNullOperator = (comparisonSpec.Not ?
+                                    (AstNode) new IsNotOperator() :
+                                    new IsOperator()).SetArgs(
+                                    columnNode,
+                                    new NullLiteral());
+                                predicates.Add(isNullOperator);
+                            }
+
+                            likeContainer.SetArgs(predicates);
+                        }
+                        else
+                        {
+                            if ((allItems == null && (comparisonSpec.IgnoreIfNull || comparisonSpec.IgnoreIfNullOrEmpty)) ||
+                                (!(allItems?.Any()).GetValueOrDefault(false) && comparisonSpec.IgnoreIfNullOrEmpty))
+                            {
+                                // do not apply the filter
+                                placeholder.SetArgs(
+                                    new EqualsOperator().SetArgs(
+                                        new Literal() { Value = "1" },
+                                        new Literal() { Value = "1" }));
+                            }
+                            else
+                            {
+                                // empty collection - return no results
+                                placeholder.SetArgs(
+                                    new EqualsOperator().SetArgs(
+                                        new Literal() { Value = "0" },
+                                        new Literal() { Value = "1" }));
+                            }
+                        }
+
+                        return sqlParameters;
+                    }
+                };
+                tokens.Add(token);
+                return placeholder;
+            }
+            if (typeof(Like).IsAssignableFrom(parameterType) ||
                 comparisonSpec.IsAnyLike)
             {
                 operatorNode = 
@@ -1226,6 +1295,26 @@ namespace SigQL
             }
 
             return placeholder;
+        }
+
+        private static object ConvertToLikeValue(object item, ColumnSpec comparisonSpec)
+        {
+            switch (item)
+            {
+                case null:
+                    return null;
+                case Like like:
+                    // already contains the appropriate wildcards
+                    return like.SqlValue;
+                case string stringValue when comparisonSpec.StartsWith:
+                    return new StartsWith(stringValue).SqlValue;
+                case string stringValue when comparisonSpec.Contains:
+                    return new Contains(stringValue).SqlValue;
+                case string stringValue when comparisonSpec.EndsWith:
+                    return new EndsWith(stringValue).SqlValue;
+                default:
+                    return item;
+            }
         }
 
         private class OrderBySpec

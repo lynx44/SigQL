@@ -1508,6 +1508,131 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void CollectionStartsWith()
+        {
+            this.laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Joe" },
+                new EFEmployee() { Name = "Jake" },
+                new EFEmployee() { Name = "Sue" },
+                new EFEmployee() { Name = "Kaylee" }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.Employee.Where(e => e.Name.StartsWith("Jo") || e.Name.StartsWith("Su")).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetEmployeesByNamesWithStartsWith(new List<string>() { "Jo", "Su" }).Select(e => e.Id);
+
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void CollectionContains()
+        {
+            this.laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Joe" },
+                new EFEmployee() { Name = "Jake" },
+                new EFEmployee() { Name = "Sue" },
+                new EFEmployee() { Name = "Kaylee" }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.Employee.Where(e => e.Name.Contains("oe") || e.Name.Contains("ue")).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetEmployeesByNamesWithContains(new List<string>() { "oe", "ue" }).Select(e => e.Id);
+
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void CollectionEndsWith()
+        {
+            this.laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Joe" },
+                new EFEmployee() { Name = "Jake" },
+                new EFEmployee() { Name = "Sue" },
+                new EFEmployee() { Name = "Kaylee" }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.Employee.Where(e => e.Name.EndsWith("oe") || e.Name.EndsWith("ke")).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetEmployeesByNamesWithEndsWith(new List<string>() { "oe", "ke" }).Select(e => e.Id);
+
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void CollectionNotContains()
+        {
+            this.laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Joe" },
+                new EFEmployee() { Name = "Jake" },
+                new EFEmployee() { Name = "Sue" },
+                new EFEmployee() { Name = "Kaylee" }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.Employee.Where(e => !e.Name.Contains("oe") && !e.Name.Contains("ue")).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetEmployeesByNamesWithNotContains(new List<string>() { "oe", "ue" }).Select(e => e.Id);
+
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void CollectionContainsViaClassFilter()
+        {
+            this.laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Joe" },
+                new EFEmployee() { Name = "Jake" },
+                new EFEmployee() { Name = "Sue" },
+                new EFEmployee() { Name = "Kaylee" }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.Employee.Where(e => e.Name.Contains("oe") || e.Name.Contains("ue")).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetEmployeesByNamesWithContainsClassFilter(
+                new Employee.EmployeeNamesContainsFilter() { NameContains = new List<string>() { "oe", "ue" } }).Select(e => e.Id);
+
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void CollectionContains_IgnoreIfNullOrEmpty_WhenEmpty_ReturnsAll()
+        {
+            this.laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Joe" },
+                new EFEmployee() { Name = "Jake" },
+                new EFEmployee() { Name = "Sue" },
+                new EFEmployee() { Name = "Kaylee" }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.Employee.Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetEmployeesByNamesWithContainsIgnoreIfNullOrEmpty(new List<string>()).Select(e => e.Id);
+
+            Assert.AreEqual(4, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void CollectionContains_WhenEmpty_ReturnsNoResults()
+        {
+            this.laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Joe" },
+                new EFEmployee() { Name = "Jake" },
+                new EFEmployee() { Name = "Sue" },
+                new EFEmployee() { Name = "Kaylee" }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetEmployeesByNamesWithContains(new List<string>()).Select(e => e.Id);
+
+            Assert.AreEqual(0, actual.Count());
+        }
+
+        [TestMethod]
         public void LikeViaNestedNavigationPropertyParameter()
         {
             this.laborDbContext.WorkLog.AddRange(

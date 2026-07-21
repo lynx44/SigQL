@@ -94,6 +94,12 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithNotStartsWith([Not, StartsWith] string name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithNotContains([Not, Contains] string name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithNotEndsWith([Not, EndsWith] string name);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNamesWithStartsWith([Column(nameof(Employee.Name)), StartsWith] List<string> names);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNamesWithContains([Column(nameof(Employee.Name)), Contains] List<string> names);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNamesWithEndsWith([Column(nameof(Employee.Name)), EndsWith] List<string> names);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNamesWithNotContains([Column(nameof(Employee.Name)), Not, Contains] List<string> names);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNamesWithContainsClassFilter(Employee.EmployeeNamesContainsFilter filter);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNamesWithContainsIgnoreIfNullOrEmpty([Column(nameof(Employee.Name)), Contains, IgnoreIfNullOrEmpty] List<string> names);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameIgnoreIfNull([IgnoreIfNull] string name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameIgnoreIfNullOrEmptyString([IgnoreIfNullOrEmpty] string name);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNameWithLike(WorkLog.GetLikeEmployeeNameFilter filter);

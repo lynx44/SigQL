@@ -530,7 +530,118 @@ namespace SigQL.Tests
 
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"Id\" in (@ids0))", sql);
         }
-        
+
+        [TestMethod]
+        public void Where_CollectionStartsWith_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeesByNamesWithStartsWith(new List<string>() { "Jo", "Su" }));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((\"Employee\".\"Name\" like @names0) or (\"Employee\".\"Name\" like @names1))", sql);
+        }
+
+        [TestMethod]
+        public void Where_CollectionStartsWith_AppendsTrailingWildcard()
+        {
+            this.monolithicRepository.GetEmployeesByNamesWithStartsWith(new List<string>() { "Jo", "Su" });
+            var parameters = this.preparedSqlStatements.First().Parameters;
+
+            Assert.AreEqual("Jo%", parameters["names0"]);
+            Assert.AreEqual("Su%", parameters["names1"]);
+        }
+
+        [TestMethod]
+        public void Where_CollectionContains_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeesByNamesWithContains(new List<string>() { "oh", "ue" }));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((\"Employee\".\"Name\" like @names0) or (\"Employee\".\"Name\" like @names1))", sql);
+        }
+
+        [TestMethod]
+        public void Where_CollectionContains_WrapsValueInWildcards()
+        {
+            this.monolithicRepository.GetEmployeesByNamesWithContains(new List<string>() { "oh", "ue" });
+            var parameters = this.preparedSqlStatements.First().Parameters;
+
+            Assert.AreEqual("%oh%", parameters["names0"]);
+            Assert.AreEqual("%ue%", parameters["names1"]);
+        }
+
+        [TestMethod]
+        public void Where_CollectionEndsWith_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeesByNamesWithEndsWith(new List<string>() { "hn", "an" }));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((\"Employee\".\"Name\" like @names0) or (\"Employee\".\"Name\" like @names1))", sql);
+        }
+
+        [TestMethod]
+        public void Where_CollectionEndsWith_PrependsWildcard()
+        {
+            this.monolithicRepository.GetEmployeesByNamesWithEndsWith(new List<string>() { "hn", "an" });
+            var parameters = this.preparedSqlStatements.First().Parameters;
+
+            Assert.AreEqual("%hn", parameters["names0"]);
+            Assert.AreEqual("%an", parameters["names1"]);
+        }
+
+        [TestMethod]
+        public void Where_CollectionContains_SingleItem_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeesByNamesWithContains(new List<string>() { "oh" }));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where (\"Employee\".\"Name\" like @names0)", sql);
+        }
+
+        [TestMethod]
+        public void Where_CollectionNotContains_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeesByNamesWithNotContains(new List<string>() { "oh", "ue" }));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((\"Employee\".\"Name\" not like @names0) and (\"Employee\".\"Name\" not like @names1))", sql);
+        }
+
+        [TestMethod]
+        public void Where_CollectionContains_WithNullItem_ChecksColumnForNull()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeesByNamesWithContains(new List<string>() { "oh", null }));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((\"Employee\".\"Name\" like @names0) or (\"Employee\".\"Name\" is null))", sql);
+        }
+
+        [TestMethod]
+        public void Where_CollectionContains_ClassFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeesByNamesWithContainsClassFilter(
+                new Employee.EmployeeNamesContainsFilter() { NameContains = new List<string>() { "oh", "ue" } }));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((\"Employee\".\"Name\" like @NameContains0) or (\"Employee\".\"Name\" like @NameContains1))", sql);
+        }
+
+        [TestMethod]
+        public void Where_CollectionContains_IgnoreIfNullOrEmpty_Empty_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeesByNamesWithContainsIgnoreIfNullOrEmpty(new List<string>()));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where (1 = 1)", sql);
+        }
+
+        [TestMethod]
+        public void Where_CollectionContains_IgnoreIfNullOrEmpty_Null_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeesByNamesWithContainsIgnoreIfNullOrEmpty(null));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where (1 = 1)", sql);
+        }
+
+        [TestMethod]
+        public void Where_CollectionContains_Empty_ReturnsNoResults()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeesByNamesWithContains(new List<string>()));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where (0 = 1)", sql);
+        }
+
         [TestMethod]
         public void Where_NullParameter_ReturnsExpectedSql()
         {

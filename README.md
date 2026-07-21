@@ -254,6 +254,26 @@ IN clauses can be specified by passing a collection:
 
 SQL Server caps a single command at 2100 parameters. When a SigQL query — or a bulk `Insert`/`Upsert`/`Sync`/`UpdateByKey` — would exceed that limit, SigQL automatically serializes the offending collection to a single JSON parameter and reads it back on the server using `OPENJSON`. The behavior is transparent: the method signature and caller code are unchanged, and small inputs continue to use ordinary parameters. This means you can pass thousands of IDs to an `IN` query, or upsert thousands of rows in one call, without manually chunking the input.
 
+##### StartsWith / Contains / EndsWith on collections
+
+The `[StartsWith]`, `[Contains]`, and `[EndsWith]` attributes can also be applied to a collection parameter. This finds all rows that match *any* of the supplied values, generating a set of `LIKE` predicates combined with `OR`:
+
+    IEnumerable<Employee.IEmployeeId> GetEmployeesByNames([Column("Name"), Contains] List<string> names);
+
+    // where (Name like '%smith%' or Name like '%jones%')
+    repository.GetEmployeesByNames(new List<string>() { "smith", "jones" });
+
+This also works when the collection is a property of a filter class:
+
+    public class EmployeeFilter
+    {
+        [Column("Name"), Contains] public List<string> EmployeeNameContains { get; set; }
+    }
+
+    IEnumerable<Employee> Get(EmployeeFilter filter);
+
+When combined with `[Not]`, the predicates are combined with `AND` instead (`Name not like '%smith%' and Name not like '%jones%'`). A `null` element additionally checks the column for `null`. An empty collection returns no results unless `[IgnoreIfNullOrEmpty]` (or `[IgnoreIfNull]` for a null collection) is also specified, in which case the filter is omitted.
+
 ##### Ignoring null or empty parameters
 
 When building search interfaces, it can be useful to omit a parameter from the WHERE clause if it is null or empty:
