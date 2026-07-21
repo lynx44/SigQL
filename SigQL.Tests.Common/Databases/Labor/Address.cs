@@ -46,6 +46,23 @@ namespace SigQL.Tests.Common.Databases.Labor
             AddressClassification Classification { get; }
         }
 
+        public interface IAddressWithNullableClassification
+        {
+            AddressClassification? Classification { get; }
+        }
+
+        public class AddressWithClassificationPoco
+        {
+            public int Id { get; set; }
+            public AddressClassification Classification { get; set; }
+        }
+
+        public class AddressWithNullableClassificationPoco
+        {
+            public int Id { get; set; }
+            public AddressClassification? Classification { get; set; }
+        }
+
         public class CityAndState
         {
             public string City { get; set; }

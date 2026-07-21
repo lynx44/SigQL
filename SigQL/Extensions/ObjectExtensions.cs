@@ -23,6 +23,24 @@ namespace SigQL.Extensions
             return o is System.DBNull ? null : o;
         }
 
+        internal static object ConvertToClr(this object o, Type targetType)
+        {
+            if (o is System.DBNull)
+                return null;
+
+            if (o == null || targetType == null)
+                return o;
+
+            var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+            if (o.GetType() == underlyingType)
+                return o;
+
+            if (underlyingType.IsEnum)
+                return Enum.ToObject(underlyingType, o);
+
+            return o;
+        }
+
         public static IDictionary<string, object> ToDictionary(this object obj)
         {
             return obj.GetType().GetProperties().ToDictionary(prop => prop.Name, prop => prop.GetValue(obj, null));

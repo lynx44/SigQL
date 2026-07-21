@@ -25,22 +25,25 @@ namespace SigQL
         }
 
         public IEnumerable<ColumnDefinitionWithPropertyPath> ResolveColumnsForSelectStatement(
-            TableRelations tableRelations, 
+            TableRelations tableRelations,
             IEnumerable<ColumnAliasForeignKeyDefinition> allForeignKeys,
             ConcurrentDictionary<string, IEnumerable<string>> tableKeyDefinitions)
+        {
+            return ResolveColumnsForSelectStatementInternal(tableRelations, allForeignKeys, tableKeyDefinitions, null);
+        }
+
+        private IEnumerable<ColumnDefinitionWithPropertyPath> ResolveColumnsForSelectStatementInternal(
+            TableRelations tableRelations,
+            IEnumerable<ColumnAliasForeignKeyDefinition> allForeignKeys,
+            ConcurrentDictionary<string, IEnumerable<string>> tableKeyDefinitions,
+            List<string> flattenedViaRelationKeyAliases)
         {
             ITableDefinition table = null;
             table = tableRelations.TargetTable;
 
             var tableColumns = tableRelations.ProjectedColumns.SelectMany(p =>
             {
-                //var targetColumn = table.Columns.FindByName(p.Name);
                 var argument = p.Arguments.GetArguments(TableRelationsColumnSource.ReturnType).FirstOrDefault();
-                //if (targetColumn == null)
-                //{
-                //    throw new InvalidIdentifierException(
-                //        $"Unable to identify matching database column for property {argument.FullyQualifiedName()}. Column {p.Name} does not exist in table {table.Name}.");
-                //}
 
                 var propertyPaths = argument?.FindFromPropertyRoot().Select(arg => arg.Name).ToList();
                 return new ColumnDefinitionWithPropertyPath()
@@ -51,14 +54,37 @@ namespace SigQL
             }).ToList();
             var columns = tableColumns.ToList();
 
+            var additionalKeyAliases = new List<string>();
             columns.AddRange(tableRelations.NavigationTables.SelectMany(p =>
             {
-                return ResolveColumnsForSelectStatement(p, allForeignKeys, tableKeyDefinitions);
+                return ResolveColumnsForSelectStatementInternal(p, allForeignKeys, tableKeyDefinitions, additionalKeyAliases);
             }));
-            
+
             var currentPaths = tableRelations.Argument.FindFromPropertyRoot().Select(p => p.Name).ToList();
-            
-            if ((tableRelations.PrimaryKey?.Any()).GetValueOrDefault(false))
+
+            // Check if this table has only flattened ViaRelation output columns
+            bool isFlattenedViaRelation = tableRelations.ProjectedColumns.Any() &&
+                tableRelations.ProjectedColumns.All(c => c is TableRelationColumnDefinition trd && trd.IsFlattenedViaRelationOutput);
+
+            if (isFlattenedViaRelation)
+            {
+                // Add hidden PK columns from this endpoint table to make joined rows unique
+                var pkColumns = tableRelations.TargetTable.PrimaryKey?.Columns;
+                if (pkColumns != null && pkColumns.Any())
+                {
+                    foreach (var pk in pkColumns)
+                    {
+                        var hiddenAlias = $"_vr_{tableRelations.TargetTable.Name}_{pk.Name}";
+                        columns.Add(new ColumnDefinitionWithPropertyPath()
+                        {
+                            ColumnDefinition = new ColumnAliasColumnDefinition(pk.Name, pk.DataTypeDeclaration, pk.Table, tableRelations, pk.IsIdentity),
+                            PropertyPath = new PropertyPath() { PropertyPaths = new List<string>() { hiddenAlias } }
+                        });
+                        flattenedViaRelationKeyAliases?.Add(hiddenAlias);
+                    }
+                }
+            }
+            else if ((tableRelations.PrimaryKey?.Any()).GetValueOrDefault(false))
             {
                 var missingPkColumns = tableRelations.PrimaryKey.Where(pkc =>
                     !columns.Any(c => ColumnEqualityComparer.Default.Equals(pkc, c.ColumnDefinition))).ToList();
@@ -73,7 +99,7 @@ namespace SigQL
                                 PropertyPath = new PropertyPath() {PropertyPaths = currentPaths.AppendOne(c.Name).ToList()}
                             };
                         }).ToList();
-                
+
                     primaryColumns.AddRange(tableColumns);
                     tableColumns = primaryColumns.ToList();
                 }
@@ -85,7 +111,26 @@ namespace SigQL
                 selectedPrimaryColumns.AddRange(columns.Except(selectedPrimaryColumns));
                 columns = selectedPrimaryColumns.ToList();
             }
-            
+
+            // Bubble up any additional key aliases from child flattened ViaRelation tables
+            if (additionalKeyAliases.Any())
+            {
+                if (flattenedViaRelationKeyAliases != null)
+                {
+                    // Not the root - pass up to parent
+                    flattenedViaRelationKeyAliases.AddRange(additionalKeyAliases);
+                }
+                else
+                {
+                    // Root level - add to root key definition
+                    var rootKey = string.Join(".", currentPaths);
+                    if (tableKeyDefinitions.ContainsKey(rootKey))
+                    {
+                        tableKeyDefinitions[rootKey] = tableKeyDefinitions[rootKey].Concat(additionalKeyAliases).ToList();
+                    }
+                }
+            }
+
             columns = columns.GroupBy(c => c.Alias, c => c).Select(c => c.First()).ToList();
 
             return columns;

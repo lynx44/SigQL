@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using SigQL.Extensions;
 using SigQL.Schema;
+using SigQL.Types;
 
 namespace SigQL
 {
@@ -52,8 +53,9 @@ namespace SigQL
             var targetTablePrimaryKey = methodInvocation.SqlStatement.TargetTablePrimaryKey;
             var tablePrimaryKeyDefinitions = methodInvocation.SqlStatement.TablePrimaryKeyDefinitions;
             var returnType = methodInvocation.SqlStatement.ReturnType;
+            var isTotalCountWithResult = methodInvocation.SqlStatement.IsTotalCountWithResult;
 
-            return MaterializeAsync(statement, targetTablePrimaryKey, tablePrimaryKeyDefinitions, returnType);
+            return MaterializeAsync(statement, targetTablePrimaryKey, tablePrimaryKeyDefinitions, returnType, isTotalCountWithResult);
         }
         
         public Task<object> MaterializeAsync(Type outputType, PreparedSqlStatement sqlStatement)
@@ -99,7 +101,7 @@ namespace SigQL
         }
 
         private async Task<object> MaterializeAsync(PreparedSqlStatement statement, ITableKeyDefinition targetTablePrimaryKey,
-            IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions, Type returnType)
+            IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions, Type returnType, bool isTotalCountWithResult = false)
         {
             RowValueCollection rowValueCollection;
             var outputInvocations = new List<object>();
@@ -116,37 +118,68 @@ namespace SigQL
                     }
                 }
             }
-            
+
+            int totalCount = 0;
 
             using (var reader = await queryExecutor.ExecuteReaderAsync(statement.CommandText, statement.Parameters))
             {
                 rowValueCollection = ReadRowValues(reader, tablePrimaryKeyDefinitions.Keys.Any(k => k == string.Empty) ? tablePrimaryKeyDefinitions[""].ToList() : new List<string>(),
                     tablePrimaryKeyDefinitions);
+
+                if (isTotalCountWithResult)
+                {
+                    reader.NextResult();
+                    if (reader.Read())
+                    {
+                        totalCount = Convert.ToInt32(reader[0]);
+                    }
+                }
             }
 
-            var rootOutputType = OutputFactory.UnwrapType(returnType);
-            var orderedRowValues = rowValueCollection.Rows.Values.OrderBy(v => v.RowNumber).ToList();
-            foreach (var rowValue in orderedRowValues)
+            var unwrappedReturnType = returnType;
+            if (unwrappedReturnType.IsTask())
             {
-                var target = new RowProjectionBuilder().Build(rootOutputType, rowValue);
+                if (unwrappedReturnType.IsGenericType)
+                {
+                    unwrappedReturnType = unwrappedReturnType.GetGenericArguments().First();
+                }
+                else
+                {
+                    unwrappedReturnType = typeof(void);
+                }
+            }
+
+            if (isTotalCountWithResult)
+            {
+                var innerResultType = unwrappedReturnType.GetGenericArguments().First();
+                var rootOutputType = OutputFactory.UnwrapType(innerResultType);
+                var orderedRowValues = rowValueCollection.Rows.Values.OrderBy(v => v.RowNumber).ToList();
+                foreach (var rowValue in orderedRowValues)
+                {
+                    var target = new RowProjectionBuilder().Build(rootOutputType, rowValue);
+                    outputInvocations.Add(target);
+                }
+
+                object dataResult = OutputFactory.Cast(outputInvocations, innerResultType);
+
+                var totalCountResultType = typeof(TotalCountResult<>).MakeGenericType(innerResultType);
+                var totalCountResult = Activator.CreateInstance(totalCountResultType);
+                totalCountResultType.GetProperty("TotalCount").SetValue(totalCountResult, totalCount);
+                totalCountResultType.GetProperty("Result").SetValue(totalCountResult, dataResult);
+
+                return totalCountResult;
+            }
+
+            var rootOutputType2 = OutputFactory.UnwrapType(returnType);
+            var orderedRowValues2 = rowValueCollection.Rows.Values.OrderBy(v => v.RowNumber).ToList();
+            foreach (var rowValue in orderedRowValues2)
+            {
+                var target = new RowProjectionBuilder().Build(rootOutputType2, rowValue);
                 outputInvocations.Add(target);
             }
 
             object result = outputInvocations;
-
-            if (returnType.IsTask())
-            {
-                if (returnType.IsGenericType)
-                {
-                    returnType = returnType.GetGenericArguments().First();
-                }
-                else
-                {
-                    returnType = typeof(void);
-                }
-                
-            }
-            result = OutputFactory.Cast(result, returnType);
+            result = OutputFactory.Cast(result, unwrappedReturnType);
 
             return result;
         }
@@ -236,7 +269,7 @@ namespace SigQL
         }
 
         private object Materialize(PreparedSqlStatement statement, ITableKeyDefinition targetTablePrimaryKey,
-            IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions, Type returnType)
+            IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions, Type returnType, bool isTotalCountWithResult = false)
         {
             RowValueCollection rowValueCollection;
             var outputInvocations = new List<object>();
@@ -254,36 +287,67 @@ namespace SigQL
                 }
             }
 
+            int totalCount = 0;
 
             using (var reader = queryExecutor.ExecuteReader(statement.CommandText, statement.Parameters))
             {
                 rowValueCollection = ReadRowValues(reader, tablePrimaryKeyDefinitions.Keys.Any(k => k == string.Empty) ? tablePrimaryKeyDefinitions[""].ToList() : new List<string>(),
                     tablePrimaryKeyDefinitions);
+
+                if (isTotalCountWithResult)
+                {
+                    reader.NextResult();
+                    if (reader.Read())
+                    {
+                        totalCount = Convert.ToInt32(reader[0]);
+                    }
+                }
             }
 
-            var rootOutputType = OutputFactory.UnwrapType(returnType);
-            var orderedRowValues = rowValueCollection.Rows.Values.OrderBy(v => v.RowNumber).ToList();
-            foreach (var rowValue in orderedRowValues)
+            var unwrappedReturnType = returnType;
+            if (unwrappedReturnType.IsTask())
             {
-                var target = new RowProjectionBuilder().Build(rootOutputType, rowValue);
+                if (unwrappedReturnType.IsGenericType)
+                {
+                    unwrappedReturnType = unwrappedReturnType.GetGenericArguments().First();
+                }
+                else
+                {
+                    unwrappedReturnType = typeof(void);
+                }
+            }
+
+            if (isTotalCountWithResult)
+            {
+                var innerResultType = unwrappedReturnType.GetGenericArguments().First();
+                var rootOutputType = OutputFactory.UnwrapType(innerResultType);
+                var orderedRowValues = rowValueCollection.Rows.Values.OrderBy(v => v.RowNumber).ToList();
+                foreach (var rowValue in orderedRowValues)
+                {
+                    var target = new RowProjectionBuilder().Build(rootOutputType, rowValue);
+                    outputInvocations.Add(target);
+                }
+
+                object dataResult = OutputFactory.Cast(outputInvocations, innerResultType);
+
+                var totalCountResultType = typeof(TotalCountResult<>).MakeGenericType(innerResultType);
+                var totalCountResult = Activator.CreateInstance(totalCountResultType);
+                totalCountResultType.GetProperty("TotalCount").SetValue(totalCountResult, totalCount);
+                totalCountResultType.GetProperty("Result").SetValue(totalCountResult, dataResult);
+
+                return totalCountResult;
+            }
+
+            var rootOutputType2 = OutputFactory.UnwrapType(returnType);
+            var orderedRowValues2 = rowValueCollection.Rows.Values.OrderBy(v => v.RowNumber).ToList();
+            foreach (var rowValue in orderedRowValues2)
+            {
+                var target = new RowProjectionBuilder().Build(rootOutputType2, rowValue);
                 outputInvocations.Add(target);
             }
 
             object result = outputInvocations;
-
-            if (returnType.IsTask())
-            {
-                if (returnType.IsGenericType)
-                {
-                    returnType = returnType.GetGenericArguments().First();
-                }
-                else
-                {
-                    returnType = typeof(void);
-                }
-
-            }
-            result = OutputFactory.Cast(result, returnType);
+            result = OutputFactory.Cast(result, unwrappedReturnType);
 
             return result;
         }
@@ -296,8 +360,9 @@ namespace SigQL
             var targetTablePrimaryKey = methodInvocation.SqlStatement.TargetTablePrimaryKey;
             var tablePrimaryKeyDefinitions = methodInvocation.SqlStatement.TablePrimaryKeyDefinitions;
             var returnType = methodInvocation.SqlStatement.ReturnType;
+            var isTotalCountWithResult = methodInvocation.SqlStatement.IsTotalCountWithResult;
 
-            return Materialize(statement, targetTablePrimaryKey, tablePrimaryKeyDefinitions, returnType);
+            return Materialize(statement, targetTablePrimaryKey, tablePrimaryKeyDefinitions, returnType, isTotalCountWithResult);
         }
 
         public object Materialize(Type outputType, PreparedSqlStatement sqlStatement)

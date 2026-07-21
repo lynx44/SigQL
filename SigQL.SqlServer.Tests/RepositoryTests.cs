@@ -7,6 +7,8 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SigQL.Exceptions;
+using SigQL.Schema;
+using SigQL.SqlServer;
 using SigQL.SqlServer.Tests.Data;
 using SigQL.SqlServer.Tests.Infrastructure;
 using SigQL.Tests.Common.Databases.Labor;
@@ -81,7 +83,65 @@ namespace SigQL.SqlServer.Tests
 
             Assert.AreEqual(expected.Count, actual.Count);
         }
-        
+
+        [TestMethod]
+        public void TotalCount_ReturnsExpectedCount()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.TotalCountWorkLogs();
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+        }
+
+        [TestMethod]
+        public void TotalCount_IgnoresOffsetFetch()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.TotalCountWorkLogsWithOffsetFetch(2, 1);
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+        }
+
+        [TestMethod]
+        public void TotalCountWithResult_ReturnsDataAndTotalCount()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.TotalCountWithResultWorkLogs();
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+            Assert.AreEqual(expected.Count, actual.Result.Count());
+        }
+
+        [TestMethod]
+        public void TotalCountWithResult_WithOffsetFetch_ReturnsPageAndTotalCount()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.TotalCountWithResultWorkLogsWithOffsetFetch(2, 1);
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+            Assert.AreEqual(2, actual.Result.Count());
+        }
+
+        [TestMethod]
+        public void TotalCountWithResult_WithFilterOffsetFetch()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = monolithicRepository.TotalCountWithResultWorkLogsByFilter(new WorkLog.FilterWithOffsetFetch() { Offset = 1, Fetch = 2 });
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+            Assert.AreEqual(2, actual.Result.Count());
+        }
+
         [TestMethod]
         public void GetWorkLogs_AvoidsStackOverflow()
         {
@@ -424,6 +484,42 @@ namespace SigQL.SqlServer.Tests
             this.laborDbContext.Address.AddRange(addAddress);
             this.laborDbContext.SaveChanges();
             var actual = this.monolithicRepository.GetAddressesWithEnumClassification();
+
+            Assert.AreEqual(1, actual.Count());
+            Assert.AreEqual(AddressClassification.Work, actual.First().Classification);
+        }
+
+        [TestMethod]
+        public void GetWithNullableEnumProperty()
+        {
+            var addAddress = new EFAddress() { Classification = AddressClassification.Work };
+            this.laborDbContext.Address.AddRange(addAddress);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetAddressesWithNullableEnumClassification();
+
+            Assert.AreEqual(1, actual.Count());
+            Assert.AreEqual(AddressClassification.Work, actual.First().Classification);
+        }
+
+        [TestMethod]
+        public void GetWithEnumPropertyPoco()
+        {
+            var addAddress = new EFAddress() { Classification = AddressClassification.Work };
+            this.laborDbContext.Address.AddRange(addAddress);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetAddressesWithEnumClassificationPoco();
+
+            Assert.AreEqual(1, actual.Count());
+            Assert.AreEqual(AddressClassification.Work, actual.First().Classification);
+        }
+
+        [TestMethod]
+        public void GetWithNullableEnumPropertyPoco()
+        {
+            var addAddress = new EFAddress() { Classification = AddressClassification.Work };
+            this.laborDbContext.Address.AddRange(addAddress);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetAddressesWithNullableEnumClassificationPoco();
 
             Assert.AreEqual(1, actual.Count());
             Assert.AreEqual(AddressClassification.Work, actual.First().Classification);
@@ -1595,6 +1691,59 @@ namespace SigQL.SqlServer.Tests
             var actual = this.monolithicRepository.GetWorkLogsWithAnyIdIgnoreIfNullOrEmpty(new List<int>()).Select(e => e.Id);
             
             Assert.AreEqual(5, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void InParameter_LargeCollection_ReturnsExpectedResults()
+        {
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog(),
+                new EFWorkLog() { },
+                new EFWorkLog() { },
+                new EFWorkLog() { },
+                new EFWorkLog() { }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var allIds = laborDbContext.WorkLog.Select(wl => wl.Id).ToList();
+            // Create a large list of IDs that includes the real IDs plus many non-existent ones
+            var largeIdList = allIds.Cast<int?>().Concat(Enumerable.Range(100000, 2500).Cast<int?>()).ToList();
+            var actual = this.monolithicRepository.GetWorkLogsWithAnyId(largeIdList).Select(e => e.Id);
+
+            Assert.AreEqual(5, actual.Count());
+            AreEquivalent(allIds, actual);
+        }
+
+        [TestMethod]
+        public void InParameter_TwoLargeCollections_ReturnsExpectedResults()
+        {
+            var employee1 = new EFEmployee() { Name = "E1" };
+            var employee2 = new EFEmployee() { Name = "E2" };
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = employee1 },
+                new EFWorkLog() { Employee = employee1 },
+                new EFWorkLog() { Employee = employee2 },
+                new EFWorkLog() { Employee = employee2 },
+                new EFWorkLog() { Employee = employee2 }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var targetIds = laborDbContext.WorkLog.Take(2).Select(wl => wl.Id).ToList();
+            var targetEmployeeIds = new List<int> { employee1.Id };
+
+            // Build two large collections that exceed 2000 total params
+            var largeIdList = targetIds.Cast<int?>().Concat(Enumerable.Range(100000, 1200).Cast<int?>()).ToList();
+            var largeEmployeeIdList = targetEmployeeIds.Cast<int?>().Concat(Enumerable.Range(100000, 1200).Cast<int?>()).ToList();
+
+            var actual = this.monolithicRepository.GetWorkLogsWithAnyIdOrEmployeeId(largeIdList, largeEmployeeIdList).Select(e => e.Id).ToList();
+
+            // Should return work logs that match either condition
+            var expected = laborDbContext.WorkLog
+                .Where(wl => targetIds.Contains(wl.Id) || targetEmployeeIds.Contains(wl.EmployeeId.Value))
+                .Select(wl => wl.Id).ToList();
+
+            Assert.AreEqual(expected.Count, actual.Count);
             AreEquivalent(expected, actual);
         }
 
@@ -3648,7 +3797,64 @@ namespace SigQL.SqlServer.Tests
             AreSame(expected, actual);
         }
 
-        #region View 
+        [TestMethod]
+        public void ViaRelationOnOutputProjection_OneHop_ReturnsFlattenedResults()
+        {
+            var employee1 = new EFEmployee() { Name = "Alice" };
+            var employee2 = new EFEmployee() { Name = "Bob" };
+            var workLog1 = new EFWorkLog() { Employee = employee1, StartDate = new DateTime(2022, 1, 1), EndDate = new DateTime(2022, 1, 2) };
+            var workLog2 = new EFWorkLog() { Employee = employee1, StartDate = new DateTime(2022, 2, 1), EndDate = new DateTime(2022, 2, 2) };
+            var workLog3 = new EFWorkLog() { Employee = employee2, StartDate = new DateTime(2022, 3, 1), EndDate = new DateTime(2022, 3, 2) };
+            this.laborDbContext.WorkLog.AddRange(workLog1, workLog2, workLog3);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetEmployeesWithWorkLogFlattened().ToList();
+
+            Assert.IsTrue(actual.Count >= 3);
+            Assert.IsTrue(actual.Any(a => a.Name == "Alice" && a.StartDate == new DateTime(2022, 1, 1) && a.EndDate == new DateTime(2022, 1, 2)));
+            Assert.IsTrue(actual.Any(a => a.Name == "Alice" && a.StartDate == new DateTime(2022, 2, 1) && a.EndDate == new DateTime(2022, 2, 2)));
+            Assert.IsTrue(actual.Any(a => a.Name == "Bob" && a.StartDate == new DateTime(2022, 3, 1) && a.EndDate == new DateTime(2022, 3, 2)));
+        }
+
+        [TestMethod]
+        public void ViaRelationOnOutputProjection_OneHop_Interface_ReturnsFlattenedResults()
+        {
+            var employee1 = new EFEmployee() { Name = "Charlie" };
+            var workLog1 = new EFWorkLog() { Employee = employee1, StartDate = new DateTime(2022, 5, 1), EndDate = new DateTime(2022, 5, 2) };
+            var workLog2 = new EFWorkLog() { Employee = employee1, StartDate = new DateTime(2022, 6, 1), EndDate = new DateTime(2022, 6, 2) };
+            this.laborDbContext.WorkLog.AddRange(workLog1, workLog2);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetEmployeesWithWorkLogFlattenedInterface().ToList();
+
+            // Validates dedup fix: same employee with 2 work logs must produce 2 rows
+            var charlieRows = actual.Where(a => a.Name == "Charlie").ToList();
+            Assert.AreEqual(2, charlieRows.Count);
+            Assert.IsTrue(charlieRows.Any(a => a.StartDate == new DateTime(2022, 5, 1) && a.EndDate == new DateTime(2022, 5, 2)));
+            Assert.IsTrue(charlieRows.Any(a => a.StartDate == new DateTime(2022, 6, 1) && a.EndDate == new DateTime(2022, 6, 2)));
+        }
+
+        [TestMethod]
+        public void ViaRelationOnOutputProjection_MultiHop_ReturnsFlattenedResults()
+        {
+            var employee1 = new EFEmployee() { Name = "Dave" };
+            var address1 = new EFAddress() { City = "Springfield" };
+            var address2 = new EFAddress() { City = "Shelbyville" };
+            address1.Employees = new List<EFEmployee>() { employee1 };
+            address2.Employees = new List<EFEmployee>() { employee1 };
+            this.laborDbContext.Address.AddRange(address1, address2);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetEmployeesWithAddressCityFlattenedEF().ToList();
+
+            // Validates dedup fix: same employee with 2 addresses must produce 2 rows
+            var daveRows = actual.Where(a => a.Name == "Dave").ToList();
+            Assert.AreEqual(2, daveRows.Count);
+            Assert.IsTrue(daveRows.Any(a => a.City == "Springfield"));
+            Assert.IsTrue(daveRows.Any(a => a.City == "Shelbyville"));
+        }
+
+        #region View
 
         [TestMethod]
         public void GetView()
@@ -4402,6 +4608,375 @@ namespace SigQL.SqlServer.Tests
             var actual = laborDbContext.WorkLog.Select(wl => new { StartDate = wl.StartDate.Value, EndDate = wl.EndDate.Value }).ToList();
             
             CustomAssert.AreEquivalent<dynamic>(Enumerable.Range(0, 2).Select(i => new { StartDate = new DateTime(2022, 2, 2), EndDate = new DateTime(2022, 2, 3) }), actual);
+        }
+
+        [TestMethod]
+        public void Update_IgnoreIfNull_WithNonNullValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateEmployeeNameIgnoreIfNull("Bob", 1);
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Update_IgnoreIfNull_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateEmployeeNameIgnoreIfNull(null, 1);
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Update_IgnoreIfNullOrEmpty_WithNonEmptyValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateEmployeeNameIgnoreIfNullOrEmpty("Bob", 1);
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Update_IgnoreIfNullOrEmpty_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateEmployeeNameIgnoreIfNullOrEmpty(null, 1);
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Update_IgnoreIfNullOrEmpty_WithEmptyValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateEmployeeNameIgnoreIfNullOrEmpty("", 1);
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Update_MixedSetAndFilterClass_OnlyUpdatesFilteredRow()
+        {
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) },
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 3), EndDate = new DateTime(2021, 1, 4) }
+            );
+            this.laborDbContext.SaveChanges();
+            var targetId = laborDbContext.WorkLog.OrderBy(w => w.StartDate).First().Id;
+
+            this.monolithicRepository.UpdateAllWorkLogsStartDateAndEndDateSetAndFilterClass(new WorkLog.SetDatesWithIdFilter()
+            {
+                StartDate = new DateTime(2022, 2, 2),
+                EndDate = new DateTime(2022, 2, 3),
+                Id = targetId
+            });
+
+            var updated = laborDbContext.WorkLog.AsNoTracking().Single(w => w.Id == targetId);
+            Assert.AreEqual(new DateTime(2022, 2, 2), updated.StartDate);
+            Assert.AreEqual(new DateTime(2022, 2, 3), updated.EndDate);
+
+            var untouched = laborDbContext.WorkLog.AsNoTracking().Single(w => w.Id != targetId);
+            Assert.AreEqual(new DateTime(2021, 1, 3), untouched.StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 4), untouched.EndDate);
+        }
+
+        [TestMethod]
+        public void Update_MixedSetAndFilterClassWithScalarFilter_OnlyUpdatesMatchingRow()
+        {
+            var employee = new EFEmployee() { Name = "Mike" };
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.SaveChanges();
+
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2), EmployeeId = employee.Id },
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 3), EndDate = new DateTime(2021, 1, 4), EmployeeId = employee.Id }
+            );
+            this.laborDbContext.SaveChanges();
+            var targetId = laborDbContext.WorkLog.OrderBy(w => w.StartDate).First().Id;
+
+            this.monolithicRepository.UpdateWorkLogDatesWithIdFilterAndScalarFilter(new WorkLog.SetDatesWithIdFilter()
+            {
+                StartDate = new DateTime(2022, 2, 2),
+                EndDate = new DateTime(2022, 2, 3),
+                Id = targetId
+            }, employee.Id);
+
+            var updated = laborDbContext.WorkLog.AsNoTracking().Single(w => w.Id == targetId);
+            Assert.AreEqual(new DateTime(2022, 2, 2), updated.StartDate);
+            Assert.AreEqual(new DateTime(2022, 2, 3), updated.EndDate);
+        }
+
+        [TestMethod]
+        public void Update_MixedSetAndIgnoreIfNullFilter_NullMeansNoFilter()
+        {
+            var employee1 = new EFEmployee() { Name = "Mike" };
+            var employee2 = new EFEmployee() { Name = "Jane" };
+            this.laborDbContext.Employee.AddRange(employee1, employee2);
+            this.laborDbContext.SaveChanges();
+
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2), EmployeeId = employee1.Id },
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 3), EndDate = new DateTime(2021, 1, 4), EmployeeId = employee2.Id }
+            );
+            this.laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateWorkLogDatesWithIgnoreIfNullFilter(new WorkLog.SetDatesWithIgnoreIfNullFilter()
+            {
+                StartDate = new DateTime(2022, 2, 2),
+                EndDate = new DateTime(2022, 2, 3),
+                EmployeeId = null
+            });
+
+            var all = laborDbContext.WorkLog.AsNoTracking().ToList();
+            Assert.IsTrue(all.All(w => w.StartDate == new DateTime(2022, 2, 2) && w.EndDate == new DateTime(2022, 2, 3)));
+        }
+
+        [TestMethod]
+        public void Update_MixedSetAndOrFilter_UpdatesMatchingRows()
+        {
+            var employee = new EFEmployee() { Name = "Mike" };
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.SaveChanges();
+
+            var location = new EFLocation() { Name = "Office" };
+            this.laborDbContext.Location.Add(location);
+            this.laborDbContext.SaveChanges();
+
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2), EmployeeId = employee.Id, LocationId = null },
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 3), EndDate = new DateTime(2021, 1, 4), EmployeeId = null, LocationId = location.Id },
+                new EFWorkLog() { StartDate = new DateTime(2021, 1, 5), EndDate = new DateTime(2021, 1, 6), EmployeeId = null, LocationId = null }
+            );
+            this.laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateWorkLogDatesWithOrFilter(new WorkLog.SetDatesWithOrFilter()
+            {
+                StartDate = new DateTime(2022, 2, 2),
+                EndDate = new DateTime(2022, 2, 3),
+                EmployeeId = employee.Id,
+                LocationId = location.Id
+            });
+
+            var all = laborDbContext.WorkLog.AsNoTracking().OrderBy(w => w.Id).ToList();
+            Assert.AreEqual(new DateTime(2022, 2, 2), all[0].StartDate);
+            Assert.AreEqual(new DateTime(2022, 2, 2), all[1].StartDate);
+            Assert.AreEqual(new DateTime(2021, 1, 5), all[2].StartDate);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNull_WithNonNullValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNull(new[] { new Employee.UpsertFieldsIgnoreIfNull() { Id = 1, Name = "Bob" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNull_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNull(new[] { new Employee.UpsertFieldsIgnoreIfNull() { Id = 1, Name = null } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNullOrEmpty_WithNonEmptyValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpsertFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "Bob" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNullOrEmpty_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpsertFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = null } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNullOrEmpty_WithEmptyValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpsertFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNull_WithNonNullValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNull(new[] { new Employee.UpdateByKeyFieldsIgnoreIfNull() { Id = 1, Name = "Bob" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNull_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNull(new[] { new Employee.UpdateByKeyFieldsIgnoreIfNull() { Id = 1, Name = null } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNullOrEmpty_WithNonEmptyValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpdateByKeyFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "Bob" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNullOrEmpty_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpdateByKeyFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = null } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_IgnoreIfNullOrEmpty_WithEmptyValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyEmployeesIgnoreIfNullOrEmpty(new[] { new Employee.UpdateByKeyFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "" } });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Sync_IgnoreIfNull_WithNonNullValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeesIgnoreIfNull(new Employee.SyncFieldsIgnoreIfNull() { Id = 1, Name = "Bob" });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Sync_IgnoreIfNull_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeesIgnoreIfNull(new Employee.SyncFieldsIgnoreIfNull() { Id = 1, Name = null });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Sync_IgnoreIfNullOrEmpty_WithNonEmptyValue_UpdatesValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeesIgnoreIfNullOrEmpty(new Employee.SyncFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "Bob" });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Bob", actual.Name);
+        }
+
+        [TestMethod]
+        public void Sync_IgnoreIfNullOrEmpty_WithNullValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeesIgnoreIfNullOrEmpty(new Employee.SyncFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = null });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Sync_IgnoreIfNullOrEmpty_WithEmptyValue_RetainsOriginalValue()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeesIgnoreIfNullOrEmpty(new Employee.SyncFieldsIgnoreIfNullOrEmpty() { Id = 1, Name = "" });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Single();
+            Assert.AreEqual("Mike", actual.Name);
+        }
+
+        [TestMethod]
+        public void Upsert_IgnoreIfNull_MixedNullAndNonNull_UpdatesCorrectly()
+        {
+            laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Mike" },
+                new EFEmployee() { Name = "Jane" }
+            );
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeesIgnoreIfNull(new[]
+            {
+                new Employee.UpsertFieldsIgnoreIfNull() { Id = 1, Name = "Bob" },
+                new Employee.UpsertFieldsIgnoreIfNull() { Id = 2, Name = null }
+            });
+
+            var actual = laborDbContext.Employee.AsNoTracking().OrderBy(e => e.Id).ToList();
+            Assert.AreEqual("Bob", actual[0].Name);
+            Assert.AreEqual("Jane", actual[1].Name);
         }
 
         [TestMethod]
@@ -6023,6 +6598,148 @@ namespace SigQL.SqlServer.Tests
 
         #endregion
 
+        #region KeyColumns
+
+        [TestMethod]
+        public void Upsert_LargeCollection_RoundTripsCorrectly()
+        {
+            // each row has 2 params (Id, Name). 1200 rows -> 2400 params, exceeds the 2100 SQL Server limit.
+            var rows = Enumerable.Range(1, 1200)
+                .Select(i => new Employee.UpsertFieldsByName() { Name = "Emp_" + i })
+                .ToArray();
+
+            this.monolithicRepository.UpsertEmployeeByName(rows);
+
+            var actual = laborDbContext.Employee.AsNoTracking().ToList();
+            Assert.AreEqual(1200, actual.Count);
+            Assert.IsTrue(actual.Any(e => e.Name == "Emp_1"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Emp_600"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Emp_1200"));
+        }
+
+        [TestMethod]
+        public void Upsert_LargeCollection_UpdatesExistingAndInsertsNew()
+        {
+            for (var i = 1; i <= 5; i++)
+            {
+                laborDbContext.Employee.Add(new EFEmployee() { Name = "Existing_" + i });
+            }
+            laborDbContext.SaveChanges();
+
+            var rows = new List<Employee.UpsertFieldsByName>();
+            for (var i = 1; i <= 5; i++) rows.Add(new Employee.UpsertFieldsByName() { Name = "Existing_" + i });
+            for (var i = 1; i <= 1200; i++) rows.Add(new Employee.UpsertFieldsByName() { Name = "New_" + i });
+
+            this.monolithicRepository.UpsertEmployeeByName(rows.ToArray());
+
+            var actual = laborDbContext.Employee.AsNoTracking().ToList();
+            Assert.AreEqual(1205, actual.Count);
+            Assert.IsTrue(actual.Any(e => e.Name == "Existing_1"));
+            Assert.IsTrue(actual.Any(e => e.Name == "New_1"));
+            Assert.IsTrue(actual.Any(e => e.Name == "New_1200"));
+        }
+
+        [TestMethod]
+        public void Upsert_NestedRelations_BothListsExceedParameterLimit_RoundTripsCorrectly()
+        {
+            // 1200 employees × 2 params = 2400 parent params (over threshold)
+            // 1200 × 2 worklogs × 3 params = 7200 child params (over threshold)
+            // Both lookup inserts must be rewritten to openjson for the query to execute.
+            var employees = Enumerable.Range(1, 1200).Select(i => new Employee.UpsertFieldsWithWorkLogs()
+            {
+                Name = "Emp_" + i,
+                WorkLogs = new[]
+                {
+                    new WorkLog.UpsertFields() { StartDate = new DateTime(2024, 1, 1).AddDays(i), EndDate = new DateTime(2024, 1, 2).AddDays(i) },
+                    new WorkLog.UpsertFields() { StartDate = new DateTime(2024, 6, 1).AddDays(i), EndDate = new DateTime(2024, 6, 2).AddDays(i) }
+                }
+            }).ToArray();
+
+            this.monolithicRepository.UpsertMultipleEmployeesWithWorkLogs(employees);
+
+            var actualEmployees = laborDbContext.Employee.AsNoTracking().Include(e => e.WorkLogs).ToList();
+            Assert.AreEqual(1200, actualEmployees.Count);
+            Assert.AreEqual(2400, actualEmployees.Sum(e => e.WorkLogs.Count));
+
+            var first = actualEmployees.Single(e => e.Name == "Emp_1");
+            Assert.AreEqual(2, first.WorkLogs.Count);
+            Assert.IsTrue(first.WorkLogs.Any(wl => wl.StartDate == new DateTime(2024, 1, 2)));
+
+            var last = actualEmployees.Single(e => e.Name == "Emp_1200");
+            Assert.AreEqual(2, last.WorkLogs.Count);
+        }
+
+        [TestMethod]
+        public void Upsert_WithKeyColumns_MatchesByName()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Lester" });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpsertEmployeeByName(
+                new Employee.UpsertFieldsByName[]
+                {
+                    new Employee.UpsertFieldsByName() { Name = "Mike" },
+                    new Employee.UpsertFieldsByName() { Name = "NewGuy" }
+                }
+            );
+
+            var actual = laborDbContext.Employee.AsNoTracking().ToList();
+            Assert.AreEqual(3, actual.Count);
+            Assert.IsTrue(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            Assert.IsTrue(actual.Any(e => e.Name == "NewGuy"));
+        }
+
+        [TestMethod]
+        public void UpdateByKey_WithKeyColumns_MatchesByStartDate()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+            laborDbContext.WorkLog.Add(new EFWorkLog() { EmployeeId = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) });
+            laborDbContext.WorkLog.Add(new EFWorkLog() { EmployeeId = 1, StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyWorkLogByStartDate(
+                new WorkLog.UpdateByKeyFieldsByStartDate[]
+                {
+                    new WorkLog.UpdateByKeyFieldsByStartDate() { StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2099, 12, 31) },
+                });
+
+            var actual = laborDbContext.WorkLog.AsNoTracking().ToList();
+            var updated = actual.Single(w => w.StartDate == new DateTime(2021, 1, 1));
+            Assert.AreEqual(new DateTime(2099, 12, 31), updated.EndDate);
+            var unchanged = actual.Single(w => w.StartDate == new DateTime(2021, 2, 1));
+            Assert.AreEqual(new DateTime(2021, 2, 2), unchanged.EndDate);
+        }
+
+        [TestMethod]
+        public void Sync_WithKeyColumns_MatchesByName()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Kyle" });
+            laborDbContext.SaveChanges();
+            laborDbContext.WorkLog.Add(new EFWorkLog() { EmployeeId = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) });
+            laborDbContext.WorkLog.Add(new EFWorkLog() { EmployeeId = 1, StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2) });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeeByNameWithWorkLogs(
+                new Employee.SyncFieldsByNameWithWorkLogs()
+                {
+                    Name = "Kyle",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.SyncFields() { Id = 2, StartDate = new DateTime(2022, 3, 1), EndDate = new DateTime(2022, 3, 2) }
+                    }
+                });
+
+            var actual = laborDbContext.Employee.AsNoTracking().Include(e => e.WorkLogs).Single();
+            Assert.AreEqual("Kyle", actual.Name);
+            Assert.AreEqual(1, actual.WorkLogs.Count);
+            Assert.AreEqual(new DateTime(2022, 3, 1), actual.WorkLogs.First().StartDate);
+        }
+
+        #endregion
+
         #region Abstract Class
 
         [TestMethod]
@@ -6202,6 +6919,41 @@ namespace SigQL.SqlServer.Tests
         //     this.laborDbContext.CompositeKeyTable.Where(c => c.EFCompositeForeignKeyTables.Any(b => b.Id == 1)).Skip(1)
         //         .ToList();
         // }
+
+        [TestMethod]
+        public void GetWithAddForeignKey_NavigationPropertyResolvesWithoutJoinRelationAttribute()
+        {
+            var employee = new EFEmployee() { Name = "Name" };
+            var workLog = new EFWorkLog()
+            {
+                Employee = employee,
+                StartDate = new DateTime(2022, 1, 1),
+                EndDate = new DateTime(2022, 2, 2)
+            };
+            this.laborDbContext.WorkLog.Add(workLog);
+            this.laborDbContext.SaveChanges();
+
+            // Build a new repository with a programmatically-added foreign key
+            var sqlConnection = (laborDbConnection as SqlConnection);
+            var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.ConnectionString);
+            var workLogTableDef = sqlDatabaseConfiguration.Tables.FindByName("WorkLog");
+            var viewTableDef = sqlDatabaseConfiguration.Tables.FindByName("WorkLogEmployeeView");
+            workLogTableDef.AddForeignKey(
+                t => t.Columns.FindByName("EmployeeId"),
+                viewTableDef.Columns.FindByName("EmployeeId"));
+
+            var builder = new RepositoryBuilder(new SqlQueryExecutor(() => laborDbConnection), sqlDatabaseConfiguration);
+            var repo = builder.Build<IMonolithicRepository>();
+
+            var actual = repo.GetWithAddForeignKey().First();
+
+            Assert.AreEqual(workLog.Id, actual.Id);
+            Assert.AreEqual(employee.Id, actual.View.EmployeeId);
+            Assert.AreEqual(employee.Name, actual.View.EmployeeName);
+            Assert.AreEqual(workLog.StartDate, actual.View.StartDate);
+            Assert.AreEqual(workLog.EndDate, actual.View.EndDate);
+            Assert.AreEqual(workLog.Id, actual.View.WorkLogId);
+        }
 
         private void AreEquivalent<T>(IEnumerable<T> expected, IEnumerable<T> actual)
         {

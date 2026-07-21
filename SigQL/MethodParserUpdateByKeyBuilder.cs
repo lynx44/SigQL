@@ -121,16 +121,16 @@ namespace SigQL
         private Update BuildUpdateFromLookupStatement(UpsertTableRelations upsertTableRelations, string lookupTableName)
         {
             var targetTable = upsertTableRelations.TableRelations.TargetTable;
-            var primaryKeyColumns = targetTable.PrimaryKey.Columns;
+            var primaryKeyColumns = upsertTableRelations.KeyColumns ?? targetTable.PrimaryKey.Columns;
             var foreignValueLookupStatements = BuildForeignValueLookupStatements(upsertTableRelations, lookupTableName);
             var ast = new Update()
             {
-                SetClause = 
+                SetClause =
                     upsertTableRelations.ColumnParameters
                         .Where(c =>
                         {
-                            
-                            return !primaryKeyColumns.Any(pkc =>
+                            return !c.Column.IsIdentity &&
+                                !primaryKeyColumns.Any(pkc =>
                                     ColumnEqualityComparer.Default.Equals(c.Column, pkc));
                         })
                         .Select(c => new SetEqualOperator()
@@ -140,15 +140,7 @@ namespace SigQL
                                     {
                                         Label = c.Column.Name
                                     }),
-                                new ColumnIdentifier().SetArgs(
-                                    new RelationalTable()
-                                    {
-                                        Label = lookupTableName
-                                    },
-                                    new RelationalColumn()
-                                    {
-                                        Label = c.Column.Name
-                                    })
+                                BuildUpsertSetValueExpression(c, lookupTableName, targetTable.Name)
                             )).ToList()
                         .Concat(foreignValueLookupStatements.Select(c => 
                             new SetEqualOperator()
@@ -206,6 +198,35 @@ namespace SigQL
             }.SetArgs(new TableIdentifier().SetArgs(new RelationalTable() { Label = targetTable.Name }));
 
             return ast;
+        }
+
+        private AstNode BuildUpsertSetValueExpression(UpsertColumnParameter c, string lookupTableName, string targetTableName)
+        {
+            var lookupColumnRef = new ColumnIdentifier().SetArgs(
+                new RelationalTable() { Label = lookupTableName },
+                new RelationalColumn() { Label = c.Column.Name });
+
+            if (c.IgnoreIfNullOrEmpty)
+            {
+                return new Function() { Name = "IsNull" }.SetArgs(
+                    new Function() { Name = "NullIf" }.SetArgs(
+                        lookupColumnRef,
+                        new Literal() { Value = "''" }),
+                    new ColumnIdentifier().SetArgs(
+                        new RelationalTable() { Label = targetTableName },
+                        new RelationalColumn() { Label = c.Column.Name }));
+            }
+
+            if (c.IgnoreIfNull)
+            {
+                return new Function() { Name = "IsNull" }.SetArgs(
+                    lookupColumnRef,
+                    new ColumnIdentifier().SetArgs(
+                        new RelationalTable() { Label = targetTableName },
+                        new RelationalColumn() { Label = c.Column.Name }));
+            }
+
+            return lookupColumnRef;
         }
     }
 }

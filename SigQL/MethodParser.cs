@@ -70,11 +70,17 @@ namespace SigQL
             Type projectionType;
             var returnType = methodInfo.ReturnType;
             var isCountResult = returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ICountResult<>);
-            if (isCountResult)
+            var isTotalCount = returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ITotalCount<>);
+            var isTotalCountResult = returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ITotalCountResult<>);
+            if (isCountResult || isTotalCount)
             {
                 returnType = methodInfo.ReturnType.GetGenericArguments().First();
             }
-            
+            else if (isTotalCountResult)
+            {
+                returnType = methodInfo.ReturnType.GetGenericArguments().First();
+            }
+
             projectionType = OutputFactory.UnwrapType(returnType);
 
 
@@ -157,7 +163,33 @@ namespace SigQL
             var offsetParameter = GetParameterPathWithAttribute<OffsetAttribute>(arguments);
             var fetchParameter = GetParameterPathWithAttribute<FetchAttribute>(arguments);
             var whereClauseTableRelations = allTableRelations.Mask(TableRelationsColumnSource.Parameters, ColumnFilters.WhereClause);
-            if ((offsetParameter != null || fetchParameter != null))
+
+            // For ITotalCount, ignore offset/fetch entirely
+            // For ITotalCountResult, build the count query from the base (no offset/fetch)
+            Select totalCountStatement = null;
+            if (isTotalCountResult && (offsetParameter != null || fetchParameter != null))
+            {
+                // Build the count base query before offset/fetch restructures things
+                var countBaseStatement = new Select()
+                {
+                    SelectClause = selectClause,
+                    FromClause = fromClause
+                };
+                if (whereClauseTableRelations.ProjectedColumns.Any() || whereClauseTableRelations.NavigationTables.Any())
+                {
+                    countBaseStatement.WhereClause = BuildWhereClauseFromTargetTablePerspective(
+                        new RelationalTable() { Label = allTableRelations.Alias }, whereClauseRelations, parameterPaths, tokens);
+                }
+
+                totalCountStatement = new Select();
+                totalCountStatement.SelectClause = new SelectClause();
+                totalCountStatement.SelectClause.SetArgs(
+                    new Alias() { Label = "TotalCount" }.SetArgs(new Count().SetArgs(new Literal() { Value = "1" })));
+                totalCountStatement.FromClause = new FromClause();
+                totalCountStatement.FromClause.SetArgs(new SubqueryAlias() { Alias = "Subquery" }.SetArgs(countBaseStatement));
+            }
+
+            if ((offsetParameter != null || fetchParameter != null) && !isTotalCount)
             {
                 if ((allTableRelations.NavigationTables != null && allTableRelations.NavigationTables.Any()))
                 {
@@ -316,28 +348,52 @@ namespace SigQL
                     tokens);
             }
             
-            if (isCountResult)
+            var isAnyCountType = isCountResult || isTotalCount;
+
+            if (isCountResult || isTotalCount)
             {
                 var countStatement = new Select();
                 countStatement.SelectClause = new SelectClause();
+                var countAlias = isCountResult ? "Count" : "TotalCount";
                 countStatement.SelectClause.SetArgs(
-                    new Alias() {Label = "Count"}.SetArgs(new Count().SetArgs(new Literal() {Value = "1"})));
+                    new Alias() {Label = countAlias}.SetArgs(new Count().SetArgs(new Literal() {Value = "1"})));
                 countStatement.FromClause = new FromClause();
                 countStatement.FromClause.SetArgs(new SubqueryAlias() {Alias = "Subquery"}.SetArgs(statement));
 
                 statement = countStatement;
             }
 
+            IEnumerable<AstNode> commandAst;
+            if (isTotalCountResult)
+            {
+                if (totalCountStatement == null)
+                {
+                    // No offset/fetch params - build the count query from the current statement
+                    totalCountStatement = new Select();
+                    totalCountStatement.SelectClause = new SelectClause();
+                    totalCountStatement.SelectClause.SetArgs(
+                        new Alias() { Label = "TotalCount" }.SetArgs(new Count().SetArgs(new Literal() { Value = "1" })));
+                    totalCountStatement.FromClause = new FromClause();
+                    totalCountStatement.FromClause.SetArgs(new SubqueryAlias() { Alias = "Subquery" }.SetArgs(statement));
+                }
+                commandAst = new AstNode[] { statement, totalCountStatement };
+            }
+            else
+            {
+                commandAst = statement.AsEnumerable();
+            }
+
             var sqlStatement = new MethodSqlStatement()
             {
-                CommandAst = statement.AsEnumerable(),
+                CommandAst = commandAst,
                 SqlBuilder = this.builder,
                 ReturnType = methodInfo.ReturnType,
                 UnwrappedReturnType = projectionType,
                 Parameters = parameterPaths,
                 Tokens = tokens,
-                TargetTablePrimaryKey = !isCountResult ? new TableKeyDefinition(allTableRelations.PrimaryKey.ToArray()) : new TableKeyDefinition(),
-                TablePrimaryKeyDefinitions = !isCountResult ? tablePrimaryKeyDefinitions : new ConcurrentDictionary<string, IEnumerable<string>>()
+                TargetTablePrimaryKey = !isAnyCountType ? new TableKeyDefinition(allTableRelations.PrimaryKey.ToArray()) : new TableKeyDefinition(),
+                TablePrimaryKeyDefinitions = !isAnyCountType ? tablePrimaryKeyDefinitions : new ConcurrentDictionary<string, IEnumerable<string>>(),
+                IsTotalCountWithResult = isTotalCountResult
             };
             return sqlStatement;
         }
@@ -999,9 +1055,16 @@ namespace SigQL
                     (comparisonSpec.Not ? (InPredicate) new NotInPredicate() : new InPredicate());
                 inPredicate.LeftComparison = columnNode;
                 placeholder.SetArgs(inPredicate);
+                var elementType = parameterType.IsArray
+                    ? parameterType.GetElementType()
+                    : parameterType.GetGenericArguments().FirstOrDefault() ?? typeof(object);
                 var token = new TokenPath(argument)
                 {
                     SqlParameterName = parameterName,
+                    InPredicate = inPredicate,
+                    ColumnNode = columnNode,
+                    ElementType = elementType,
+                    IsNot = comparisonSpec.Not,
                     UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                     {
                         var enumerable = parameterValue as IEnumerable;
@@ -1732,6 +1795,10 @@ namespace SigQL
         public string SqlParameterName { get; set; }
         internal IArgument Argument { get; set; }
         public Func<object, TokenPath, IEnumerable<ParameterArg>, IDictionary<string, object>> UpdateNodeFunc { get; set; }
+        internal InPredicate InPredicate { get; set; }
+        internal AstNode ColumnNode { get; set; }
+        internal Type ElementType { get; set; }
+        internal bool IsNot { get; set; }
     }
 
     public class ParameterArg

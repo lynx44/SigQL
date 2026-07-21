@@ -48,6 +48,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             string Name { get; set; }
         }
 
+        public class SetNameWithIdFilter
+        {
+            [Set]
+            public string Name { get; set; }
+            public int Id { get; set; }
+        }
+
         public class InsertFields
         {
             public string Name { get; set; }
@@ -279,6 +286,91 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string Name { get; set; }
             [OrGroup]
             public Address.AddressStreetAddress Address { get; set; }
+        }
+
+        public class UpsertFieldsByName
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+        }
+
+        public class UpsertFieldsIgnoreIfNull
+        {
+            public int? Id { get; set; }
+            [IgnoreIfNull] public string Name { get; set; }
+        }
+
+        public class UpsertFieldsIgnoreIfNullOrEmpty
+        {
+            public int? Id { get; set; }
+            [IgnoreIfNullOrEmpty] public string Name { get; set; }
+        }
+
+        public class UpdateByKeyFieldsIgnoreIfNull
+        {
+            public int Id { get; set; }
+            [IgnoreIfNull] public string Name { get; set; }
+        }
+
+        public class UpdateByKeyFieldsIgnoreIfNullOrEmpty
+        {
+            public int Id { get; set; }
+            [IgnoreIfNullOrEmpty] public string Name { get; set; }
+        }
+
+        public class SyncFieldsIgnoreIfNull
+        {
+            public int? Id { get; set; }
+            [IgnoreIfNull] public string Name { get; set; }
+        }
+
+        public class SyncFieldsIgnoreIfNullOrEmpty
+        {
+            public int? Id { get; set; }
+            [IgnoreIfNullOrEmpty] public string Name { get; set; }
+        }
+
+        public class SyncFieldsByNameWithWorkLogs
+        {
+            public int? Id { get; set; }
+            public string Name { get; set; }
+            public IEnumerable<WorkLog.SyncFields> WorkLogs { get; set; }
+        }
+
+        public class EmployeeWithWorkLogFlattened
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            [ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), nameof(WorkLog.StartDate))]
+            public DateTime? StartDate { get; set; }
+            [ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), nameof(WorkLog.EndDate))]
+            public DateTime? EndDate { get; set; }
+        }
+
+        public interface IEmployeeWithWorkLogFlattened
+        {
+            int Id { get; }
+            string Name { get; }
+            [ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), nameof(WorkLog.StartDate))]
+            DateTime? StartDate { get; }
+            [ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), nameof(WorkLog.EndDate))]
+            DateTime? EndDate { get; }
+        }
+
+        public class EmployeeWithAddressCityFlattened
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            [ViaRelation(nameof(Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address), nameof(Address.City))]
+            public string City { get; set; }
+        }
+
+        public class EmployeeWithAddressCityFlattenedEF
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            [ViaRelation(nameof(Employee) + "->EFAddressEFEmployee->" + nameof(Address), nameof(Address.City))]
+            public string City { get; set; }
         }
     }
 

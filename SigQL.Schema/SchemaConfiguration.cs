@@ -363,6 +363,32 @@ namespace SigQL.Schema
         }
     }
 
+    public static class ITableDefinitionExtensions
+    {
+        public static ITableDefinition AddForeignKey(
+            this ITableDefinition table,
+            Func<ITableDefinition, IColumnDefinition[]> foreignKeyColumns,
+            IColumnDefinition[] primaryKeyColumns)
+        {
+            var foreignColumns = foreignKeyColumns(table);
+            var primaryKeyTable = primaryKeyColumns[0].Table;
+            var keyPairs = foreignColumns.Zip(primaryKeyColumns, (fk, pk) => new ForeignKeyPair(fk, pk)).ToArray();
+            var fkDefinition = new ForeignKeyDefinition(primaryKeyTable, keyPairs);
+            ((ForeignKeyDefinitionCollection)table.ForeignKeyCollection).AddForeignKeys(fkDefinition);
+            return table;
+        }
+
+        public static ITableDefinition AddForeignKey(
+            this ITableDefinition table,
+            Func<ITableDefinition, IColumnDefinition> foreignKeyColumn,
+            IColumnDefinition primaryKeyColumn)
+        {
+            return table.AddForeignKey(
+                t => new[] { foreignKeyColumn(t) },
+                new[] { primaryKeyColumn });
+        }
+    }
+
     public class ForeignKeyDefinitionEqualityComparer : IEqualityComparer<IForeignKeyDefinition>
     {
         private readonly static ForeignKeyDefinitionEqualityComparer _foreignKeyEqualityComparer = new ForeignKeyDefinitionEqualityComparer();

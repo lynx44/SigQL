@@ -34,5 +34,25 @@ namespace SigQL.Extensions
         {
             return type == typeof(Task) || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>));
         }
+
+        public static string GetSqlTypeName(this Type type)
+        {
+            var unwrapped = Nullable.GetUnderlyingType(type) ?? type;
+
+            if (unwrapped == typeof(int)) return "int";
+            if (unwrapped == typeof(long)) return "bigint";
+            if (unwrapped == typeof(short)) return "smallint";
+            if (unwrapped == typeof(byte)) return "tinyint";
+            if (unwrapped == typeof(bool)) return "bit";
+            if (unwrapped == typeof(string)) return "nvarchar(max)";
+            if (unwrapped == typeof(Guid)) return "uniqueidentifier";
+            if (unwrapped == typeof(DateTime)) return "datetime2";
+            if (unwrapped == typeof(DateTimeOffset)) return "datetimeoffset";
+            if (unwrapped == typeof(decimal)) return "decimal(38,18)";
+            if (unwrapped == typeof(double)) return "float";
+            if (unwrapped == typeof(float)) return "real";
+
+            return "nvarchar(max)";
+        }
     }
 }

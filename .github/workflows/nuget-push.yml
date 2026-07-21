@@ -19,9 +19,9 @@ jobs:
         echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
         echo "::set-output name=version::$(cat version.txt)"
     - name: Setup .NET
-      uses: actions/setup-dotnet@v1
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 3.1.x
+        dotnet-version: 8.0.x
     - name: Restore dependencies
       run: dotnet restore
     - name: Build

@@ -169,10 +169,11 @@ namespace SigQL
 
                     builderAstCollection.RegisterReference(upsertTableRelations.TableRelations.TargetTable, InsertBuilderAstCollection.AstReferenceSource.Merge, merge);
                     
-                    // only insert the values if columns other than the PK are specified
+                    // only insert the values if columns other than the key columns are specified
+                    var insertKeyColumns = upsertTableRelations.KeyColumns ?? upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns;
                     if ((!(upsertTableRelations.TableRelations.Argument is TypeArgument) &&
                         !upsertTableRelations.ColumnParameters.All(c =>
-                            upsertTableRelations.TableRelations.TargetTable.PrimaryKey.Columns.All(
+                            insertKeyColumns.All(
                                 pkc => ColumnEqualityComparer.Default.Equals(c.Column, pkc)))
                         ) || (upsertTableRelations.TableRelations.Argument is TypeArgument && upsertTableRelations.TableRelations.Argument.Type == typeof(void)))
                     {
@@ -186,6 +187,20 @@ namespace SigQL
                         {
                             statement.Add(updateLookupTablePKsStatement);
                             builderAstCollection.RegisterReference(upsertTableRelations.TableRelations.TargetTable, InsertBuilderAstCollection.AstReferenceSource.UpdateLookupIds, updateLookupTablePKsStatement);
+                        }
+
+                        // When using custom key columns that differ from the PK, populate the lookup table's PK
+                        // from the actual table for existing records (the insertedTable update only covers newly inserted rows).
+                        var pkColumns = upsertTableRelations.TableRelations.TargetTable.PrimaryKey?.Columns;
+                        if (upsertTableRelations.KeyColumns != null && pkColumns != null &&
+                            !upsertTableRelations.KeyColumns.SequenceEqual(pkColumns, ColumnEqualityComparer.Default))
+                        {
+                            var updateLookupFromExistingStatement = BuildUpdateLookupFromExistingStatement(
+                                upsertTableRelations.TableRelations, upsertTableRelations.KeyColumns);
+                            if (updateLookupFromExistingStatement != null)
+                            {
+                                statement.Add(updateLookupFromExistingStatement);
+                            }
                         }
                             
                         var outputParameterTableName = GetInsertedTableName(upsertTableRelations.TableRelations);
@@ -973,6 +988,85 @@ namespace SigQL
             return null;
         }
 
+        private AstNode BuildUpdateLookupFromExistingStatement(TableRelations tableRelations, IEnumerable<IColumnDefinition> keyColumns)
+        {
+            var primaryKeyColumns = tableRelations.TargetTable.PrimaryKey?.Columns.ToList();
+            if (primaryKeyColumns == null || !primaryKeyColumns.Any() || keyColumns == null || !keyColumns.Any())
+                return null;
+
+            var lookupTableName = GetLookupTableName(tableRelations);
+            var targetTableName = tableRelations.TargetTable.Name;
+
+            var ast = new Update()
+            {
+                SetClause =
+                    primaryKeyColumns.Select(pk =>
+                        new SetEqualOperator()
+                            .SetArgs(
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalColumn()
+                                    {
+                                        Label = pk.Name
+                                    }),
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalTable()
+                                    {
+                                        Label = targetTableName
+                                    },
+                                    new RelationalColumn()
+                                    {
+                                        Label = pk.Name
+                                    })
+                                )).ToList(),
+                FromClause = new FromClause().SetArgs(
+                        new FromClauseNode().SetArgs(
+                                new Alias()
+                                {
+                                    Label = lookupTableName
+                                }.SetArgs(
+                                    new NamedParameterIdentifier()
+                                    {
+                                        Name = lookupTableName
+                                    }),
+                                new InnerJoin()
+                                {
+                                    RightNode = new TableIdentifier().SetArgs(
+                                        new RelationalTable() { Label = targetTableName })
+                                }.SetArgs(
+                                    new AndOperator().SetArgs(
+                                        keyColumns.Select(kc =>
+                                            new EqualsOperator().SetArgs(
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = targetTableName
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = kc.Name
+                                                    }),
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = lookupTableName
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = kc.Name
+                                                    }))
+                                        ).ToList()
+                                    )
+                                )
+                         )
+                 )
+            }.SetArgs(new Alias()
+            {
+                Label = lookupTableName
+            });
+
+            return ast;
+        }
+
         private static IEnumerable<TableIndexReference> OrderIndexReferences(UpsertTableRelations insertTableRelations, IEnumerable<TableIndexReference> parentIndexMappings)
         {
             var columnCollectionComparer = new FuncEqualityComparer<IEnumerable<IColumnDefinition>>((l1, l2) => Enumerable.SequenceEqual(l1, l2, ColumnEqualityComparer.Default));
@@ -1168,9 +1262,29 @@ namespace SigQL
                     TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>());
 
 
+                if (!string.IsNullOrEmpty(upsertAttribute.KeyColumns))
+                {
+                    var keyColumnNames = upsertAttribute.KeyColumns.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+                    var resolvedKeyColumns = new List<IColumnDefinition>();
+                    foreach (var colName in keyColumnNames)
+                    {
+                        var col = insertSpec.Table.Columns.FirstOrDefault(c => string.Equals(c.Name, colName, StringComparison.OrdinalIgnoreCase));
+                        if (col == null)
+                        {
+                            throw new InvalidOperationException($"KeyColumns: column '{colName}' not found on table '{insertSpec.Table.Name}'.");
+                        }
+                        resolvedKeyColumns.Add(col);
+                    }
+                    insertSpec.KeyColumns = resolvedKeyColumns;
+                }
+                else
+                {
+                    insertSpec.KeyColumns = insertSpec.Table.PrimaryKey?.Columns;
+                }
+
                 var dependencyOrderedTableRelations = GetInsertTableRelationsOrderedByDependencies(parameterTableRelations).ToList();
-                insertSpec.UpsertTableRelationsCollection = dependencyOrderedTableRelations.Select(tr => ToInsertTableRelations(tr, dependencyOrderedTableRelations)).ToList();
-                
+                insertSpec.UpsertTableRelationsCollection = dependencyOrderedTableRelations.Select(tr => ToInsertTableRelations(tr, dependencyOrderedTableRelations, insertSpec)).ToList();
+
                 insertSpec.ReturnType = methodInfo.ReturnType;
                 insertSpec.UnwrappedReturnType = OutputFactory.UnwrapType(methodInfo.ReturnType);
                 insertSpec.RootMethodInfo = methodInfo;
@@ -1202,7 +1316,7 @@ namespace SigQL
             return null;
         }
 
-        private UpsertTableRelations ToInsertTableRelations(TableRelations parameterTableRelations, List<TableRelations> dependencyList)
+        private UpsertTableRelations ToInsertTableRelations(TableRelations parameterTableRelations, List<TableRelations> dependencyList, UpsertSpec upsertSpec)
         {
             var insertRelations = new UpsertTableRelations();
             insertRelations.ColumnParameters = parameterTableRelations.ProjectedColumns.SelectMany(pc =>
@@ -1213,13 +1327,25 @@ namespace SigQL
                         return new UpsertColumnParameter()
                         {
                             Column = pc,
-                            ParameterPath = parameterPath
+                            ParameterPath = parameterPath,
+                            IgnoreIfNull = arg.GetCustomAttribute<IgnoreIfNullAttribute>() != null,
+                            IgnoreIfNullOrEmpty = arg.GetCustomAttribute<IgnoreIfNullOrEmptyAttribute>() != null
                         };
                     }
                 )
             ).ToList();
             insertRelations.ForeignTableColumns = GetRequiredForeignKeys(parameterTableRelations, dependencyList);
             insertRelations.TableRelations = parameterTableRelations;
+
+            // Only apply custom KeyColumns to the root table; child tables use their own PK
+            if (TableEqualityComparer.Default.Equals(parameterTableRelations.TargetTable, upsertSpec.Table))
+            {
+                insertRelations.KeyColumns = upsertSpec.KeyColumns;
+            }
+            else
+            {
+                insertRelations.KeyColumns = parameterTableRelations.TargetTable.PrimaryKey?.Columns;
+            }
 
             return insertRelations;
         }
@@ -1305,9 +1431,9 @@ namespace SigQL
         {
             public IList<UpsertColumnParameter> ColumnParameters { get; set; }
             public TableRelations TableRelations { get; set; }
-            
+
             public IEnumerable<ForeignTableColumn> ForeignTableColumns { get; set; }
-            
+            public IEnumerable<IColumnDefinition> KeyColumns { get; set; }
         }
 
         private static string GetLookupTableName(TableRelations tableRelations)
@@ -1346,7 +1472,8 @@ namespace SigQL
             public Type UnwrappedReturnType { get; set; }
             public MethodInfo RootMethodInfo { get; set; }
             public bool IsSingular { get; set; }
-            
+            public IEnumerable<IColumnDefinition> KeyColumns { get; set; }
+
             public List<UpsertTableRelations> UpsertTableRelationsCollection { get; set; }
         }
         
@@ -1355,6 +1482,8 @@ namespace SigQL
         {
             public IColumnDefinition Column { get; set; }
             public ParameterPath ParameterPath { get; set; }
+            public bool IgnoreIfNull { get; set; }
+            public bool IgnoreIfNullOrEmpty { get; set; }
         }
 
         private class FuncEqualityComparer<T> : IEqualityComparer<T>

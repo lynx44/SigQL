@@ -80,7 +80,7 @@ namespace SigQL
                 // is a value
                 if (rowValues.Values.ContainsKey(propertyInfo.Name))
                 {
-                    var value = rowValues.Values[propertyInfo.Name].ConvertToClr();
+                    var value = rowValues.Values[propertyInfo.Name].ConvertToClr(propertyInfo.PropertyType);
                     SetReturnValue(value, interceptResult);
                     propertyValueCache[propertyInfo] = value;
                 }

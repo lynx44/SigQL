@@ -23,6 +23,9 @@ namespace SigQL.Tests.Common.Databases.Labor
         Employee.IEmployeeFields GetWithFilterSpecifiedColumnName(Employee.EmployeeIdFilter filter);
         Employee.IEmployeeId GetWithFilterNestedSpecifiedColumnName(Employee.EmployeeAddressWithNestedColumnAliasFilter filter);
         IEnumerable<Address.IAddressWithClassification> GetAddressesWithEnumClassification();
+        IEnumerable<Address.IAddressWithNullableClassification> GetAddressesWithNullableEnumClassification();
+        IEnumerable<Address.AddressWithClassificationPoco> GetAddressesWithEnumClassificationPoco();
+        IEnumerable<Address.AddressWithNullableClassificationPoco> GetAddressesWithNullableEnumClassificationPoco();
         Employee.IEmployeeFields GetNot([Not] int id);
         Employee.IEmployeeFields GetByNameNot([Not] string name);
         Employee.IEmployeeFields GetByNameFilter(Employee.EmployeeNameFilter filter);
@@ -98,6 +101,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyIdIgnoreIfNull([IgnoreIfNull] IEnumerable<int> id);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyIdIgnoreIfNullOrEmpty([IgnoreIfNullOrEmpty] IEnumerable<int> id);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyIdPlural(IEnumerable<int> ids);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsWithAnyIdOrEmployeeId(IEnumerable<int?> id, IEnumerable<int?> employeeId);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesWithIn(WorkLog.GetEmployeeNamesInFilter filter);
         IEnumerable<Address.IAddressFields> GetInWithCompositeKeys(IEnumerable<Address.CityAndState> values);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesViaRelation(WorkLog.GetEmployeeNamesViaRelation filter);
@@ -123,7 +127,13 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeId> GetEmployeeIdsForStreetAddressViaClassFilter(Employee.StreetAddressFilterViaRelation filter);
         IEnumerable<Employee.IEmployeeId> EF_GetEmployeeIdsForStreetAddressViaClassFilter(Employee.EFStreetAddressFilterViaRelation filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogIdsForEmployeeNameWithDifferingParameterNameViaClassFilter(WorkLog.EmployeeNameFilterWithAliasViaRelation filter);
-        
+
+        // ViaRelation on output projection
+        IEnumerable<Employee.EmployeeWithWorkLogFlattened> GetEmployeesWithWorkLogFlattened();
+        IEnumerable<Employee.IEmployeeWithWorkLogFlattened> GetEmployeesWithWorkLogFlattenedInterface();
+        IEnumerable<Employee.EmployeeWithAddressCityFlattened> GetEmployeesWithAddressCityFlattened();
+        IEnumerable<Employee.EmployeeWithAddressCityFlattenedEF> GetEmployeesWithAddressCityFlattenedEF();
+
         // or
         IEnumerable<WorkLog.IWorkLogId> OrGroupByTwoColumnsOfSameTable([OrGroup] DateTime startDate, [OrGroup] DateTime endDate);
         IEnumerable<WorkLog.IWorkLogId> OrGroupByTwoGroupsForColumnsOfSameTable([OrGroup("dates")] DateTime startDate, [OrGroup("dates")] DateTime endDate, [OrGroup("ids")] int id, [OrGroup("ids")] int employeeId);
@@ -255,6 +265,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Labor.WorkLog.IWorkLogId> SkipTakeWorkLogsByStartDateAndEmployeeName(
             WorkLog.GetByStartDateAndEmployeeNameFilterWithOffsetFetch filter);
         ICountResult<WorkLog.IWorkLogId> CountWorkLogs();
+        ITotalCount<WorkLog.IWorkLogId> TotalCountWorkLogs();
+        ITotalCount<WorkLog.IWorkLogId> TotalCountWorkLogsWithOffsetFetch([Fetch] int fetch, [Offset] int offset);
+        ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> TotalCountWithResultWorkLogs();
+        ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> TotalCountWithResultWorkLogsWithOffsetFetch([Fetch] int fetch, [Offset] int offset);
+        ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> TotalCountWithResultWorkLogsByFilter(WorkLog.FilterWithOffsetFetch filter);
         IEnumerable<DiagnosticLog.IFields> FetchDiagnosticLogs([Fetch] int take);
 
         IEnumerable<WorkLog.IWorkLogToView> GetWithJoinRelationAttribute();
@@ -263,6 +278,7 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeToWorkLogView> GetWithJoinRelationAttributeOnTableWithViewNavigationCollection();
         IEnumerable<Address.IEmployeeToWorkLogView> GetWithNestedJoinRelationAttribute();
         IEnumerable<Employee.EmployeeToAddressJoinRelationAttribute> GetWithMultiPathJoinRelationAttribute();
+        IEnumerable<WorkLog.IWorkLogToViewViaAddForeignKey> GetWithAddForeignKey();
         IEnumerable<WorkLog.IWorkLogToViewMismatchingCase> GetWithJoinRelationAttributeMismatchingKeyCase();
         IEnumerable<WorkLog.IWorkLogToViewToEmployee> GetWithJoinRelationAttributeAndFilterToSameTable([ViaRelation("WorkLog(EmployeeId)->(Id)Employee", "Id")] int id);
 
@@ -367,11 +383,26 @@ namespace SigQL.Tests.Common.Databases.Labor
         void UpdateAllWorkLogsStartDateAndEndDate([Set] DateTime startDate, [Set] DateTime endDate);
         [Update(TableName = nameof(WorkLog))]
         void UpdateAllWorkLogsStartDateAndEndDateSetClass([Set] WorkLog.SetDateFields workLogDates);
-        // todo
-        //[Update(TableName = nameof(WorkLog))]
-        //void UpdateAllWorkLogsStartDateAndEndDateSetAndFilterClass(WorkLog.SetDatesWithIdFilter workLog);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateAllWorkLogsStartDateAndEndDateSetAndFilterClass(WorkLog.SetDatesWithIdFilter workLog);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateWorkLogDatesWithIgnoreIfNullFilter(WorkLog.SetDatesWithIgnoreIfNullFilter workLog);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateWorkLogDatesIgnoreIfNullWithIdFilter(WorkLog.SetDatesIgnoreIfNullWithIdFilter workLog);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateWorkLogDatesWithOrFilter(WorkLog.SetDatesWithOrFilter workLog);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateWorkLogDatesWithGreaterThanFilter(WorkLog.SetDatesWithGreaterThanFilter workLog);
+        [Update(TableName = nameof(Employee))]
+        void UpdateEmployeeByIdMixed(Employee.SetNameWithIdFilter employee);
+        [Update(TableName = nameof(WorkLog))]
+        void UpdateWorkLogDatesWithIdFilterAndScalarFilter(WorkLog.SetDatesWithIdFilter workLog, int employeeId);
         [Update(TableName = nameof(Employee))]
         void UpdateEmployeeById([Set] string name, int id);
+        [Update(TableName = nameof(Employee))]
+        void UpdateEmployeeNameIgnoreIfNull([Set][IgnoreIfNull] string name, int id);
+        [Update(TableName = nameof(Employee))]
+        void UpdateEmployeeNameIgnoreIfNullOrEmpty([Set][IgnoreIfNullOrEmpty] string name, int id);
 
         // UpdateByKey
 
@@ -379,6 +410,30 @@ namespace SigQL.Tests.Common.Databases.Labor
         void UpdateByKeyEmployeeViaMethodParams(int id, string name);
         [UpdateByKey]
         void UpdateByKeyMultipleEmployeesWithWorkLogs(IEnumerable<Employee.UpdateByKeyFieldsWithWorkLogs> employees);
+
+        // KeyColumns
+        [Upsert(TableName = nameof(Employee), KeyColumns = "Name")]
+        void UpsertEmployeeByName(IEnumerable<Employee.UpsertFieldsByName> employees);
+
+        [UpdateByKey(TableName = nameof(WorkLog), KeyColumns = "StartDate")]
+        void UpdateByKeyWorkLogByStartDate(IEnumerable<WorkLog.UpdateByKeyFieldsByStartDate> workLogs);
+
+        [Sync(KeyColumns = "Name")]
+        void SyncEmployeeByNameWithWorkLogs(Employee.SyncFieldsByNameWithWorkLogs employees);
+
+        // IgnoreIfNull / IgnoreIfNullOrEmpty
+        [Upsert(TableName = nameof(Employee))]
+        void UpsertEmployeesIgnoreIfNull(IEnumerable<Employee.UpsertFieldsIgnoreIfNull> employees);
+        [Upsert(TableName = nameof(Employee))]
+        void UpsertEmployeesIgnoreIfNullOrEmpty(IEnumerable<Employee.UpsertFieldsIgnoreIfNullOrEmpty> employees);
+        [UpdateByKey(TableName = nameof(Employee))]
+        void UpdateByKeyEmployeesIgnoreIfNull(IEnumerable<Employee.UpdateByKeyFieldsIgnoreIfNull> employees);
+        [UpdateByKey(TableName = nameof(Employee))]
+        void UpdateByKeyEmployeesIgnoreIfNullOrEmpty(IEnumerable<Employee.UpdateByKeyFieldsIgnoreIfNullOrEmpty> employees);
+        [Sync(TableName = nameof(Employee))]
+        void SyncEmployeesIgnoreIfNull(Employee.SyncFieldsIgnoreIfNull employees);
+        [Sync(TableName = nameof(Employee))]
+        void SyncEmployeesIgnoreIfNullOrEmpty(Employee.SyncFieldsIgnoreIfNullOrEmpty employees);
 
         // delete
         [Delete(TableName = nameof(Employee))]

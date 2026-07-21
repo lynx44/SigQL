@@ -537,4 +537,22 @@ namespace SigQL
         public string Name { get; set; }
         public AstNode Definition { get; set; }
     }
+
+    public class OpenJsonSelect : AstNode
+    {
+        public string ParameterName { get; set; }
+        public string CastType { get; set; }
+    }
+
+    public class OpenJsonTable : AstNode
+    {
+        public string ParameterName { get; set; }
+        public List<OpenJsonTableColumn> Columns { get; set; } = new List<OpenJsonTableColumn>();
+    }
+
+    public class OpenJsonTableColumn
+    {
+        public string Name { get; set; }
+        public string SqlType { get; set; }
+    }
 }
