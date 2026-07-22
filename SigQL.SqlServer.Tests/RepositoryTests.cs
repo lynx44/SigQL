@@ -1957,6 +1957,61 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void CrossRelationOrGroup_Contains_Mixed_OrsAcrossRelations()
+        {
+            // mirrors the public-search shape: a keyword "contains" filter spanning multiple relations in
+            // one OrGroup, alongside plain (empty) filters on the same relations. A worklog should match if
+            // the keyword appears in the employee name OR the location name (not AND).
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "nurse joe" }, Location = new EFLocation() { Name = "downtown" } },
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "bob" }, Location = new EFLocation() { Name = "nurse clinic" } },
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "bob" }, Location = new EFLocation() { Name = "downtown" } },
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "nurse amy" }, Location = new EFLocation() { Name = "nurse ward" } }
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.WorkLog
+                .Where(wl => wl.Employee.Name.Contains("nurse") || wl.Location.Name.Contains("nurse"))
+                .Select(wl => wl.Id).ToList();
+            var filter = new WorkLog.GetByEmployeeOrLocationNameContainsMixed();
+            filter.EmployeeNameContains = new[] { "nurse" };
+            filter.LocationNameContains = new[] { "nurse" };
+            var actual = this.monolithicRepository.GetWorkLogsByEmployeeOrLocationNameContainsMixed(filter)
+                .Select(wl => wl.Id).ToList();
+
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void DualCollection_SameViaRelationColumn_OrGroup_AppliesBothFilters()
+        {
+            // mirrors the public-search shape: a plain filter and a keyword "contains" filter (in its own
+            // OrGroup) both targeting the same relation column (Employee.Name).
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Jake" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Jam" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Kaylee" }}
+            );
+            this.laborDbContext.SaveChanges();
+
+            // Names in ("Joe","Jake","Jam") AND Name contains ("Ja") => Jake, Jam
+            var expected = laborDbContext.WorkLog
+                .Where(wl => new[] { "Joe", "Jake", "Jam" }.Contains(wl.Employee.Name) && wl.Employee.Name.Contains("Ja"))
+                .Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetWorkLogsByDualEmployeeNamesViaRelationOrGroup(
+                new WorkLog.GetEmployeeNamesDualViaRelationOrGroup()
+                {
+                    Names = new[] { "Joe", "Jake", "Jam" },
+                    NamesContains = new[] { "Ja" }
+                }).Select(wl => wl.Id).ToList();
+
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
         public void InParameter_WhenInViaRelationPropertyNullCollection_ReturnsExpected()
         {
             this.laborDbContext.WorkLog.AddRange(

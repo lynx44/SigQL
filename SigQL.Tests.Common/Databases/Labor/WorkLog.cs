@@ -221,6 +221,29 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<string> NamesContains { get; set; } = new List<string>();
         }
 
+        public class GetByEmployeeOrLocationNameContains
+        {
+            // pure cross-relation OrGroup: match if employee name OR location name contains the keyword.
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Labor.Employee.Name)), OrGroup("query")]
+            public IEnumerable<string> EmployeeNameContains { get; set; } = new List<string>();
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Location), nameof(Labor.Location.Name)), OrGroup("query")]
+            public IEnumerable<string> LocationNameContains { get; set; } = new List<string>();
+        }
+
+        public class GetByEmployeeOrLocationNameContainsMixed
+        {
+            // mirrors the public-search shape: plain (ungrouped) filters AND keyword contains filters (OrGroup)
+            // both targeting the same relations.
+            [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Labor.Employee.Name))]
+            public IEnumerable<string> EmployeeNames { get; set; } = new List<string>();
+            [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Location), nameof(Labor.Location.Name))]
+            public IEnumerable<string> LocationNames { get; set; } = new List<string>();
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Labor.Employee.Name)), OrGroup("query")]
+            public IEnumerable<string> EmployeeNameContains { get; set; } = new List<string>();
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Location), nameof(Labor.Location.Name)), OrGroup("query")]
+            public IEnumerable<string> LocationNameContains { get; set; } = new List<string>();
+        }
+
         public class GetMultipleContainsViaRelation
         {
             [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee), nameof(Labor.Employee.Name))]

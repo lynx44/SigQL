@@ -775,16 +775,26 @@ namespace SigQL
                         );
                     }
 
-                    var navigationTablesGroup = tableRelations.NavigationTables
-                        .GroupBy(tr => tr.Argument?.GetCustomAttribute<OrGroupAttribute>()?.Group).ToList();
-
-                    foreach (var navigationTables in navigationTablesGroup)
+                    // A navigation relation can carry filter columns from multiple OrGroups (for example a
+                    // plain "in" filter and a keyword "contains" filter both targeting the same relation).
+                    // Grouping the whole relation by a single representative argument routes every predicate
+                    // to one logical group, which silently AND's predicates that were meant to OR across
+                    // relations. Instead split each relation per OrGroup - masking it down to the columns
+                    // belonging to that group - so each group's predicates form their own EXISTS subquery and
+                    // join the correct AND/OR conditional.
+                    var navigationTableEmissionCounts = new Dictionary<string, int>();
+                    foreach (var groupKey in GetNavigationTableOrGroupKeys(tableRelations.NavigationTables))
                     {
-                        var columnConditional = AppendGetConditionalOperand(conditionalLookup, navigationTables.Key, tableRelationsConditional);
+                        var columnConditional = AppendGetConditionalOperand(conditionalLookup, groupKey, tableRelationsConditional);
+                        var groupNavigationTables = tableRelations.NavigationTables
+                            .Select(nt => MaskNavigationTableToOrGroup(nt, groupKey))
+                            .Where(nt => nt != null)
+                            .ToList();
                         columnConditional.AppendArgs(
-                            navigationTables.Select(nt =>
-                                BuildWhereClauseForPerspective(primaryTableReference, nt, "0", parameterPaths,
-                                    tokens)).ToList()
+                            groupNavigationTables.Select(nt =>
+                                BuildWhereClauseForPerspective(primaryTableReference, nt,
+                                    GetNavigationTablePostfix(nt.TargetTable.Name, navigationTableEmissionCounts),
+                                    parameterPaths, tokens)).ToList()
                         );
                     }
                 }
@@ -957,6 +967,91 @@ namespace SigQL
 
             return new AndOperator().SetArgs(
                 new LogicalGrouping().SetArgs(new Exists().SetArgs(selectStatement)));
+        }
+
+        // Distinct OrGroup keys present across the navigation tables' filter columns (recursively), in
+        // first-seen order. The ungrouped (null) bucket is emitted first so plain filters keep their
+        // existing aliases and AND semantics.
+        private static IEnumerable<string> GetNavigationTableOrGroupKeys(IEnumerable<TableRelations> navigationTables)
+        {
+            var keys = new List<string>();
+            var hasUngrouped = false;
+            foreach (var navigationTable in navigationTables)
+            {
+                foreach (var key in GetOrGroupKeysInTree(navigationTable))
+                {
+                    if (key == null)
+                    {
+                        hasUngrouped = true;
+                    }
+                    else if (!keys.Contains(key))
+                    {
+                        keys.Add(key);
+                    }
+                }
+            }
+
+            return (hasUngrouped ? new string[] { null } : Array.Empty<string>()).Concat(keys);
+        }
+
+        private static IEnumerable<string> GetOrGroupKeysInTree(TableRelations tableRelations)
+        {
+            foreach (var column in tableRelations.ProjectedColumns)
+            {
+                foreach (var argument in column.Arguments.GetArguments(TableRelationsColumnSource.Parameters))
+                {
+                    yield return GetEffectiveOrGroupKey(argument);
+                }
+            }
+
+            foreach (var navigationTable in tableRelations.NavigationTables)
+            {
+                foreach (var key in GetOrGroupKeysInTree(navigationTable))
+                {
+                    yield return key;
+                }
+            }
+        }
+
+        // The OrGroup a filter argument belongs to. ViaRelation filters declare [OrGroup] on the leaf
+        // argument, while navigation-class filters declare it on the navigation property (an ancestor), so
+        // walk up the argument chain and use the nearest declared group.
+        private static string GetEffectiveOrGroupKey(IArgument argument)
+        {
+            var current = argument;
+            while (current != null)
+            {
+                var group = current.GetCustomAttribute<OrGroupAttribute>()?.Group;
+                if (group != null)
+                {
+                    return group;
+                }
+
+                current = current.Parent;
+            }
+
+            return null;
+        }
+
+        // Masks a navigation relation down to only the filter columns belonging to the given OrGroup.
+        // Returns null when the relation has no predicates in that group.
+        private static TableRelations MaskNavigationTableToOrGroup(TableRelations navigationTable, string groupKey)
+        {
+            var masked = navigationTable.Mask(TableRelationsColumnSource.Parameters,
+                new TableRelationsFilter((argument, isTable) =>
+                    GetEffectiveOrGroupKey(argument) == groupKey));
+
+            return masked.ProjectedColumns.Any() || masked.NavigationTables.Any() ? masked : null;
+        }
+
+        // The alias/parameter postfix for a navigation relation within a single perspective. The first
+        // emission of a given table keeps "0" (preserving existing sql); a relation split across multiple
+        // OrGroups gets distinct postfixes on subsequent emissions so its aliases and parameters stay unique.
+        private static string GetNavigationTablePostfix(string tableName, IDictionary<string, int> emissionCounts)
+        {
+            emissionCounts.TryGetValue(tableName, out var count);
+            emissionCounts[tableName] = count + 1;
+            return count == 0 ? "0" : "0_" + count;
         }
 
         private static string MakeUniqueParameterName(string baseName, HashSet<string> usedParameterNames)

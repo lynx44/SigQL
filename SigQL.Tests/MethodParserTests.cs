@@ -920,6 +920,34 @@ namespace SigQL.Tests
             Assert.IsTrue(values.Contains("%ke%"), "missing '%ke%'. params: " + DumpParams(parameters));
         }
 
+        [TestMethod]
+        public void Where_CrossRelationOrGroup_Contains_Pure()
+        {
+            // two Contains filters in the same OrGroup targeting different relations must be OR'd together.
+            var filter = new WorkLog.GetByEmployeeOrLocationNameContains();
+            filter.EmployeeNameContains = new[] { "nurse" };
+            filter.LocationNameContains = new[] { "nurse" };
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByEmployeeOrLocationNameContains(filter));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" like @Employee0Name0)))) or (exists (select 1 from \"Location\" \"Location0\" where ((\"Location0\".\"Id\" = \"WorkLog\".\"LocationId\") and (\"Location0\".\"Name\" like @Location0Name0)))))", sql);
+        }
+
+        [TestMethod]
+        public void Where_CrossRelationOrGroup_Contains_Mixed()
+        {
+            // the same two OrGroup Contains filters, but the class also carries plain (ungrouped) filters on
+            // the same relations. The plain filters (empty here) must AND as (1=1) while the Contains filters
+            // still OR across relations - each group getting its own EXISTS subquery with distinct aliases.
+            var filter = new WorkLog.GetByEmployeeOrLocationNameContainsMixed();
+            filter.EmployeeNameContains = new[] { "nurse" };
+            filter.LocationNameContains = new[] { "nurse" };
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByEmployeeOrLocationNameContainsMixed(filter));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (1 = 1)))) and (exists (select 1 from \"Location\" \"Location0\" where ((\"Location0\".\"Id\" = \"WorkLog\".\"LocationId\") and (1 = 1))))) and ((exists (select 1 from \"Employee\" \"Employee0_1\" where ((\"Employee0_1\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0_1\".\"Name\" like @Employee0_1Name0)))) or (exists (select 1 from \"Location\" \"Location0_1\" where ((\"Location0_1\".\"Id\" = \"WorkLog\".\"LocationId\") and (\"Location0_1\".\"Name\" like @Location0_1Name0))))))", sql);
+        }
+
         private static string DumpParams(IDictionary<string, object> parameters)
         {
             return string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value}"));

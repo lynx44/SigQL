@@ -371,6 +371,27 @@ This generates a WHERE clause similar to:
 
 This logic can be mixed and matched anywhere within the parameter tree of a method.
 
+An OrGroup can span multiple relations (including via `[ViaRelation]`), and those relations may also carry plain, ungrouped filters at the same time. The grouped predicates are OR'd together across the relations, while the ungrouped predicates continue to AND, even when a single relation is targeted by both a grouped and an ungrouped filter:
+
+    public class JobSearch
+    {
+        // plain filters - AND'd
+        [IgnoreIfNullOrEmpty, ViaRelation("Jobs->Positions", "Name")]
+        public IEnumerable<string> Positions { get; set; }
+        [IgnoreIfNullOrEmpty, ViaRelation("Jobs->Categories", "Name")]
+        public IEnumerable<string> Categories { get; set; }
+        // keyword search - OR'd across the same relations
+        [IgnoreIfNullOrEmpty, Contains, ViaRelation("Jobs->Positions", "Name"), OrGroup("query")]
+        public IEnumerable<string> PositionContains { get; set; }
+        [IgnoreIfNullOrEmpty, Contains, ViaRelation("Jobs->Categories", "Name"), OrGroup("query")]
+        public IEnumerable<string> CategoryContains { get; set; }
+    }
+
+This generates a WHERE clause similar to:
+
+    where (exists (Positions where ...) and exists (Categories where ...))       -- plain filters, AND'd
+      and (exists (Positions where Name like @query) or exists (Categories where Name like @query))  -- OrGroup, OR'd
+
 #### Offset and Fetch
 
 Offset and Fetch are also supported, which is often used for paging:
