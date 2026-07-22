@@ -290,6 +290,26 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<string> LocationNameContains => SplitQuery;
         }
 
+        // Public-search shape whose keyword OrGroup spans a column (Employee.Name) and a nested many-to-many
+        // relation (Employee -> Address). Used by integration tests to prove the group OR's across the nested
+        // relation. Uses the EF-generated join-table name.
+        public class PublicSearchReproNestedEF
+        {
+            [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee), nameof(Labor.Employee.Name))]
+            public IEnumerable<string> EmployeeNameFilter { get; set; } = new List<string>();
+
+            [ClrOnly]
+            public string Query { get; set; }
+
+            private IEnumerable<string> SplitQuery => this.Query?.Split(' ').Select(v => v.Trim())
+                .Where(v => !string.IsNullOrWhiteSpace(v)).ToList();
+
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee), nameof(Labor.Employee.Name)), OrGroup("query")]
+            public IEnumerable<string> EmployeeNameContains => SplitQuery;
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee) + "->EFAddressEFEmployee->" + nameof(Address), nameof(Labor.Address.City)), OrGroup("query")]
+            public IEnumerable<string> CityContains => SplitQuery;
+        }
+
         public class GetMultipleContainsViaRelation
         {
             [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee), nameof(Labor.Employee.Name))]

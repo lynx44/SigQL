@@ -959,7 +959,7 @@ namespace SigQL.Tests
             filter.Query = null;
             var sql = GetSqlForCall(() => monolithicRepository.PublicSearchRepro(filter));
 
-            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((\"Employee0\".\"Name\" in (@Employee0Name0)) and (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress00\" where ((\"EmployeeAddress00\".\"EmployeeId\" = \"Employee0\".\"Id\") and (exists (select 1))))))))) and (exists (select 1 from \"Employee\" \"Employee0_1\" where ((\"Employee0_1\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((1 = 1) and (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress0_10\" where ((\"EmployeeAddress0_10\".\"EmployeeId\" = \"Employee0_1\".\"Id\") and (exists (select 1))))))))))", sql);
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((\"Employee0\".\"Name\" in (@Employee0Name0)) and (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress00\" where ((\"EmployeeAddress00\".\"EmployeeId\" = \"Employee0\".\"Id\") and (exists (select 1))))))))) and (exists (select 1 from \"Employee\" \"Employee0_1\" where ((\"Employee0_1\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((1 = 1) or (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress0_10\" where ((\"EmployeeAddress0_10\".\"EmployeeId\" = \"Employee0_1\".\"Id\") and (exists (select 1))))))))))", sql);
         }
 
         [TestMethod]
@@ -999,6 +999,20 @@ namespace SigQL.Tests
             Assert.AreEqual(2, statements.Length);
             StringAssert.StartsWith(statements[1], "select count(1) \"TotalCount\"");
             Assert.IsFalse(statements[1].Contains("fetch next"), "TotalCount query must not apply FETCH");
+        }
+
+        [TestMethod]
+        public void Where_KeywordOrGroup_AcrossNestedRelation_OrsPredicates()
+        {
+            // A keyword OrGroup spanning a column (Employee.Name) and a nested/many-to-many relation
+            // (Employee -> Address City/State) must OR every predicate in the group. The nested relation's
+            // OrGroup lives on the leaf ViaRelation column, so its group key must be resolved from the
+            // subtree - otherwise it was silently AND'd instead, excluding all rows.
+            var filter = new WorkLog.PublicSearchRepro();
+            filter.Query = "nurse";
+            var sql = GetSqlForCall(() => monolithicRepository.PublicSearchRepro(filter));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((1 = 1) and (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress00\" where ((\"EmployeeAddress00\".\"EmployeeId\" = \"Employee0\".\"Id\") and (exists (select 1 from \"Address\" \"Address000\" where ((\"Address000\".\"Id\" = \"EmployeeAddress00\".\"AddressId\") and (1 = 1))))))))))) and (exists (select 1 from \"Employee\" \"Employee0_1\" where ((\"Employee0_1\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((\"Employee0_1\".\"Name\" like @Employee0_1Name0) or (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress0_10\" where ((\"EmployeeAddress0_10\".\"EmployeeId\" = \"Employee0_1\".\"Id\") and (exists (select 1 from \"Address\" \"Address0_100\" where ((\"Address0_100\".\"Id\" = \"EmployeeAddress0_10\".\"AddressId\") and ((\"Address0_100\".\"City\" like @Address0_100City0) or (\"Address0_100\".\"State\" like @Address0_100State0)))))))))))))", sql);
         }
 
         private static string DumpParams(IDictionary<string, object> parameters)

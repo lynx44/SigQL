@@ -850,8 +850,13 @@ namespace SigQL
             // or their parameter values collide and clobber each other, so track the names used within this
             // perspective and disambiguate duplicates.
             var usedParameterNames = new HashSet<string>();
+            // Group nested relations by the OrGroup of the filter columns they carry (recursively), so a
+            // keyword predicate on a nested/many-to-many relation OR's with the sibling column predicates in
+            // the same group. Reading the OrGroup attribute straight off the navigation argument returned null
+            // for ViaRelation filters (whose [OrGroup] sits on the leaf column) and for many-to-many joins,
+            // which silently dropped those predicates into an AND bucket instead of the intended OR group.
             var tableRelationsGroups = navigationTableRelations.NavigationTables
-                .GroupBy(g => !g.IsManyToMany ? g.Argument.GetCustomAttribute<OrGroupAttribute>()?.Group : g.NavigationTables.First().Argument.GetCustomAttribute<OrGroupAttribute>()?.Group).ToList();
+                .GroupBy(g => GetOrGroupKeysInTree(g).FirstOrDefault()).ToList();
             foreach (var columnGroup in columnGroups)
             {
                 var columnConditional = AppendGetConditionalOperand(conditionalLookup, columnGroup.Key, columnOperator);

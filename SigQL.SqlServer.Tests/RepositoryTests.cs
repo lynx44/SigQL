@@ -194,6 +194,31 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void KeywordOrGroup_AcrossNestedRelation_MatchesViaNestedRelation()
+        {
+            // The keyword group is (Employee.Name contains) OR (Employee's Address.City contains). These rows
+            // match only through the nested Address relation - the employee name does not contain the term.
+            // Previously the group AND'd the two, so nested-only matches were wrongly excluded.
+            this.laborDbContext.WorkLog.AddRange(
+                Enumerable.Range(1, 3).Select(i => new EFWorkLog()
+                {
+                    Employee = new EFEmployee() { Name = "Bob", Addresses = new List<EFAddress>() { new EFAddress() { City = "Seattle" } } }
+                }).ToArray());
+            this.laborDbContext.WorkLog.Add(new EFWorkLog()
+            {
+                Employee = new EFEmployee() { Name = "Bob", Addresses = new List<EFAddress>() { new EFAddress() { City = "Dallas" } } }
+            });
+            this.laborDbContext.SaveChanges();
+
+            var filter = new WorkLog.PublicSearchReproNestedEF();
+            filter.Query = "Seattle";
+
+            var actual = this.monolithicRepository.PublicSearchReproNestedEF(filter).Select(wl => wl.Id).ToList();
+
+            Assert.AreEqual(3, actual.Count());
+        }
+
+        [TestMethod]
         public void GetWorkLogs_AvoidsStackOverflow()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
