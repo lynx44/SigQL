@@ -1602,10 +1602,9 @@ namespace SigQL.Tests
             );
 
             var sql = Build(ast);
-            Assert.AreEqual(@"; with cte as (
-select 1
-)
-select * from ""cte""", sql);
+            // The builder emits CRLF line breaks; assert with explicit \r\n so this does not depend on the
+            // line endings this source file happens to be checked out with.
+            Assert.AreEqual("; with cte as (\r\nselect 1\r\n)\r\nselect * from \"cte\"", sql);
         }
 
 
