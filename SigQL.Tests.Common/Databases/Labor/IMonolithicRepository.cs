@@ -111,6 +111,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesWithIn(WorkLog.GetEmployeeNamesInFilter filter);
         IEnumerable<Address.IAddressFields> GetInWithCompositeKeys(IEnumerable<Address.CityAndState> values);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesViaRelation(WorkLog.GetEmployeeNamesViaRelation filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesContainsViaRelation(WorkLog.GetEmployeeNamesContainsViaRelation filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByMultipleContainsViaRelation(WorkLog.GetMultipleContainsViaRelation filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByDualEmployeeNamesViaRelation(WorkLog.GetEmployeeNamesDualViaRelation filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByDualEmployeeNamesViaRelationOrGroup(WorkLog.GetEmployeeNamesDualViaRelationOrGroup filter);
+        IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesContainsNav(WorkLog.GetEmployeeNamesContainsNavFilter filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelation(WorkLog.GetEmployeeNamesAndAddressCitiesViaRelation filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesAndAddressCitiesViaRelationEF(WorkLog.GetEmployeeNamesAndAddressCitiesViaRelationEF filter);
         IEnumerable<WorkLog.IWorkLogId> GetWorkLogsByEmployeeNamesAndEmployeeIdsViaRelation(WorkLog.GetEmployeeNamesAndEmployeeIdsViaRelation filter);

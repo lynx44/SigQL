@@ -1911,6 +1911,52 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void ContainsCollection_WhenViaRelationProperty_ReturnsExpected()
+        {
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Jake" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Jam" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Kaylee" }}
+            );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.WorkLog.Where(wl => wl.Employee.Name.Contains("Ja") || wl.Employee.Name.Contains("lee")).Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetWorkLogsByEmployeeNamesContainsViaRelation(new WorkLog.GetEmployeeNamesContainsViaRelation() { Names = new[] { "Ja", "lee" } }).Select(wl => wl.Id);
+
+            Assert.AreEqual(3, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void DualCollection_SameViaRelationColumn_AppliesBothFilters()
+        {
+            // two collection filters (in + contains) targeting the same relation column (Employee.Name).
+            // their sql parameters must not collide - both filters must be applied.
+            this.laborDbContext.WorkLog.AddRange(
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Jake" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Jam" }},
+                new EFWorkLog() { Employee = new EFEmployee() { Name = "Kaylee" }}
+            );
+            this.laborDbContext.SaveChanges();
+
+            // Names in ("Joe","Jake","Jam") AND Name contains ("Ja") => Jake, Jam
+            var expected = laborDbContext.WorkLog
+                .Where(wl => new[] { "Joe", "Jake", "Jam" }.Contains(wl.Employee.Name) && wl.Employee.Name.Contains("Ja"))
+                .Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetWorkLogsByDualEmployeeNamesViaRelation(
+                new WorkLog.GetEmployeeNamesDualViaRelation()
+                {
+                    Names = new[] { "Joe", "Jake", "Jam" },
+                    NamesContains = new[] { "Ja" }
+                }).Select(wl => wl.Id).ToList();
+
+            Assert.AreEqual(2, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
         public void InParameter_WhenInViaRelationPropertyNullCollection_ReturnsExpected()
         {
             this.laborDbContext.WorkLog.AddRange(

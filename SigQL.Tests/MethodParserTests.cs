@@ -826,6 +826,113 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Where_ContainsCollection_ViaRelation_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByEmployeeNamesContainsViaRelation(new WorkLog.GetEmployeeNamesContainsViaRelation()
+                    {Names = new[] {"bob", "joe"}}));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((\"Employee0\".\"Name\" like @Employee0Name0) or (\"Employee0\".\"Name\" like @Employee0Name1)))))", sql);
+        }
+
+        [TestMethod]
+        public void Where_ContainsCollection_ViaRelation_DoesNotLeakRawCollectionParameter()
+        {
+            this.monolithicRepository.GetWorkLogsByEmployeeNamesContainsViaRelation(new WorkLog.GetEmployeeNamesContainsViaRelation()
+                { Names = new[] { "bob", "joe" } });
+
+            AssertNoRawCollectionParameters(this.preparedSqlStatements.First().Parameters);
+        }
+
+        [TestMethod]
+        public void Where_ContainsCollection_NavigationClassFilter()
+        {
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByEmployeeNamesContainsNav(new WorkLog.GetEmployeeNamesContainsNavFilter()
+                    { Employee = new Employee.EmployeeNamesContainsFilter() { NameContains = new List<string>() { "bob", "joe" } } }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((\"Employee0\".\"Name\" like @Employee0Name0) or (\"Employee0\".\"Name\" like @Employee0Name1)))))", sql);
+            AssertNoRawCollectionParameters(this.preparedSqlStatements.First().Parameters);
+        }
+
+        [TestMethod]
+        public void Where_MultipleContainsCollection_ViaRelation_DefaultEmptyLists()
+        {
+            // mirrors a search filter where only one of several ViaRelation Contains collections is populated;
+            // the empty (IgnoreIfNullOrEmpty) collections must be omitted and never leak as raw parameters
+            var filter = new WorkLog.GetMultipleContainsViaRelation();
+            filter.AddressCities = new[] { "Seattle" };
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByMultipleContainsViaRelation(filter));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((1 = 1) and (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress00\" where ((\"EmployeeAddress00\".\"EmployeeId\" = \"Employee0\".\"Id\") and (exists (select 1 from \"Address\" \"Address000\" where ((\"Address000\".\"Id\" = \"EmployeeAddress00\".\"AddressId\") and ((\"Address000\".\"City\" like @Address000City0) and (1 = 1))))))))))))", sql);
+            AssertNoRawCollectionParameters(this.preparedSqlStatements.First().Parameters);
+        }
+
+        [TestMethod]
+        public void Where_DualCollection_SameViaRelationColumn_ProducesDistinctParameters()
+        {
+            // two collection filters targeting the same relation+column (Employee.Name):
+            // one plain IN, one Contains. Their SQL parameters must not collide.
+            var filter = new WorkLog.GetEmployeeNamesDualViaRelation();
+            filter.Names = new[] { "bob", "joe" };
+            filter.NamesContains = new[] { "za", "ke" };
+            var sql = GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByDualEmployeeNamesViaRelation(filter));
+
+            var parameters = this.preparedSqlStatements.First().Parameters;
+
+            // every named parameter referenced in the sql must be declared exactly once and carry a single value
+            var duplicateKeys = parameters.GroupBy(p => p.Key).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+            Assert.IsFalse(duplicateKeys.Any(), "Duplicate parameter keys: " + string.Join(", ", duplicateKeys));
+
+            // all four distinct filter values must be represented
+            var values = parameters.Values.Select(v => v?.ToString()).ToList();
+            Assert.IsTrue(values.Contains("bob"), "missing 'bob'. params: " + DumpParams(parameters));
+            Assert.IsTrue(values.Contains("joe"), "missing 'joe'. params: " + DumpParams(parameters));
+            Assert.IsTrue(values.Contains("%za%"), "missing '%za%'. params: " + DumpParams(parameters));
+            Assert.IsTrue(values.Contains("%ke%"), "missing '%ke%'. params: " + DumpParams(parameters));
+
+            System.Console.WriteLine(sql);
+            System.Console.WriteLine(DumpParams(parameters));
+        }
+
+        [TestMethod]
+        public void Where_DualCollection_SameViaRelationColumn_DifferentOrGroups_ProducesDistinctParameters()
+        {
+            // exactly mirrors a public search filter: a plain filter and a keyword "contains" filter
+            // (in its own OrGroup) both targeting the same relation column. parameters must not collide.
+            var filter = new WorkLog.GetEmployeeNamesDualViaRelationOrGroup();
+            filter.Names = new[] { "bob", "joe" };
+            filter.NamesContains = new[] { "za", "ke" };
+            GetSqlForCall(() =>
+                monolithicRepository.GetWorkLogsByDualEmployeeNamesViaRelationOrGroup(filter));
+
+            var parameters = this.preparedSqlStatements.First().Parameters;
+
+            var duplicateKeys = parameters.GroupBy(p => p.Key).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+            Assert.IsFalse(duplicateKeys.Any(), "Duplicate parameter keys: " + string.Join(", ", duplicateKeys));
+
+            var values = parameters.Values.Select(v => v?.ToString()).ToList();
+            Assert.IsTrue(values.Contains("bob"), "missing 'bob'. params: " + DumpParams(parameters));
+            Assert.IsTrue(values.Contains("joe"), "missing 'joe'. params: " + DumpParams(parameters));
+            Assert.IsTrue(values.Contains("%za%"), "missing '%za%'. params: " + DumpParams(parameters));
+            Assert.IsTrue(values.Contains("%ke%"), "missing '%ke%'. params: " + DumpParams(parameters));
+        }
+
+        private static string DumpParams(IDictionary<string, object> parameters)
+        {
+            return string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value}"));
+        }
+
+        private static void AssertNoRawCollectionParameters(IDictionary<string, object> parameters)
+        {
+            Assert.IsFalse(parameters.Values.Any(v => v is System.Collections.IEnumerable && !(v is string)),
+                "A collection filter should be expanded into individual parameters, not passed as a raw collection. Parameters: " +
+                string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value?.GetType().Name}")));
+        }
+
+        [TestMethod]
         public void Where_In_ViaRelation_EmptyCollection_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() =>

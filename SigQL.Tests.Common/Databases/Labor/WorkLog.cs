@@ -186,10 +186,49 @@ namespace SigQL.Tests.Common.Databases.Labor
             public Employee.EmployeeNamesInFilter Employee { get; set; }
         }
 
+        public class GetEmployeeNamesContainsNavFilter
+        {
+            public Employee.EmployeeNamesContainsFilter Employee { get; set; }
+        }
+
         public class GetEmployeeNamesViaRelation
         {
             [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Labor.Employee.Name))]
             public IEnumerable<string> Names { get; set; }
+        }
+
+        public class GetEmployeeNamesContainsViaRelation
+        {
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Labor.Employee.Name))]
+            public IEnumerable<string> Names { get; set; }
+        }
+
+        public class GetEmployeeNamesDualViaRelation
+        {
+            [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Labor.Employee.Name))]
+            public IEnumerable<string> Names { get; set; } = new List<string>();
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Labor.Employee.Name))]
+            public IEnumerable<string> NamesContains { get; set; } = new List<string>();
+        }
+
+        public class GetEmployeeNamesDualViaRelationOrGroup
+        {
+            // mirrors a public search: a plain filter and a keyword "contains" filter (in its own OrGroup)
+            // both targeting the same relation column (Employee.Name).
+            [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Labor.Employee.Name))]
+            public IEnumerable<string> Names { get; set; } = new List<string>();
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Labor.Employee.Name)), OrGroup("query")]
+            public IEnumerable<string> NamesContains { get; set; } = new List<string>();
+        }
+
+        public class GetMultipleContainsViaRelation
+        {
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee), nameof(Labor.Employee.Name))]
+            public IEnumerable<string> EmployeeNames { get; set; } = new List<string>();
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address), nameof(Labor.Address.City))]
+            public IEnumerable<string> AddressCities { get; set; } = new List<string>();
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address), nameof(Labor.Address.State))]
+            public IEnumerable<string> AddressStates { get; set; } = new List<string>();
         }
 
         public class GetEmployeeNamesAndAddressCitiesViaRelation

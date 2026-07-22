@@ -831,6 +831,11 @@ namespace SigQL
             AstNode columnOperator = new AndOperator();
 
             var conditionalLookup = new Dictionary<string, AstNode>();
+            // multiple filter properties can target the same relation column (e.g. an "in" filter and a
+            // "contains" filter both pointing at Employee.Name). each needs a distinct sql parameter name
+            // or their parameter values collide and clobber each other, so track the names used within this
+            // perspective and disambiguate duplicates.
+            var usedParameterNames = new HashSet<string>();
             var tableRelationsGroups = navigationTableRelations.NavigationTables
                 .GroupBy(g => !g.IsManyToMany ? g.Argument.GetCustomAttribute<OrGroupAttribute>()?.Group : g.NavigationTables.First().Argument.GetCustomAttribute<OrGroupAttribute>()?.Group).ToList();
             foreach (var columnGroup in columnGroups)
@@ -840,14 +845,13 @@ namespace SigQL
                 columnConditional.SetArgs(
                     columnGroup.SelectMany(c =>
                      {
-                         var sqlParameterName = $"{navigationTableAlias}{c.Name}";
                          var parameterArguments = c.Arguments.GetArguments(TableRelationsColumnSource.Parameters).ToList();
 
                          var astNodes = parameterArguments.Select(arg =>
                              BuildComparisonNode(
                                  new ColumnIdentifier().SetArgs(new Alias() { Label = navigationTableAlias },
                                      new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Name })),
-                                 sqlParameterName, arg, parameterPaths, tokens)).ToList();
+                                 MakeUniqueParameterName($"{navigationTableAlias}{c.Name}", usedParameterNames), arg, parameterPaths, tokens)).ToList();
 
                          var parameterTokens = tokens.Where(t => parameterArguments.Contains(t.Argument)).ToList();
                          var notNullTokenCountForTable = parameterTokens.Count;
@@ -953,6 +957,19 @@ namespace SigQL
 
             return new AndOperator().SetArgs(
                 new LogicalGrouping().SetArgs(new Exists().SetArgs(selectStatement)));
+        }
+
+        private static string MakeUniqueParameterName(string baseName, HashSet<string> usedParameterNames)
+        {
+            var name = baseName;
+            var suffix = 1;
+            while (!usedParameterNames.Add(name))
+            {
+                name = baseName + "_" + suffix;
+                suffix++;
+            }
+
+            return name;
         }
 
         private AstNode AppendGetConditionalOperand(IDictionary<string, AstNode> conditionalLookup, string groupName, AstNode outerNode)
