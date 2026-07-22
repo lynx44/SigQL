@@ -143,6 +143,57 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void TotalCountWithResult_NavigationFilterOffsetFetch_PlainPopulatedQueryEmpty_CountIgnoresPaging()
+        {
+            // Public-search shape: a plain (ungrouped) navigation filter is populated while the keyword
+            // "contains" OrGroup is empty. Previously this crashed while building the SQL; it must now run,
+            // return only the requested page, and report the full (unpaged) total count.
+            this.laborDbContext.WorkLog.AddRange(
+                Enumerable.Range(1, 5).Select(i => new EFWorkLog()
+                {
+                    Employee = new EFEmployee() { Name = "Bob", Addresses = new List<EFAddress>() { new EFAddress() { City = "Seattle" } } }
+                }).ToArray());
+            this.laborDbContext.WorkLog.Add(new EFWorkLog()
+            {
+                Employee = new EFEmployee() { Name = "Alice", Addresses = new List<EFAddress>() { new EFAddress() { City = "Dallas" } } }
+            });
+            this.laborDbContext.SaveChanges();
+
+            var filter = new WorkLog.PublicSearchReproEF();
+            filter.EmployeeNameFilter = new[] { "Bob" };
+            filter.Query = null;
+
+            var actual = this.monolithicRepository.PublicSearchReproWithCountEF(filter, 0, 2);
+
+            Assert.AreEqual(5, actual.TotalCount);
+            Assert.AreEqual(2, actual.Result.Count());
+        }
+
+        [TestMethod]
+        public void TotalCountWithResult_NavigationFilterOffsetFetch_QueryPopulated_ReturnsMatchesAndCount()
+        {
+            // keyword search across multiple relations via the OrGroup, with offset/fetch and total count.
+            this.laborDbContext.WorkLog.AddRange(
+                Enumerable.Range(1, 4).Select(i => new EFWorkLog()
+                {
+                    Employee = new EFEmployee() { Name = "Nurse Joy", Addresses = new List<EFAddress>() { new EFAddress() { City = "Seattle" } } }
+                }).ToArray());
+            this.laborDbContext.WorkLog.Add(new EFWorkLog()
+            {
+                Employee = new EFEmployee() { Name = "Bob", Addresses = new List<EFAddress>() { new EFAddress() { City = "Dallas" } } }
+            });
+            this.laborDbContext.SaveChanges();
+
+            var filter = new WorkLog.PublicSearchReproEF();
+            filter.Query = "Nurse";
+
+            var actual = this.monolithicRepository.PublicSearchReproWithCountEF(filter, 0, 2);
+
+            Assert.AreEqual(4, actual.TotalCount);
+            Assert.AreEqual(2, actual.Result.Count());
+        }
+
+        [TestMethod]
         public void GetWorkLogs_AvoidsStackOverflow()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();

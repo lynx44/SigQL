@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using SigQL.Types;
 using SigQL.Types.Attributes;
 
@@ -242,6 +243,51 @@ namespace SigQL.Tests.Common.Databases.Labor
             public IEnumerable<string> EmployeeNameContains { get; set; } = new List<string>();
             [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Location), nameof(Labor.Location.Name)), OrGroup("query")]
             public IEnumerable<string> LocationNameContains { get; set; } = new List<string>();
+        }
+
+        // Reproduces a public-search filter: plain (ungrouped) filters and a keyword "contains" OrGroup,
+        // several of the contains filters targeting the same relation, everything IgnoreIfNullOrEmpty, driven
+        // by a [ClrOnly] Query that is often empty. Mirrors the shape that produced a null-Args crash.
+        public class PublicSearchRepro
+        {
+            [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee), nameof(Labor.Employee.Name))]
+            public IEnumerable<string> EmployeeNameFilter { get; set; } = new List<string>();
+            [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address), nameof(Labor.Address.City))]
+            public IEnumerable<string> CityFilter { get; set; } = new List<string>();
+
+            [ClrOnly]
+            public string Query { get; set; }
+
+            private IEnumerable<string> SplitQuery => this.Query?.Split(' ').Select(v => v.Trim())
+                .Where(v => !string.IsNullOrWhiteSpace(v)).ToList();
+
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee), nameof(Labor.Employee.Name)), OrGroup("query")]
+            public IEnumerable<string> EmployeeNameContains => SplitQuery;
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address), nameof(Labor.Address.City)), OrGroup("query")]
+            public IEnumerable<string> CityContains => SplitQuery;
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee) + "->" + nameof(EmployeeAddress) + "->" + nameof(Address), nameof(Labor.Address.State)), OrGroup("query")]
+            public IEnumerable<string> StateContains => SplitQuery;
+        }
+
+        // A public-search shape faithful to the reported filter: a plain (ungrouped) filter plus a keyword
+        // "contains" OrGroup spanning sibling single-hop relations (Employee, Location), everything
+        // IgnoreIfNullOrEmpty and driven by a [ClrOnly] Query. Used by integration tests against the real
+        // (migrated) database schema.
+        public class PublicSearchReproEF
+        {
+            [IgnoreIfNullOrEmpty, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee), nameof(Labor.Employee.Name))]
+            public IEnumerable<string> EmployeeNameFilter { get; set; } = new List<string>();
+
+            [ClrOnly]
+            public string Query { get; set; }
+
+            private IEnumerable<string> SplitQuery => this.Query?.Split(' ').Select(v => v.Trim())
+                .Where(v => !string.IsNullOrWhiteSpace(v)).ToList();
+
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Employee), nameof(Labor.Employee.Name)), OrGroup("query")]
+            public IEnumerable<string> EmployeeNameContains => SplitQuery;
+            [IgnoreIfNullOrEmpty, Contains, ViaRelation(nameof(WorkLog) + "->" + nameof(Labor.Location), nameof(Labor.Location.Name)), OrGroup("query")]
+            public IEnumerable<string> LocationNameContains => SplitQuery;
         }
 
         public class GetMultipleContainsViaRelation

@@ -169,11 +169,15 @@ namespace SigQL
             Select totalCountStatement = null;
             if (isTotalCountResult && (offsetParameter != null || fetchParameter != null))
             {
-                // Build the count base query before offset/fetch restructures things
+                // Build the count base query before offset/fetch restructures things.
+                // Use a dedicated FromClause here: the offset/fetch logic below mutates the shared
+                // fromClause in place (wrapping it in the paged offset subquery). Sharing that reference
+                // would leak the OFFSET/FETCH into the count, capping TotalCount at the page size instead
+                // of reporting the true total.
                 var countBaseStatement = new Select()
                 {
                     SelectClause = selectClause,
-                    FromClause = fromClause
+                    FromClause = new FromClause().SetArgs(fromClauseNode)
                 };
                 if (whereClauseTableRelations.ProjectedColumns.Any() || whereClauseTableRelations.NavigationTables.Any())
                 {
@@ -857,13 +861,20 @@ namespace SigQL
                      {
                          var parameterArguments = c.Arguments.GetArguments(TableRelationsColumnSource.Parameters).ToList();
 
+                         // Only the tokens created by the BuildComparisonNode calls below belong to this
+                         // perspective. offset/fetch and ITotalCountResult build the where clause more than
+                         // once, all appending to the same shared tokens list, so selecting by Argument alone
+                         // would also capture a prior build's tokens for the same argument - re-wrapping their
+                         // UpdateNodeFunc against this build's selectStatement and corrupting the
+                         // IgnoreIfNullOrEmpty counter, which left keyword (Contains) predicates unresolved.
+                         var tokenCountBeforeBuild = tokens.Count;
                          var astNodes = parameterArguments.Select(arg =>
                              BuildComparisonNode(
                                  new ColumnIdentifier().SetArgs(new Alias() { Label = navigationTableAlias },
                                      new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = c.Name })),
                                  MakeUniqueParameterName($"{navigationTableAlias}{c.Name}", usedParameterNames), arg, parameterPaths, tokens)).ToList();
 
-                         var parameterTokens = tokens.Where(t => parameterArguments.Contains(t.Argument)).ToList();
+                         var parameterTokens = tokens.Skip(tokenCountBeforeBuild).Where(t => parameterArguments.Contains(t.Argument)).ToList();
                          var notNullTokenCountForTable = parameterTokens.Count;
                          parameterTokens.ForEach(t =>
                          {

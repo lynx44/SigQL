@@ -283,6 +283,9 @@ namespace SigQL.Tests.Common.Databases.Labor
         ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> TotalCountWithResultWorkLogs();
         ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> TotalCountWithResultWorkLogsWithOffsetFetch([Fetch] int fetch, [Offset] int offset);
         ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> TotalCountWithResultWorkLogsByFilter(WorkLog.FilterWithOffsetFetch filter);
+        IEnumerable<WorkLog.IWorkLogId> PublicSearchRepro(WorkLog.PublicSearchRepro filter);
+        ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> PublicSearchReproWithCount(WorkLog.PublicSearchRepro filter, [Offset] int skip, [Fetch] int take);
+        ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> PublicSearchReproWithCountEF(WorkLog.PublicSearchReproEF filter, [Offset] int skip, [Fetch] int take);
         IEnumerable<DiagnosticLog.IFields> FetchDiagnosticLogs([Fetch] int take);
 
         IEnumerable<WorkLog.IWorkLogToView> GetWithJoinRelationAttribute();

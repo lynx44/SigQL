@@ -948,6 +948,59 @@ namespace SigQL.Tests
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (1 = 1)))) and (exists (select 1 from \"Location\" \"Location0\" where ((\"Location0\".\"Id\" = \"WorkLog\".\"LocationId\") and (1 = 1))))) and ((exists (select 1 from \"Employee\" \"Employee0_1\" where ((\"Employee0_1\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0_1\".\"Name\" like @Employee0_1Name0)))) or (exists (select 1 from \"Location\" \"Location0_1\" where ((\"Location0_1\".\"Id\" = \"WorkLog\".\"LocationId\") and (\"Location0_1\".\"Name\" like @Location0_1Name0))))))", sql);
         }
 
+        [TestMethod]
+        public void Where_MixedPlainAndKeywordOrGroup_PlainPopulated_QueryEmpty_ReturnsExpectedSql()
+        {
+            // A public-search filter shape: a plain (ungrouped) filter populated, while the keyword
+            // "contains" OrGroup is empty (IgnoreIfNullOrEmpty). The empty keyword group must collapse to a
+            // (1 = 1) no-op rather than leaving a null-Args conditional that crashes the SQL builder.
+            var filter = new WorkLog.PublicSearchRepro();
+            filter.EmployeeNameFilter = new[] { "bob" };
+            filter.Query = null;
+            var sql = GetSqlForCall(() => monolithicRepository.PublicSearchRepro(filter));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where ((exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((\"Employee0\".\"Name\" in (@Employee0Name0)) and (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress00\" where ((\"EmployeeAddress00\".\"EmployeeId\" = \"Employee0\".\"Id\") and (exists (select 1))))))))) and (exists (select 1 from \"Employee\" \"Employee0_1\" where ((\"Employee0_1\".\"Id\" = \"WorkLog\".\"EmployeeId\") and ((1 = 1) and (exists (select 1 from \"EmployeeAddress\" \"EmployeeAddress0_10\" where ((\"EmployeeAddress0_10\".\"EmployeeId\" = \"Employee0_1\".\"Id\") and (exists (select 1))))))))))", sql);
+        }
+
+        [TestMethod]
+        public void TotalCountWithResult_WithNavigationFilterAndOffsetFetch_DoesNotThrow_AndCountIgnoresPaging()
+        {
+            // ITotalCountResult with offset/fetch over a navigation-table filter builds the where clause more
+            // than once against a shared tokens list. This previously crashed (null-Args conditional) because
+            // token wrappers leaked across builds. It must now succeed, and the TotalCount query must NOT
+            // carry the OFFSET/FETCH paging (it reports the full total, not just the page).
+            var filter = new WorkLog.PublicSearchRepro();
+            filter.EmployeeNameFilter = new[] { "bob" };
+            filter.Query = null;
+            var sql = GetSqlForCall(() => monolithicRepository.PublicSearchReproWithCount(filter, 0, 25));
+
+            var statements = sql.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+            Assert.AreEqual(2, statements.Length, "expected a data statement and a TotalCount statement");
+
+            var dataStatement = statements[0];
+            var countStatement = statements[1];
+
+            // the paged data query keeps offset/fetch
+            StringAssert.Contains(dataStatement, "offset @skip rows fetch next @take rows only");
+            // the count query counts the full result set - no paging
+            StringAssert.StartsWith(countStatement, "select count(1) \"TotalCount\"");
+            Assert.IsFalse(countStatement.Contains("offset "), "TotalCount query must not apply OFFSET: " + countStatement);
+            Assert.IsFalse(countStatement.Contains("fetch next"), "TotalCount query must not apply FETCH: " + countStatement);
+        }
+
+        [TestMethod]
+        public void TotalCountWithResult_WithNavigationFilterAndOffsetFetch_QueryPopulated_DoesNotThrow()
+        {
+            var filter = new WorkLog.PublicSearchRepro();
+            filter.Query = "nurse";
+            var sql = GetSqlForCall(() => monolithicRepository.PublicSearchReproWithCount(filter, 0, 25));
+
+            var statements = sql.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+            Assert.AreEqual(2, statements.Length);
+            StringAssert.StartsWith(statements[1], "select count(1) \"TotalCount\"");
+            Assert.IsFalse(statements[1].Contains("fetch next"), "TotalCount query must not apply FETCH");
+        }
+
         private static string DumpParams(IDictionary<string, object> parameters)
         {
             return string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value}"));

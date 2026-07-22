@@ -760,6 +760,19 @@ Counting the total number of rows in a result set can be achieved by using the I
 	var countResult = repository.CountWorkLogs(1);
 	var numberOfItems = countResult.Count;
 
+#### Count with Results (paging)
+
+When paging a result set, you usually need both the current page of data and the total number of matching rows (for example, to render page controls). The ITotalCountResult\<T\> interface returns both from a single call, running two queries: one for the requested page and one for the total count.
+
+    ITotalCountResult<IEnumerable<Employee>> GetEmployees(
+        EmployeeFilter filter, [Offset] int offset, [Fetch] int fetch);
+	...
+	var result = repository.GetEmployees(filter, 0, 25);
+	int total = result.TotalCount;              // total matching rows, ignoring offset/fetch
+	IEnumerable<Employee> page = result.Result; // just the requested page (up to 25 rows)
+
+The `TotalCount` always reflects the full number of rows matching the filter and ignores the `[Offset]`/`[Fetch]` paging, while `Result` contains only the requested page.
+
 #### Views
 
 Views are supported:
