@@ -600,6 +600,23 @@ namespace SigQL.Tests.Common.Databases.Labor
             public Employee.InsertFieldsWithAddress Employee { get; set; }
             public Location.Insert Location { get; set; }
         }
+
+        // many-to-one: reference an existing Employee by key only. The Employee row
+        // must not be inserted or updated; only WorkLog.EmployeeId should be set.
+        public class InsertFieldsWithExistingEmployee
+        {
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
+            public Employee.IEmployeeId Employee { get; set; }
+        }
+
+        public class UpsertFieldsWithExistingEmployee
+        {
+            public int? Id { get; set; }
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
+            public Employee.IEmployeeId Employee { get; set; }
+        }
         public class UpsertFieldsWithEmployeeAndLocation
         {
             public int? Id { get; set; }

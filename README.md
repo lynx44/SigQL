@@ -966,6 +966,62 @@ Insert with relations:
 
 *Note that all relations will be inserted. If updating existing relations is desired, use the [Upsert] attribute*
 
+##### Referencing an existing related record by key
+
+Sometimes a record should point at a related row that already exists, without inserting or
+updating that related row. To do this, type the navigation property as an interface (or class)
+that exposes only the related table's key. SigQL treats a navigation whose supplied columns are
+exactly the related table's key as a foreign-key reference: it sets the foreign key column to the
+provided key and never emits an insert or update against the related table.
+
+    public class WorkLog
+    {
+        // exposes only the key of the related Employee
+        public interface IEmployeeId
+        {
+            int Id { get; set; }
+        }
+
+        public class InsertFieldsWithExistingEmployee
+        {
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
+            public Employee.IEmployeeId Employee { get; set; }
+        }
+    }
+    ...
+    [Insert]
+    void InsertWorkLogs(IEnumerable<WorkLog.InsertFieldsWithExistingEmployee> worklogs);
+
+Here each WorkLog is inserted with its `EmployeeId` set to the referenced `Employee.Id`; the
+`Employee` row itself is left untouched. This works identically under `[Upsert]` and `[Sync]`, and
+supports non-identity keys such as a client-supplied `uniqueidentifier` (GUID) primary key. If the
+navigation property supplies columns beyond the key, the related row is inserted/updated as usual.
+
+For a many-to-many relationship, the same idea can be expressed against the join table with
+`[ViaRelation]`, supplying the far-side key directly as a flat collection of primitives:
+
+    public class Employee
+    {
+        public class SyncWithAddressIds
+        {
+            public int? Id { get; set; }
+            // links this Employee to existing Addresses through the join table,
+            // setting only the join row's AddressesId; the Address rows are untouched
+            [ViaRelation("Employee->EFAddressEFEmployee", "AddressesId")]
+            public IEnumerable<int> AddressIds { get; set; }
+        }
+    }
+    ...
+    [Sync]
+    void SyncEmployeeAddresses(Employee.SyncWithAddressIds employee);
+
+Under `[Sync]` this inserts the join rows that don't yet exist, leaves existing ones in place, and
+deletes the join rows for that Employee whose key is no longer present — so an empty collection
+clears all of the Employee's associations. The referenced Address rows are never inserted, updated,
+or deleted. (The equivalent can also be written with an Id-class collection, e.g.
+`IEnumerable<Address.AddressId>`, when you prefer a class over a flat primitive.)
+
 #### UpdateByKey
 
 UpdateByKey will update one or multiple rows, including relations, based on a provided primary key.

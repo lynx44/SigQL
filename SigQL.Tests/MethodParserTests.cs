@@ -1918,6 +1918,65 @@ update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLo
         }
 
         [TestMethod]
+        public void InsertMultipleWithManyToOneExistingGuidKeyedParentByIdOnly_DoesNotInsertParent_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.InsertCategoryItemsWithExistingCategory(
+                new[]
+                {
+                    new CategoryItem.InsertFieldsWithExistingCategory()
+                    {
+                        Name = "Item1",
+                        Category = new Category.CategoryIdImpl() { Id = Guid.NewGuid() }
+                    }
+                }));
+
+            // The referenced Category has a client-supplied uniqueidentifier PK. It is supplied by key
+            // only, so no merge/insert against Category is emitted; its lookup is typed as
+            // uniqueidentifier and seeded with the provided GUID, and CategoryItem.CategoryId resolves
+            // from that lookup.
+            AssertSqlEqual(@"declare @insertedCategoryItem table(""Id"" int, ""_index"" int)
+declare @insertedCategory table(""Id"" uniqueidentifier, ""_index"" int)
+declare @CategoryLookup table(""Id"" uniqueidentifier, ""_index"" int)
+insert @CategoryLookup(""Id"", ""_index"") values(@itemsCategory_Id0, 0)
+update ""CategoryLookup"" set ""Id"" = ""insertedCategory"".""Id"" from @CategoryLookup ""CategoryLookup"" inner join @insertedCategory ""insertedCategory"" on (""CategoryLookup"".""_index"" = ""insertedCategory"".""_index"");
+declare @CategoryItemLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int, ""CategoryId_index"" int)
+insert @CategoryItemLookup(""Name"", ""_index"", ""CategoryId_index"") values(@itemsName0, 0, 0)
+merge ""CategoryItem"" using (select ""Name"", ""_index"", ""CategoryId_index"" from @CategoryItemLookup ""CategoryItemLookup"") as i (""Name"",""_index"",""CategoryId_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"", ""CategoryId"") values(""i"".""Name"", (select ""Id"" from @CategoryLookup ""CategoryLookup"" where (""CategoryLookup"".""_index"" = ""i"".""CategoryId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedCategoryItem(""Id"", ""_index"");
+update ""CategoryItemLookup"" set ""Id"" = ""insertedCategoryItem"".""Id"" from @CategoryItemLookup ""CategoryItemLookup"" inner join @insertedCategoryItem ""insertedCategoryItem"" on (""CategoryItemLookup"".""_index"" = ""insertedCategoryItem"".""_index"");", sql);
+        }
+
+        [TestMethod]
+        public void InsertMultipleWithManyToOneExistingParentByIdOnly_DoesNotInsertParent_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.InsertWorkLogsWithExistingEmployee(
+                new[]
+                {
+                    new WorkLog.InsertFieldsWithExistingEmployee()
+                    {
+                        StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                        Employee = new Employee.EmployeeIdImpl() { Id = 5 }
+                    }
+                }));
+
+            // The referenced Employee is supplied by key only, so no merge/insert against the
+            // Employee table is emitted; its lookup is seeded directly with the provided Id, and
+            // WorkLog.EmployeeId resolves from that lookup.
+            AssertSqlEqual(@"declare @insertedWorkLog table(""Id"" int, ""_index"" int)
+declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""_index"" int)
+insert @EmployeeLookup(""Id"", ""_index"") values(@worklogsEmployee_Id0, 0)
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
+insert @WorkLogLookup(""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") values(@worklogsStartDate0, @worklogsEndDate0, 0, 0)
+merge ""WorkLog"" using (select ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"" from @WorkLogLookup ""WorkLogLookup"") as i (""StartDate"",""EndDate"",""_index"",""EmployeeId_index"") on (1 = 0)
+ when not matched then
+ insert (""StartDate"", ""EndDate"", ""EmployeeId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
+update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLookup ""WorkLogLookup"" inner join @insertedWorkLog ""insertedWorkLog"" on (""WorkLogLookup"".""_index"" = ""insertedWorkLog"".""_index"");", sql);
+        }
+
+        [TestMethod]
         public void InsertMultipleWithAdjacentAndManyToManyNavigationProperties_Void_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleWorkLogsWithAdjacentAndNestedRelations(

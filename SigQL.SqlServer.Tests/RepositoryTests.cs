@@ -4393,6 +4393,138 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void InsertMultiple_Void_ManyToOneExistingParentByIdOnly_SetsForeignKeyWithoutTouchingParent()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+            var existingEmployeeId = laborDbContext.Employee.Single().Id;
+            laborDbContext.ChangeTracker.Clear();
+
+            this.monolithicRepository.InsertWorkLogsWithExistingEmployee(new[]
+            {
+                new WorkLog.InsertFieldsWithExistingEmployee()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee = new Employee.EmployeeIdImpl() { Id = existingEmployeeId }
+                }
+            });
+
+            var employees = this.laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+            // the referenced Employee must not have been re-inserted or duplicated
+            Assert.AreEqual(1, employees.Count);
+            Assert.AreEqual("Mike", employees.Single().Name);
+            var workLogs = this.laborDbContext.WorkLog.ToList();
+            Assert.AreEqual(1, workLogs.Count);
+            Assert.AreEqual(existingEmployeeId, workLogs.Single().EmployeeId);
+        }
+
+        [TestMethod]
+        public void InsertMultiple_Void_ManyToOneExistingGuidKeyedParentByIdOnly_SetsForeignKeyWithoutTouchingParent()
+        {
+            var categoryId = Guid.NewGuid();
+            laborDbContext.Category.Add(new EFCategory() { Id = categoryId, Name = "Widgets" });
+            laborDbContext.SaveChanges();
+            laborDbContext.ChangeTracker.Clear();
+
+            this.monolithicRepository.InsertCategoryItemsWithExistingCategory(new[]
+            {
+                new CategoryItem.InsertFieldsWithExistingCategory()
+                {
+                    Name = "Item1",
+                    Category = new Category.CategoryIdImpl() { Id = categoryId }
+                }
+            });
+
+            var categories = this.laborDbContext.Category.ToList();
+            Assert.AreEqual(1, categories.Count);                    // GUID parent not inserted/duplicated
+            Assert.AreEqual("Widgets", categories.Single().Name);    // GUID parent not updated
+            var items = this.laborDbContext.CategoryItem.ToList();
+            Assert.AreEqual(1, items.Count);
+            Assert.AreEqual(categoryId, items.Single().CategoryId);  // GUID FK resolved and set
+        }
+
+        [TestMethod]
+        public void Upsert_Void_ManyToOneExistingGuidKeyedParentByIdOnly_InsertAndUpdateSetForeignKeyWithoutTouchingParent()
+        {
+            var widgetsId = Guid.NewGuid();
+            var gadgetsId = Guid.NewGuid();
+            laborDbContext.Category.Add(new EFCategory() { Id = widgetsId, Name = "Widgets" });
+            laborDbContext.Category.Add(new EFCategory() { Id = gadgetsId, Name = "Gadgets" });
+            laborDbContext.SaveChanges();
+            laborDbContext.ChangeTracker.Clear();
+
+            // insert branch: new CategoryItem referencing existing Widgets
+            this.monolithicRepository.UpsertCategoryItemsWithExistingCategory(new[]
+            {
+                new CategoryItem.UpsertFieldsWithExistingCategory()
+                {
+                    Name = "Item1",
+                    Category = new Category.CategoryIdImpl() { Id = widgetsId }
+                }
+            });
+            var inserted = this.laborDbContext.CategoryItem.Single();
+            Assert.AreEqual(widgetsId, inserted.CategoryId);
+
+            // update branch: same item (Id provided) re-pointed to Gadgets
+            this.monolithicRepository.UpsertCategoryItemsWithExistingCategory(new[]
+            {
+                new CategoryItem.UpsertFieldsWithExistingCategory()
+                {
+                    Id = inserted.Id,
+                    Name = "Item1",
+                    Category = new Category.CategoryIdImpl() { Id = gadgetsId }
+                }
+            });
+            laborDbContext.ChangeTracker.Clear();
+
+            Assert.AreEqual(2, this.laborDbContext.Category.Count());         // no GUID parent inserted/duplicated
+            var items = this.laborDbContext.CategoryItem.ToList();
+            Assert.AreEqual(1, items.Count);                                  // upsert updated, not inserted
+            Assert.AreEqual(gadgetsId, items.Single().CategoryId);           // GUID FK re-pointed
+        }
+
+        [TestMethod]
+        public void Upsert_Void_ManyToOneExistingParentByIdOnly_InsertAndUpdateSetForeignKeyWithoutTouchingParent()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Lester" });
+            laborDbContext.SaveChanges();
+            var mikeId = laborDbContext.Employee.Single(e => e.Name == "Mike").Id;
+            var lesterId = laborDbContext.Employee.Single(e => e.Name == "Lester").Id;
+            laborDbContext.ChangeTracker.Clear();
+
+            // insert branch: new WorkLog (Id null) referencing existing Mike
+            this.monolithicRepository.UpsertWorkLogsWithExistingEmployee(new[]
+            {
+                new WorkLog.UpsertFieldsWithExistingEmployee()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee = new Employee.EmployeeIdImpl() { Id = mikeId }
+                }
+            });
+
+            var insertedWorkLog = this.laborDbContext.WorkLog.Single();
+            Assert.AreEqual(mikeId, insertedWorkLog.EmployeeId);
+
+            // update branch: same WorkLog (Id provided) re-pointed to Lester
+            this.monolithicRepository.UpsertWorkLogsWithExistingEmployee(new[]
+            {
+                new WorkLog.UpsertFieldsWithExistingEmployee()
+                {
+                    Id = insertedWorkLog.Id,
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee = new Employee.EmployeeIdImpl() { Id = lesterId }
+                }
+            });
+            laborDbContext.ChangeTracker.Clear();
+
+            Assert.AreEqual(2, this.laborDbContext.Employee.Count());       // no parent inserted/duplicated
+            var workLogs = this.laborDbContext.WorkLog.ToList();
+            Assert.AreEqual(1, workLogs.Count);                             // upsert updated, not inserted
+            Assert.AreEqual(lesterId, workLogs.Single().EmployeeId);        // FK re-pointed
+        }
+
+        [TestMethod]
         public void InsertMultiple_Void_ValuesWithManyToOneAdjacentAndNestedManyToManyNavigationTables_ReturnsExpected()
         {
             var insertFields = new[]
@@ -5765,6 +5897,84 @@ namespace SigQL.SqlServer.Tests
         }
         
         [TestMethod]
+        public void Sync_OneToMany_EmptyCollection_DeletesAllChildren()
+        {
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(new[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields() {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields() {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields() {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 3, 2)}
+                    }
+                }
+            });
+
+            this.monolithicRepository.SyncEmployeeWithWorkLogs(
+                new Employee.SyncFieldsWithWorkLogs()
+                {
+                    Id = 1,
+                    Name = "Mike",
+                    WorkLogs = new List<WorkLog.SyncFields>()
+                });
+
+            laborDbContext.ChangeTracker.Clear();
+            var actual = laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+            Assert.AreEqual(0, actual.Single(e => e.Id == 1).WorkLogs.Count);   // all of Mike's children deleted
+            Assert.AreEqual(1, actual.Single(e => e.Id == 2).WorkLogs.Count);   // Lester's child untouched
+        }
+
+        [TestMethod]
+        public void Sync_OneToMany_ReassignChildToDifferentParent_UpdatesForeignKey()
+        {
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(new[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields() {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields() {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 3, 2)}
+                    }
+                }
+            });
+            // WorkLog 2 currently belongs to Lester (Employee 2). Sync it under Mike (Employee 1).
+            this.monolithicRepository.SyncEmployeeWithWorkLogs(
+                new Employee.SyncFieldsWithWorkLogs()
+                {
+                    Id = 1,
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.SyncFields() {Id = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.SyncFields() {Id = 2, StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 3, 2)}
+                    }
+                });
+
+            laborDbContext.ChangeTracker.Clear();
+            var workLog2 = laborDbContext.WorkLog.Single(w => w.Id == 2);
+            Assert.AreEqual(1, workLog2.EmployeeId);   // re-parented to Mike
+        }
+
+        [TestMethod]
         public async Task Sync_SingleCollectionNavigationPropertyAsync()
         {
             var insertFields = new Employee.InsertFieldsWithWorkLogs[]
@@ -6274,69 +6484,137 @@ namespace SigQL.SqlServer.Tests
             Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
         }
 
-        //[TestMethod]
-        //public void Sync_IdViaRelation_ManyToManyPrimaryKeyFromForeignKeyNavigationProperty()
-        //{
-        //    var insertFields = new EFEmployee[]
-        //    {
-        //        new EFEmployee()
-        //        {
-        //            Name = "Mike",
-        //            Addresses = new[]
-        //            {
-        //                new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
-        //                new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
-        //            }
-        //        },
-        //        new EFEmployee()
-        //        {
-        //            Name = "Lester",
-        //            Addresses = new[]
-        //            {
-        //                new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL" },
-        //                new EFAddress() { StreetAddress = "910 fake st", City = "Atlanta", State = "GA" }
-        //            }
-        //        }
-        //    };
+        [TestMethod]
+        public void Sync_IdViaRelation_ManyToManyPrimaryKeyFromForeignKeyNavigationProperty()
+        {
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                        new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                    }
+                },
+                new EFEmployee()
+                {
+                    Name = "Lester",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL" },
+                        new EFAddress() { StreetAddress = "910 fake st", City = "Atlanta", State = "GA" }
+                    }
+                }
+            };
 
-        //    laborDbContext.Employee.AddRange(insertFields);
-        //    laborDbContext.SaveChanges();
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
 
-        //    this.monolithicRepository.SyncEmployeeWithAddressIdViaRelation(
-        //            new Employee.SyncWithAddressIdViaRelationEF()
-        //            {
-        //                Id = 1,
-        //                AddressIds = new[]
-        //                {
-        //                    1,
-        //                    3
-        //                }
-        //            });
+            this.monolithicRepository.SyncEmployeeWithAddressIdViaRelation(
+                    new Employee.SyncWithAddressIdViaRelationEF()
+                    {
+                        Id = 1,
+                        AddressIds = new[]
+                        {
+                            1,
+                            3
+                        }
+                    });
 
-        //    laborDbContext.ChangeTracker.Clear();
-        //    var actual = this.monolithicRepository.GetSyncManyToManyEmployeeWithAddresses();
+            laborDbContext.ChangeTracker.Clear();
+            var actual = this.monolithicRepository.GetSyncManyToManyEmployeeWithAddresses();
 
-        //    Assert.IsTrue(actual.Any(e => e.Name == "Mike"));
-        //    Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
-        //    var actualEmployee1 = actual.Single(e => e.Id == 1);
-        //    Assert.AreEqual("Mike", actualEmployee1.Name);
-        //    Assert.AreEqual(2, actualEmployee1.Addresses.Count());
-        //    Assert.AreEqual("123 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 1).StreetAddress);
-        //    Assert.AreEqual("Seattle", actualEmployee1.Addresses.First(wl => wl.Id == 1).City);
-        //    Assert.AreEqual("WA", actualEmployee1.Addresses.First(wl => wl.Id == 1).State);
-        //    Assert.AreEqual("678 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 3).StreetAddress);
-        //    Assert.AreEqual("Orlando", actualEmployee1.Addresses.First(wl => wl.Id == 3).City);
-        //    Assert.AreEqual("FL", actualEmployee1.Addresses.First(wl => wl.Id == 3).State);
-        //    var actualEmployee2 = actual.Single(e => e.Id == 2);
-        //    Assert.AreEqual(2, actualEmployee2.Addresses.Count());
-        //    Assert.AreEqual("678 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 3).StreetAddress);
-        //    Assert.AreEqual("Orlando", actualEmployee2.Addresses.First(wl => wl.Id == 3).City);
-        //    Assert.AreEqual("FL", actualEmployee2.Addresses.First(wl => wl.Id == 3).State);
-        //    Assert.AreEqual("910 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 4).StreetAddress);
-        //    Assert.AreEqual("Atlanta", actualEmployee2.Addresses.First(wl => wl.Id == 4).City);
-        //    Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
-        //}
+            Assert.IsTrue(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            var actualEmployee1 = actual.Single(e => e.Id == 1);
+            Assert.AreEqual("Mike", actualEmployee1.Name);
+            Assert.AreEqual(2, actualEmployee1.Addresses.Count());
+            Assert.AreEqual("123 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 1).StreetAddress);
+            Assert.AreEqual("Seattle", actualEmployee1.Addresses.First(wl => wl.Id == 1).City);
+            Assert.AreEqual("WA", actualEmployee1.Addresses.First(wl => wl.Id == 1).State);
+            Assert.AreEqual("678 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 3).StreetAddress);
+            Assert.AreEqual("Orlando", actualEmployee1.Addresses.First(wl => wl.Id == 3).City);
+            Assert.AreEqual("FL", actualEmployee1.Addresses.First(wl => wl.Id == 3).State);
+            var actualEmployee2 = actual.Single(e => e.Id == 2);
+            Assert.AreEqual(2, actualEmployee2.Addresses.Count());
+            Assert.AreEqual("678 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 3).StreetAddress);
+            Assert.AreEqual("Orlando", actualEmployee2.Addresses.First(wl => wl.Id == 3).City);
+            Assert.AreEqual("FL", actualEmployee2.Addresses.First(wl => wl.Id == 3).State);
+            Assert.AreEqual("910 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 4).StreetAddress);
+            Assert.AreEqual("Atlanta", actualEmployee2.Addresses.First(wl => wl.Id == 4).City);
+            Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
+        }
 
+
+        [TestMethod]
+        public void Sync_IdViaRelation_EmptyCollection_ClearsAssociations()
+        {
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                        new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                    }
+                },
+                new EFEmployee()
+                {
+                    Name = "Lester",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL" }
+                    }
+                }
+            };
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeeWithAddressIdViaRelation(
+                    new Employee.SyncWithAddressIdViaRelationEF()
+                    {
+                        Id = 1,
+                        AddressIds = new int[0]
+                    });
+
+            var efAddressEfEmployees = this.monolithicRepository.GetEFAddressEFEmployees();
+            Assert.AreEqual(0, efAddressEfEmployees.Count(a => a.EmployeesId == 1));   // Mike's associations cleared
+            Assert.AreEqual(1, efAddressEfEmployees.Count(a => a.EmployeesId == 2));   // Lester's association intact
+        }
+
+        [TestMethod]
+        public void Sync_IdViaRelation_IsIdempotent()
+        {
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                        new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                    }
+                }
+            };
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
+
+            Func<Employee.SyncWithAddressIdViaRelationEF> payload = () =>
+                new Employee.SyncWithAddressIdViaRelationEF() { Id = 1, AddressIds = new[] { 1, 2 } };
+
+            this.monolithicRepository.SyncEmployeeWithAddressIdViaRelation(payload());
+            this.monolithicRepository.SyncEmployeeWithAddressIdViaRelation(payload());
+
+            var efAddressEfEmployees = this.monolithicRepository.GetEFAddressEFEmployees();
+            Assert.AreEqual(2, efAddressEfEmployees.Count(a => a.EmployeesId == 1));
+            Assert.AreEqual(1, efAddressEfEmployees.Count(a => a.AddressesId == 1 && a.EmployeesId == 1));
+            Assert.AreEqual(1, efAddressEfEmployees.Count(a => a.AddressesId == 2 && a.EmployeesId == 1));
+        }
 
         [TestMethod]
         public void Sync_NestedNavigationProperties()

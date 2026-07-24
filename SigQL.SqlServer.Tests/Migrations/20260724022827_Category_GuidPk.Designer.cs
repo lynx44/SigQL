@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SigQL.SqlServer.Tests.Data;
 
@@ -11,9 +12,11 @@ using SigQL.SqlServer.Tests.Data;
 namespace SigQL.SqlServer.Tests.Migrations
 {
     [DbContext(typeof(LaborDbContext))]
-    partial class LaborDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260724022827_Category_GuidPk")]
+    partial class Category_GuidPk
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
