@@ -6484,69 +6484,137 @@ namespace SigQL.SqlServer.Tests
             Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
         }
 
-        //[TestMethod]
-        //public void Sync_IdViaRelation_ManyToManyPrimaryKeyFromForeignKeyNavigationProperty()
-        //{
-        //    var insertFields = new EFEmployee[]
-        //    {
-        //        new EFEmployee()
-        //        {
-        //            Name = "Mike",
-        //            Addresses = new[]
-        //            {
-        //                new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
-        //                new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
-        //            }
-        //        },
-        //        new EFEmployee()
-        //        {
-        //            Name = "Lester",
-        //            Addresses = new[]
-        //            {
-        //                new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL" },
-        //                new EFAddress() { StreetAddress = "910 fake st", City = "Atlanta", State = "GA" }
-        //            }
-        //        }
-        //    };
+        [TestMethod]
+        public void Sync_IdViaRelation_ManyToManyPrimaryKeyFromForeignKeyNavigationProperty()
+        {
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                        new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                    }
+                },
+                new EFEmployee()
+                {
+                    Name = "Lester",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL" },
+                        new EFAddress() { StreetAddress = "910 fake st", City = "Atlanta", State = "GA" }
+                    }
+                }
+            };
 
-        //    laborDbContext.Employee.AddRange(insertFields);
-        //    laborDbContext.SaveChanges();
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
 
-        //    this.monolithicRepository.SyncEmployeeWithAddressIdViaRelation(
-        //            new Employee.SyncWithAddressIdViaRelationEF()
-        //            {
-        //                Id = 1,
-        //                AddressIds = new[]
-        //                {
-        //                    1,
-        //                    3
-        //                }
-        //            });
+            this.monolithicRepository.SyncEmployeeWithAddressIdViaRelation(
+                    new Employee.SyncWithAddressIdViaRelationEF()
+                    {
+                        Id = 1,
+                        AddressIds = new[]
+                        {
+                            1,
+                            3
+                        }
+                    });
 
-        //    laborDbContext.ChangeTracker.Clear();
-        //    var actual = this.monolithicRepository.GetSyncManyToManyEmployeeWithAddresses();
+            laborDbContext.ChangeTracker.Clear();
+            var actual = this.monolithicRepository.GetSyncManyToManyEmployeeWithAddresses();
 
-        //    Assert.IsTrue(actual.Any(e => e.Name == "Mike"));
-        //    Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
-        //    var actualEmployee1 = actual.Single(e => e.Id == 1);
-        //    Assert.AreEqual("Mike", actualEmployee1.Name);
-        //    Assert.AreEqual(2, actualEmployee1.Addresses.Count());
-        //    Assert.AreEqual("123 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 1).StreetAddress);
-        //    Assert.AreEqual("Seattle", actualEmployee1.Addresses.First(wl => wl.Id == 1).City);
-        //    Assert.AreEqual("WA", actualEmployee1.Addresses.First(wl => wl.Id == 1).State);
-        //    Assert.AreEqual("678 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 3).StreetAddress);
-        //    Assert.AreEqual("Orlando", actualEmployee1.Addresses.First(wl => wl.Id == 3).City);
-        //    Assert.AreEqual("FL", actualEmployee1.Addresses.First(wl => wl.Id == 3).State);
-        //    var actualEmployee2 = actual.Single(e => e.Id == 2);
-        //    Assert.AreEqual(2, actualEmployee2.Addresses.Count());
-        //    Assert.AreEqual("678 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 3).StreetAddress);
-        //    Assert.AreEqual("Orlando", actualEmployee2.Addresses.First(wl => wl.Id == 3).City);
-        //    Assert.AreEqual("FL", actualEmployee2.Addresses.First(wl => wl.Id == 3).State);
-        //    Assert.AreEqual("910 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 4).StreetAddress);
-        //    Assert.AreEqual("Atlanta", actualEmployee2.Addresses.First(wl => wl.Id == 4).City);
-        //    Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
-        //}
+            Assert.IsTrue(actual.Any(e => e.Name == "Mike"));
+            Assert.IsTrue(actual.Any(e => e.Name == "Lester"));
+            var actualEmployee1 = actual.Single(e => e.Id == 1);
+            Assert.AreEqual("Mike", actualEmployee1.Name);
+            Assert.AreEqual(2, actualEmployee1.Addresses.Count());
+            Assert.AreEqual("123 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 1).StreetAddress);
+            Assert.AreEqual("Seattle", actualEmployee1.Addresses.First(wl => wl.Id == 1).City);
+            Assert.AreEqual("WA", actualEmployee1.Addresses.First(wl => wl.Id == 1).State);
+            Assert.AreEqual("678 fake st", actualEmployee1.Addresses.First(wl => wl.Id == 3).StreetAddress);
+            Assert.AreEqual("Orlando", actualEmployee1.Addresses.First(wl => wl.Id == 3).City);
+            Assert.AreEqual("FL", actualEmployee1.Addresses.First(wl => wl.Id == 3).State);
+            var actualEmployee2 = actual.Single(e => e.Id == 2);
+            Assert.AreEqual(2, actualEmployee2.Addresses.Count());
+            Assert.AreEqual("678 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 3).StreetAddress);
+            Assert.AreEqual("Orlando", actualEmployee2.Addresses.First(wl => wl.Id == 3).City);
+            Assert.AreEqual("FL", actualEmployee2.Addresses.First(wl => wl.Id == 3).State);
+            Assert.AreEqual("910 fake st", actualEmployee2.Addresses.First(wl => wl.Id == 4).StreetAddress);
+            Assert.AreEqual("Atlanta", actualEmployee2.Addresses.First(wl => wl.Id == 4).City);
+            Assert.AreEqual("GA", actualEmployee2.Addresses.First(wl => wl.Id == 4).State);
+        }
 
+
+        [TestMethod]
+        public void Sync_IdViaRelation_EmptyCollection_ClearsAssociations()
+        {
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                        new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                    }
+                },
+                new EFEmployee()
+                {
+                    Name = "Lester",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "678 fake st", City = "Orlando", State = "FL" }
+                    }
+                }
+            };
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.SyncEmployeeWithAddressIdViaRelation(
+                    new Employee.SyncWithAddressIdViaRelationEF()
+                    {
+                        Id = 1,
+                        AddressIds = new int[0]
+                    });
+
+            var efAddressEfEmployees = this.monolithicRepository.GetEFAddressEFEmployees();
+            Assert.AreEqual(0, efAddressEfEmployees.Count(a => a.EmployeesId == 1));   // Mike's associations cleared
+            Assert.AreEqual(1, efAddressEfEmployees.Count(a => a.EmployeesId == 2));   // Lester's association intact
+        }
+
+        [TestMethod]
+        public void Sync_IdViaRelation_IsIdempotent()
+        {
+            var insertFields = new EFEmployee[]
+            {
+                new EFEmployee()
+                {
+                    Name = "Mike",
+                    Addresses = new[]
+                    {
+                        new EFAddress() { StreetAddress = "123 fake st", City = "Seattle", State = "WA" },
+                        new EFAddress() { StreetAddress = "345 fake st", City = "Portland", State = "OR" }
+                    }
+                }
+            };
+            laborDbContext.Employee.AddRange(insertFields);
+            laborDbContext.SaveChanges();
+
+            Func<Employee.SyncWithAddressIdViaRelationEF> payload = () =>
+                new Employee.SyncWithAddressIdViaRelationEF() { Id = 1, AddressIds = new[] { 1, 2 } };
+
+            this.monolithicRepository.SyncEmployeeWithAddressIdViaRelation(payload());
+            this.monolithicRepository.SyncEmployeeWithAddressIdViaRelation(payload());
+
+            var efAddressEfEmployees = this.monolithicRepository.GetEFAddressEFEmployees();
+            Assert.AreEqual(2, efAddressEfEmployees.Count(a => a.EmployeesId == 1));
+            Assert.AreEqual(1, efAddressEfEmployees.Count(a => a.AddressesId == 1 && a.EmployeesId == 1));
+            Assert.AreEqual(1, efAddressEfEmployees.Count(a => a.AddressesId == 2 && a.EmployeesId == 1));
+        }
 
         [TestMethod]
         public void Sync_NestedNavigationProperties()

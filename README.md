@@ -998,6 +998,30 @@ Here each WorkLog is inserted with its `EmployeeId` set to the referenced `Emplo
 supports non-identity keys such as a client-supplied `uniqueidentifier` (GUID) primary key. If the
 navigation property supplies columns beyond the key, the related row is inserted/updated as usual.
 
+For a many-to-many relationship, the same idea can be expressed against the join table with
+`[ViaRelation]`, supplying the far-side key directly as a flat collection of primitives:
+
+    public class Employee
+    {
+        public class SyncWithAddressIds
+        {
+            public int? Id { get; set; }
+            // links this Employee to existing Addresses through the join table,
+            // setting only the join row's AddressesId; the Address rows are untouched
+            [ViaRelation("Employee->EFAddressEFEmployee", "AddressesId")]
+            public IEnumerable<int> AddressIds { get; set; }
+        }
+    }
+    ...
+    [Sync]
+    void SyncEmployeeAddresses(Employee.SyncWithAddressIds employee);
+
+Under `[Sync]` this inserts the join rows that don't yet exist, leaves existing ones in place, and
+deletes the join rows for that Employee whose key is no longer present — so an empty collection
+clears all of the Employee's associations. The referenced Address rows are never inserted, updated,
+or deleted. (The equivalent can also be written with an Id-class collection, e.g.
+`IEnumerable<Address.AddressId>`, when you prefer a class over a flat primitive.)
+
 #### UpdateByKey
 
 UpdateByKey will update one or multiple rows, including relations, based on a provided primary key.

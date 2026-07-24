@@ -95,6 +95,19 @@ namespace SigQL
                     if (tokenPath != null)
                         tokens.Add(tokenPath);
 
+                    // For a [ViaRelation] flattened link table (e.g. Employee->EFAddressEFEmployee with the
+                    // AddressesId column supplied as a primitive), the parent foreign key (EmployeesId) is a
+                    // key column that is only carried as an index in the lookup. Resolve it into the lookup
+                    // now, before the merge, so the merge's not-exists dedup and the delete can compare the
+                    // real key values instead of a null column.
+                    if (IsViaRelationFlattenedLinkTable(upsertTableRelations))
+                    {
+                        var resolveParentForeignKeysStatement =
+                            BuildResolveParentForeignKeysIntoLookupStatement(upsertTableRelations);
+                        if (resolveParentForeignKeysStatement != null)
+                            statement.Add(resolveParentForeignKeysStatement);
+                    }
+
                     var mergeSelectStatement = new Select()
                     {
                         SelectClause = new SelectClause().SetArgs(
@@ -550,9 +563,15 @@ namespace SigQL
                                                 p.SqlParameterName == cp.ParameterPath.SqlParameterName);
                                             var sqlParameterName = $"{cp.ParameterPath.SqlParameterName}{param.Index}";
                                             var parameterValue = param.Value;
+                                            // For a [ViaRelation] flattened primitive, the column's argument is the
+                                            // same collection that was enumerated, so param.Value already IS the column
+                                            // value; there is no further property to read off of it.
+                                            var columnProperties =
+                                                cp.ParameterPath.Argument.EquivalentTo(FindRootArgument(insertTableRelations.TableRelations.Argument))
+                                                    ? new List<PropertyInfo>()
+                                                    : (cp.ParameterPath.Properties.LastOrDefault()?.AsEnumerable() ?? new List<PropertyInfo>());
                                             sqlParameters[sqlParameterName] =
-                                            MethodSqlStatement.GetValueForParameterPath(parameterValue,
-                                                cp.ParameterPath.Properties.LastOrDefault()?.AsEnumerable() ?? new List<PropertyInfo>());
+                                            MethodSqlStatement.GetValueForParameterPath(parameterValue, columnProperties);
                                             return new NamedParameterIdentifier()
                                             {
                                                 Name = sqlParameterName
@@ -984,8 +1003,88 @@ namespace SigQL
 
                 return ast;
             }
-            
+
             return null;
+        }
+
+        // Detects a [ViaRelation] flattened link table: a child relation whose foreign key to its parent is a
+        // key column carried only as an index (not a supplied column value), and one of whose supplied column
+        // parameters is the relation's own flattened primitive argument (e.g. IEnumerable<int> AddressIds).
+        private static bool IsViaRelationFlattenedLinkTable(UpsertTableRelations upsertTableRelations)
+        {
+            var rootArgument = FindRootArgument(upsertTableRelations.TableRelations.Argument);
+            if (rootArgument.Type == typeof(void))
+                return false;
+            var parentForeignKeys = upsertTableRelations.ForeignTableColumns
+                .Where(ftc => ftc.Direction == ForeignTablePropertyDirection.Parent).ToList();
+            if (!parentForeignKeys.Any())
+                return false;
+            // The parent foreign key must itself be a key column of the link table, so it is carried in the
+            // lookup (as an unselected key column) and can be resolved there before the merge/delete. When the
+            // link table has its own surrogate key instead, this pre-resolution does not apply.
+            var keyColumns = upsertTableRelations.TableRelations.TargetTable.PrimaryKey?.Columns;
+            if (keyColumns == null || !keyColumns.Any())
+                return false;
+            var parentForeignColumns = parentForeignKeys
+                .SelectMany(ftc => ftc.ForeignKey.KeyPairs.Select(kp => kp.ForeignTableColumn));
+            if (!parentForeignColumns.All(fc => keyColumns.Any(kc => ColumnEqualityComparer.Default.Equals(kc, fc))))
+                return false;
+            // At least one supplied column is the relation's own flattened primitive (e.g. IEnumerable<int>).
+            return upsertTableRelations.ColumnParameters.Any(cp =>
+                cp.ParameterPath.Argument.EquivalentTo(rootArgument));
+        }
+
+        // Populates the parent foreign key column(s) in this relation's lookup table by joining the parent's
+        // lookup on the carried index. Used for [ViaRelation] flattened link tables so that key comparisons
+        // (merge not-exists dedup, sync delete) have real values before the merge runs.
+        private AstNode BuildResolveParentForeignKeysIntoLookupStatement(UpsertTableRelations upsertTableRelations)
+        {
+            var lookupTableName = GetLookupTableName(upsertTableRelations.TableRelations);
+            var parentForeignColumns = upsertTableRelations.ForeignTableColumns
+                .Where(ftc => ftc.Direction == ForeignTablePropertyDirection.Parent)
+                .ToList();
+            if (!parentForeignColumns.Any())
+                return null;
+
+            var setClauses = new List<SetEqualOperator>();
+            var joins = new List<AstNode>();
+            foreach (var ftc in parentForeignColumns)
+            {
+                var parentLookupName = GetLookupTableName(ftc.PrimaryTableRelations);
+                setClauses.AddRange(ftc.ForeignKey.KeyPairs.Select(kp =>
+                    new SetEqualOperator().SetArgs(
+                        new ColumnIdentifier().SetArgs(new RelationalColumn() { Label = kp.ForeignTableColumn.Name }),
+                        new ColumnIdentifier().SetArgs(
+                            new RelationalTable() { Label = parentLookupName },
+                            new RelationalColumn() { Label = kp.PrimaryTableColumn.Name }))));
+                joins.Add(new InnerJoin()
+                {
+                    RightNode = new Alias() { Label = parentLookupName }.SetArgs(
+                        new NamedParameterIdentifier() { Name = parentLookupName })
+                }.SetArgs(
+                    new AndOperator().SetArgs(
+                        ftc.ForeignKey.KeyPairs.Select(kp =>
+                            new EqualsOperator().SetArgs(
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalTable() { Label = parentLookupName },
+                                    new RelationalColumn() { Label = MergeIndexColumnName }),
+                                new ColumnIdentifier().SetArgs(
+                                    new RelationalTable() { Label = lookupTableName },
+                                    new RelationalColumn() { Label = GetForeignColumnIndexName(kp.ForeignTableColumn.Name) })
+                            ))
+                    )));
+            }
+
+            return new Update()
+            {
+                SetClause = setClauses,
+                FromClause = new FromClause().SetArgs(
+                    new FromClauseNode().SetArgs(
+                        new Alias() { Label = lookupTableName }.SetArgs(
+                            new NamedParameterIdentifier() { Name = lookupTableName })
+                            .AsEnumerable<AstNode>()
+                            .Concat(joins)))
+            }.SetArgs(new Alias() { Label = lookupTableName });
         }
 
         private AstNode BuildUpdateLookupFromExistingStatement(TableRelations tableRelations, IEnumerable<IColumnDefinition> keyColumns)
