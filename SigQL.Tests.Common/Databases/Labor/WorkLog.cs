@@ -738,6 +738,13 @@ namespace SigQL.Tests.Common.Databases.Labor
             public DateTime? StartDate { get; set; }
             public DateTime? EndDate { get; set; }
         }
+
+        public class UpdateByKeyFieldsByStartDateAndEndDate
+        {
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
+            public int? EmployeeId { get; set; }
+        }
     }
 
     [SqlIdentifier(nameof(WorkLog))]

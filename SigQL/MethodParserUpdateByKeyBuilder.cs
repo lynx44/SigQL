@@ -171,27 +171,29 @@ namespace SigQL
                                                 })
                                             )
                                 }.SetArgs(
-                                    primaryKeyColumns.Select(pkc =>
-                                        new EqualsOperator().SetArgs(
-                                            new ColumnIdentifier().SetArgs(
-                                                new RelationalTable()
-                                                {
-                                                    Label = lookupTableName
-                                                },
-                                                new RelationalColumn()
-                                                {
-                                                    Label = pkc.Name
-                                                }),
-                                            new ColumnIdentifier().SetArgs(
-                                                new RelationalTable()
-                                                {
-                                                    Label = targetTable.Name
-                                                },
-                                                new RelationalColumn()
-                                                {
-                                                    Label = pkc.Name
-                                                }))
-                                    ).ToList()
+                                    new AndOperator().SetArgs(
+                                        primaryKeyColumns.Select(pkc =>
+                                            new EqualsOperator().SetArgs(
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = lookupTableName
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = pkc.Name
+                                                    }),
+                                                new ColumnIdentifier().SetArgs(
+                                                    new RelationalTable()
+                                                    {
+                                                        Label = targetTable.Name
+                                                    },
+                                                    new RelationalColumn()
+                                                    {
+                                                        Label = pkc.Name
+                                                    }))
+                                        ).ToList()
+                                    )
                                 )
                          )
                  )

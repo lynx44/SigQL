@@ -7360,6 +7360,37 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void UpdateByKey_WithCompositeKeyColumns_MatchesByBothColumns()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Sue" });
+            laborDbContext.SaveChanges();
+            // Two rows share StartDate but differ in EndDate; only the row matching BOTH key
+            // columns should be updated. A missing AND between the composite-key join conditions
+            // would produce invalid SQL (previously a bug) or match the wrong row.
+            laborDbContext.WorkLog.Add(new EFWorkLog() { EmployeeId = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2) });
+            laborDbContext.WorkLog.Add(new EFWorkLog() { EmployeeId = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 3) });
+            laborDbContext.SaveChanges();
+
+            this.monolithicRepository.UpdateByKeyWorkLogByStartDateAndEndDate(
+                new WorkLog.UpdateByKeyFieldsByStartDateAndEndDate[]
+                {
+                    new WorkLog.UpdateByKeyFieldsByStartDateAndEndDate()
+                    {
+                        StartDate = new DateTime(2021, 1, 1),
+                        EndDate = new DateTime(2021, 1, 2),
+                        EmployeeId = 2
+                    },
+                });
+
+            var actual = laborDbContext.WorkLog.AsNoTracking().ToList();
+            var updated = actual.Single(w => w.EndDate == new DateTime(2021, 1, 2));
+            Assert.AreEqual(2, updated.EmployeeId);
+            var unchanged = actual.Single(w => w.EndDate == new DateTime(2021, 1, 3));
+            Assert.AreEqual(1, unchanged.EmployeeId);
+        }
+
+        [TestMethod]
         public void Sync_WithKeyColumns_MatchesByName()
         {
             laborDbContext.Employee.Add(new EFEmployee() { Name = "Kyle" });

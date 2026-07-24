@@ -455,6 +455,9 @@ namespace SigQL.Tests.Common.Databases.Labor
         [UpdateByKey(TableName = nameof(WorkLog), KeyColumns = "StartDate")]
         void UpdateByKeyWorkLogByStartDate(IEnumerable<WorkLog.UpdateByKeyFieldsByStartDate> workLogs);
 
+        [UpdateByKey(TableName = nameof(WorkLog), KeyColumns = "StartDate,EndDate")]
+        void UpdateByKeyWorkLogByStartDateAndEndDate(IEnumerable<WorkLog.UpdateByKeyFieldsByStartDateAndEndDate> workLogs);
+
         [Sync(KeyColumns = "Name")]
         void SyncEmployeeByNameWithWorkLogs(Employee.SyncFieldsByNameWithWorkLogs employees);
 

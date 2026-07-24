@@ -3267,6 +3267,25 @@ update ""WorkLog"" set ""EndDate"" = ""WorkLogLookup"".""EndDate"" from ""WorkLo
         }
 
         [TestMethod]
+        public void UpdateByKey_WithCompositeKeyColumns_JoinsConditionsWithAnd()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.UpdateByKeyWorkLogByStartDateAndEndDate(
+                new WorkLog.UpdateByKeyFieldsByStartDateAndEndDate[]
+                {
+                    new WorkLog.UpdateByKeyFieldsByStartDateAndEndDate()
+                    {
+                        StartDate = new DateTime(2021, 1, 1),
+                        EndDate = new DateTime(2021, 1, 2),
+                        EmployeeId = 5
+                    }
+                }));
+
+            AssertSqlEqual(@"declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""EmployeeId"" nvarchar(max), ""_index"" int)
+insert @WorkLogLookup(""StartDate"", ""EndDate"", ""EmployeeId"", ""_index"") values(@workLogsStartDate0, @workLogsEndDate0, @workLogsEmployeeId0, 0)
+update ""WorkLog"" set ""EmployeeId"" = ""WorkLogLookup"".""EmployeeId"" from ""WorkLog"" inner join @WorkLogLookup ""WorkLogLookup"" on ((""WorkLogLookup"".""StartDate"" = ""WorkLog"".""StartDate"") and (""WorkLogLookup"".""EndDate"" = ""WorkLog"".""EndDate""));", sql);
+        }
+
+        [TestMethod]
         public void Sync_WithKeyColumns_UsesSpecifiedKeyColumnsInSql()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.SyncEmployeeByNameWithWorkLogs(
