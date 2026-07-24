@@ -46,6 +46,7 @@ namespace SigQL
             {
                 CommandText = string.Join("\r\n", this.CommandAst.Select(this.SqlBuilder.Build)),
                 Parameters = allParameters,
+                CommandTimeout = this.CommandTimeout,
                 PrimaryKeyColumns = new PrimaryKeyQuerySpecifierCollection((this.TablePrimaryKeyDefinitions?.SelectMany(pk => pk.Value.Select(c => new PrimaryKeyQuerySpecifier(pk.Key, c)).ToList()) ?? new List<PrimaryKeyQuerySpecifier>()).ToList())
             };
         }
@@ -264,6 +265,11 @@ namespace SigQL
         public IDictionary<string, IEnumerable<string>> TablePrimaryKeyDefinitions { get; set; }
         internal SqlStatementBuilder SqlBuilder { get; set; }
         internal bool IsTotalCountWithResult { get; set; }
+        /// <summary>
+        /// The command timeout, in seconds, to apply when executing this statement. Sourced from the
+        /// method's [Command(Timeout = n)] attribute. Null means use the provider/global default.
+        /// </summary>
+        public int? CommandTimeout { get; set; }
 
         public IDictionary<string, object> GetParameters(IEnumerable<ParameterArg> methodArgs)
         {

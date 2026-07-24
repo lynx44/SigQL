@@ -30,6 +30,13 @@ namespace SigQL
 
         public MethodSqlStatement SqlFor(MethodInfo methodInfo)
         {
+            var statement = BuildStatement(methodInfo);
+            statement.CommandTimeout = GetCommandTimeout(methodInfo);
+            return statement;
+        }
+
+        private MethodSqlStatement BuildStatement(MethodInfo methodInfo)
+        {
             var statementType = DetectStatementType(methodInfo);
             if (statementType == StatementType.Insert)
             {
@@ -61,8 +68,20 @@ namespace SigQL
                 var updateSpec = GetUpdateSpec(methodInfo);
                 return BuildUpdateStatement(updateSpec);
             }
-            
+
             return BuildSelectStatement(methodInfo);
+        }
+
+        private static int? GetCommandTimeout(MethodInfo methodInfo)
+        {
+            // Use GetCustomAttributes(Type, bool) rather than the generic GetCustomAttribute<T>()
+            // extension: synthetic MethodInfo implementations (e.g. SqlGeneratorMethodInfo) only
+            // override this overload, and the generic extension takes a reflection path that throws
+            // on them.
+            var commandAttribute = methodInfo.GetCustomAttributes(typeof(CommandAttribute), false)
+                .OfType<CommandAttribute>()
+                .FirstOrDefault();
+            return commandAttribute?.CommandTimeout;
         }
 
         private MethodSqlStatement BuildSelectStatement(MethodInfo methodInfo)
@@ -1859,6 +1878,12 @@ namespace SigQL
 
         public string CommandText { get; set; }
         public IDictionary<string, object> Parameters { get; set; }
+
+        /// <summary>
+        /// The command timeout, in seconds, to apply when executing this statement. Sourced from the
+        /// method's [Command(Timeout = n)] attribute. Null means use the provider/global default.
+        /// </summary>
+        public int? CommandTimeout { get; set; }
 
         /// <summary>
         /// A list of qualified column names in the select list that are primary keys. This will deduplicate

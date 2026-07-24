@@ -62,6 +62,72 @@ namespace SigQL.SqlServer.Tests
         {
         }
 
+        private IMonolithicRepository BuildRepositoryCapturingCommandTimeout(out Func<int?> getCapturedTimeout)
+        {
+            int? capturedTimeout = null;
+            getCapturedTimeout = () => capturedTimeout;
+            var sqlConnection = (laborDbConnection as SqlConnection);
+            var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(sqlConnection.ConnectionString);
+            var builder = new RepositoryBuilder(
+                new SqlQueryExecutor(() => laborDbConnection, command =>
+                {
+                    capturedTimeout = command.CommandTimeout;
+                    return command;
+                }), sqlDatabaseConfiguration);
+            return builder.Build<IMonolithicRepository>();
+        }
+
+        [TestMethod]
+        public void CommandTimeout_WhenSpecifiedOnMethod_IsAppliedToSqlCommand()
+        {
+            var repository = BuildRepositoryCapturingCommandTimeout(out var getCapturedTimeout);
+
+            repository.GetEmployeesWithCommandTimeout().ToList();
+
+            Assert.AreEqual(60, getCapturedTimeout());
+        }
+
+        [TestMethod]
+        public async Task CommandTimeout_WhenSpecifiedOnAsyncMethod_IsAppliedToSqlCommand()
+        {
+            var repository = BuildRepositoryCapturingCommandTimeout(out var getCapturedTimeout);
+
+            (await repository.GetEmployeesWithCommandTimeoutAsync()).ToList();
+
+            Assert.AreEqual(45, getCapturedTimeout());
+        }
+
+        [TestMethod]
+        public void CommandTimeout_WhenSetToZero_IsAppliedAsInfiniteTimeout()
+        {
+            var repository = BuildRepositoryCapturingCommandTimeout(out var getCapturedTimeout);
+
+            repository.GetEmployeesWithInfiniteCommandTimeout().ToList();
+
+            Assert.AreEqual(0, getCapturedTimeout());
+        }
+
+        [TestMethod]
+        public void CommandTimeout_OnNonQueryMethod_IsAppliedToSqlCommand()
+        {
+            var repository = BuildRepositoryCapturingCommandTimeout(out var getCapturedTimeout);
+
+            repository.DeleteEmployeeWithCommandTimeout("nobody");
+
+            Assert.AreEqual(90, getCapturedTimeout());
+        }
+
+        [TestMethod]
+        public void CommandTimeout_WhenNotSpecified_UsesAdoDefault()
+        {
+            var repository = BuildRepositoryCapturingCommandTimeout(out var getCapturedTimeout);
+
+            repository.GetAllEmployeeFields().ToList();
+
+            // ADO.NET's SqlCommand.CommandTimeout default is 30 seconds.
+            Assert.AreEqual(30, getCapturedTimeout());
+        }
+
         [TestMethod]
         public void GetAllIds()
         {

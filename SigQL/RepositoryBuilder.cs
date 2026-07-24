@@ -157,12 +157,12 @@ namespace SigQL
                     
                     if (sqlStatement.ReturnType.IsTask())
                     {
-                        var taskResult = this.queryExecutor.ExecuteNonQueryAsync(statement.CommandText, statement.Parameters);
+                        var taskResult = this.queryExecutor.ExecuteNonQueryAsync(statement.CommandText, statement.Parameters, statement.CommandTimeout);
                         invocation.ReturnValue = taskResult;
                     }
                     else
                     {
-                        this.queryExecutor.ExecuteNonQuery(statement.CommandText, statement.Parameters);
+                        this.queryExecutor.ExecuteNonQuery(statement.CommandText, statement.Parameters, statement.CommandTimeout);
                     }
                 }
             }

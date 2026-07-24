@@ -3306,6 +3306,56 @@ delete ""WorkLog"" from ""WorkLog"" where (exists (select 1 from @EmployeeLookup
             this.methodParser.SqlFor(methodInfo);
         }
 
+        #region CommandTimeout
+
+        [TestMethod]
+        public void CommandTimeout_WhenSpecifiedOnMethod_FlowsToPreparedStatement()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetEmployeesWithCommandTimeout));
+            var preparedStatement = this.methodParser.SqlFor(methodInfo).GetPreparedStatement(new ParameterArg[0]);
+
+            Assert.AreEqual(60, preparedStatement.CommandTimeout);
+        }
+
+        [TestMethod]
+        public void CommandTimeout_WhenSpecifiedOnAsyncMethod_FlowsToPreparedStatement()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetEmployeesWithCommandTimeoutAsync));
+            var preparedStatement = this.methodParser.SqlFor(methodInfo).GetPreparedStatement(new ParameterArg[0]);
+
+            Assert.AreEqual(45, preparedStatement.CommandTimeout);
+        }
+
+        [TestMethod]
+        public void CommandTimeout_WhenSetToZero_FlowsAsInfiniteTimeout()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetEmployeesWithInfiniteCommandTimeout));
+            var preparedStatement = this.methodParser.SqlFor(methodInfo).GetPreparedStatement(new ParameterArg[0]);
+
+            Assert.AreEqual(0, preparedStatement.CommandTimeout);
+        }
+
+        [TestMethod]
+        public void CommandTimeout_OnDeleteMethod_FlowsToPreparedStatement()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.DeleteEmployeeWithCommandTimeout));
+            var preparedStatement = this.methodParser.SqlFor(methodInfo).GetPreparedStatement(
+                new[] { new ParameterArg() { Parameter = methodInfo.GetParameters()[0], Value = "test" } });
+
+            Assert.AreEqual(90, preparedStatement.CommandTimeout);
+        }
+
+        [TestMethod]
+        public void CommandTimeout_WhenNotSpecified_IsNull()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetAllEmployeeFields));
+            var preparedStatement = this.methodParser.SqlFor(methodInfo).GetPreparedStatement(new ParameterArg[0]);
+
+            Assert.IsNull(preparedStatement.CommandTimeout);
+        }
+
+        #endregion
+
         private string GetSqlFor(MethodInfo methodInfo)
         {
             return this.methodParser.SqlFor(methodInfo).GetPreparedStatement(new ParameterArg[0]).CommandText;

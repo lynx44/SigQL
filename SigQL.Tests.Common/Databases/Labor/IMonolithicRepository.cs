@@ -41,6 +41,18 @@ namespace SigQL.Tests.Common.Databases.Labor
         WorkLog.IEmployeeID_MismatchingCase GetWorkLogWithEmployeeMismatchingPKCase(int id);
 
 
+        // command timeout
+        [Command(Timeout = 60)]
+        IEnumerable<Employee.IEmployeeFields> GetEmployeesWithCommandTimeout();
+        [Command(Timeout = 45)]
+        Task<IEnumerable<Employee.IEmployeeFields>> GetEmployeesWithCommandTimeoutAsync();
+        [Command(Timeout = 0)]
+        IEnumerable<Employee.IEmployeeFields> GetEmployeesWithInfiniteCommandTimeout();
+        [Command(Timeout = 90)]
+        [Delete(TableName = nameof(Employee))]
+        void DeleteEmployeeWithCommandTimeout(string name);
+
+
 
         // joins
         WorkLog.IWorkLogWithEmployee GetWorkLogWithEmployee();

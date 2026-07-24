@@ -76,6 +76,7 @@ The goal of SigQL is to enable developers precise and concise access to data by 
    - [Alternate Keys on Sync](#alternate-keys-on-sync)
    - [IgnoreIfNull on Sync](#ignoreifnull-on-sync)
  - [Delete](#delete)
+ - [Command Timeout](#command-timeout)
  
 **Custom SQL**
 
@@ -1286,6 +1287,27 @@ Delete statements are executed via filter parameters:
     void Delete([ViaRelation("Employee->WorkLog", "StartDate"), GreaterThanOrEqual] DateTime startDate);
 
 Currently, delete statements cannot return a return value. Nested relations also cannot be deleted via a [Delete] method.
+
+### Command Timeout
+
+The command timeout for a specific method can be set with the `[Command]` attribute. The `Timeout` value is in seconds and is applied to the generated SQL command (`SqlCommand.CommandTimeout`). This works for queries as well as insert/update/upsert/sync/delete methods:
+
+    [Command(Timeout = 120)]
+    IEnumerable<WorkLog> GetWorkLogs();
+
+    [Command(Timeout = 300)]
+    [Delete(TableName = nameof(Employee))]
+    void Delete(int id);
+
+A `Timeout` of `0` means no timeout (the command waits indefinitely). When `[Command]` is not specified, the provider default (30 seconds for SQL Server) is used.
+
+If you configure a `commandAction` on the `SqlQueryExecutor`, it runs *after* the per-method timeout is applied, so it remains the final override:
+
+    new SqlQueryExecutor(() => new SqlConnection(connectionString), command =>
+    {
+        command.CommandTimeout = 60; // overrides any per-method [Command(Timeout)]
+        return command;
+    });
 
 ### Custom SQL
 

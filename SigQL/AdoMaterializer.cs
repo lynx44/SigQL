@@ -121,7 +121,7 @@ namespace SigQL
 
             int totalCount = 0;
 
-            using (var reader = await queryExecutor.ExecuteReaderAsync(statement.CommandText, statement.Parameters))
+            using (var reader = await queryExecutor.ExecuteReaderAsync(statement.CommandText, statement.Parameters, statement.CommandTimeout))
             {
                 rowValueCollection = ReadRowValues(reader, tablePrimaryKeyDefinitions.Keys.Any(k => k == string.Empty) ? tablePrimaryKeyDefinitions[""].ToList() : new List<string>(),
                     tablePrimaryKeyDefinitions);
@@ -289,7 +289,7 @@ namespace SigQL
 
             int totalCount = 0;
 
-            using (var reader = queryExecutor.ExecuteReader(statement.CommandText, statement.Parameters))
+            using (var reader = queryExecutor.ExecuteReader(statement.CommandText, statement.Parameters, statement.CommandTimeout))
             {
                 rowValueCollection = ReadRowValues(reader, tablePrimaryKeyDefinitions.Keys.Any(k => k == string.Empty) ? tablePrimaryKeyDefinitions[""].ToList() : new List<string>(),
                     tablePrimaryKeyDefinitions);
