@@ -5897,6 +5897,84 @@ namespace SigQL.SqlServer.Tests
         }
         
         [TestMethod]
+        public void Sync_OneToMany_EmptyCollection_DeletesAllChildren()
+        {
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(new[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields() {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.DataFields() {StartDate = new DateTime(2021, 2, 1), EndDate = new DateTime(2021, 2, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields() {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 3, 2)}
+                    }
+                }
+            });
+
+            this.monolithicRepository.SyncEmployeeWithWorkLogs(
+                new Employee.SyncFieldsWithWorkLogs()
+                {
+                    Id = 1,
+                    Name = "Mike",
+                    WorkLogs = new List<WorkLog.SyncFields>()
+                });
+
+            laborDbContext.ChangeTracker.Clear();
+            var actual = laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+            Assert.AreEqual(0, actual.Single(e => e.Id == 1).WorkLogs.Count);   // all of Mike's children deleted
+            Assert.AreEqual(1, actual.Single(e => e.Id == 2).WorkLogs.Count);   // Lester's child untouched
+        }
+
+        [TestMethod]
+        public void Sync_OneToMany_ReassignChildToDifferentParent_UpdatesForeignKey()
+        {
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(new[]
+            {
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields() {StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)}
+                    }
+                },
+                new Employee.InsertFieldsWithWorkLogs()
+                {
+                    Name = "Lester",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.DataFields() {StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 3, 2)}
+                    }
+                }
+            });
+            // WorkLog 2 currently belongs to Lester (Employee 2). Sync it under Mike (Employee 1).
+            this.monolithicRepository.SyncEmployeeWithWorkLogs(
+                new Employee.SyncFieldsWithWorkLogs()
+                {
+                    Id = 1,
+                    Name = "Mike",
+                    WorkLogs = new[]
+                    {
+                        new WorkLog.SyncFields() {Id = 1, StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2)},
+                        new WorkLog.SyncFields() {Id = 2, StartDate = new DateTime(2021, 3, 1), EndDate = new DateTime(2021, 3, 2)}
+                    }
+                });
+
+            laborDbContext.ChangeTracker.Clear();
+            var workLog2 = laborDbContext.WorkLog.Single(w => w.Id == 2);
+            Assert.AreEqual(1, workLog2.EmployeeId);   // re-parented to Mike
+        }
+
+        [TestMethod]
         public async Task Sync_SingleCollectionNavigationPropertyAsync()
         {
             var insertFields = new Employee.InsertFieldsWithWorkLogs[]
