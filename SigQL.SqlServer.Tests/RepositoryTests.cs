@@ -4393,6 +4393,138 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void InsertMultiple_Void_ManyToOneExistingParentByIdOnly_SetsForeignKeyWithoutTouchingParent()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.SaveChanges();
+            var existingEmployeeId = laborDbContext.Employee.Single().Id;
+            laborDbContext.ChangeTracker.Clear();
+
+            this.monolithicRepository.InsertWorkLogsWithExistingEmployee(new[]
+            {
+                new WorkLog.InsertFieldsWithExistingEmployee()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee = new Employee.EmployeeIdImpl() { Id = existingEmployeeId }
+                }
+            });
+
+            var employees = this.laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+            // the referenced Employee must not have been re-inserted or duplicated
+            Assert.AreEqual(1, employees.Count);
+            Assert.AreEqual("Mike", employees.Single().Name);
+            var workLogs = this.laborDbContext.WorkLog.ToList();
+            Assert.AreEqual(1, workLogs.Count);
+            Assert.AreEqual(existingEmployeeId, workLogs.Single().EmployeeId);
+        }
+
+        [TestMethod]
+        public void InsertMultiple_Void_ManyToOneExistingGuidKeyedParentByIdOnly_SetsForeignKeyWithoutTouchingParent()
+        {
+            var categoryId = Guid.NewGuid();
+            laborDbContext.Category.Add(new EFCategory() { Id = categoryId, Name = "Widgets" });
+            laborDbContext.SaveChanges();
+            laborDbContext.ChangeTracker.Clear();
+
+            this.monolithicRepository.InsertCategoryItemsWithExistingCategory(new[]
+            {
+                new CategoryItem.InsertFieldsWithExistingCategory()
+                {
+                    Name = "Item1",
+                    Category = new Category.CategoryIdImpl() { Id = categoryId }
+                }
+            });
+
+            var categories = this.laborDbContext.Category.ToList();
+            Assert.AreEqual(1, categories.Count);                    // GUID parent not inserted/duplicated
+            Assert.AreEqual("Widgets", categories.Single().Name);    // GUID parent not updated
+            var items = this.laborDbContext.CategoryItem.ToList();
+            Assert.AreEqual(1, items.Count);
+            Assert.AreEqual(categoryId, items.Single().CategoryId);  // GUID FK resolved and set
+        }
+
+        [TestMethod]
+        public void Upsert_Void_ManyToOneExistingGuidKeyedParentByIdOnly_InsertAndUpdateSetForeignKeyWithoutTouchingParent()
+        {
+            var widgetsId = Guid.NewGuid();
+            var gadgetsId = Guid.NewGuid();
+            laborDbContext.Category.Add(new EFCategory() { Id = widgetsId, Name = "Widgets" });
+            laborDbContext.Category.Add(new EFCategory() { Id = gadgetsId, Name = "Gadgets" });
+            laborDbContext.SaveChanges();
+            laborDbContext.ChangeTracker.Clear();
+
+            // insert branch: new CategoryItem referencing existing Widgets
+            this.monolithicRepository.UpsertCategoryItemsWithExistingCategory(new[]
+            {
+                new CategoryItem.UpsertFieldsWithExistingCategory()
+                {
+                    Name = "Item1",
+                    Category = new Category.CategoryIdImpl() { Id = widgetsId }
+                }
+            });
+            var inserted = this.laborDbContext.CategoryItem.Single();
+            Assert.AreEqual(widgetsId, inserted.CategoryId);
+
+            // update branch: same item (Id provided) re-pointed to Gadgets
+            this.monolithicRepository.UpsertCategoryItemsWithExistingCategory(new[]
+            {
+                new CategoryItem.UpsertFieldsWithExistingCategory()
+                {
+                    Id = inserted.Id,
+                    Name = "Item1",
+                    Category = new Category.CategoryIdImpl() { Id = gadgetsId }
+                }
+            });
+            laborDbContext.ChangeTracker.Clear();
+
+            Assert.AreEqual(2, this.laborDbContext.Category.Count());         // no GUID parent inserted/duplicated
+            var items = this.laborDbContext.CategoryItem.ToList();
+            Assert.AreEqual(1, items.Count);                                  // upsert updated, not inserted
+            Assert.AreEqual(gadgetsId, items.Single().CategoryId);           // GUID FK re-pointed
+        }
+
+        [TestMethod]
+        public void Upsert_Void_ManyToOneExistingParentByIdOnly_InsertAndUpdateSetForeignKeyWithoutTouchingParent()
+        {
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Mike" });
+            laborDbContext.Employee.Add(new EFEmployee() { Name = "Lester" });
+            laborDbContext.SaveChanges();
+            var mikeId = laborDbContext.Employee.Single(e => e.Name == "Mike").Id;
+            var lesterId = laborDbContext.Employee.Single(e => e.Name == "Lester").Id;
+            laborDbContext.ChangeTracker.Clear();
+
+            // insert branch: new WorkLog (Id null) referencing existing Mike
+            this.monolithicRepository.UpsertWorkLogsWithExistingEmployee(new[]
+            {
+                new WorkLog.UpsertFieldsWithExistingEmployee()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee = new Employee.EmployeeIdImpl() { Id = mikeId }
+                }
+            });
+
+            var insertedWorkLog = this.laborDbContext.WorkLog.Single();
+            Assert.AreEqual(mikeId, insertedWorkLog.EmployeeId);
+
+            // update branch: same WorkLog (Id provided) re-pointed to Lester
+            this.monolithicRepository.UpsertWorkLogsWithExistingEmployee(new[]
+            {
+                new WorkLog.UpsertFieldsWithExistingEmployee()
+                {
+                    Id = insertedWorkLog.Id,
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee = new Employee.EmployeeIdImpl() { Id = lesterId }
+                }
+            });
+            laborDbContext.ChangeTracker.Clear();
+
+            Assert.AreEqual(2, this.laborDbContext.Employee.Count());       // no parent inserted/duplicated
+            var workLogs = this.laborDbContext.WorkLog.ToList();
+            Assert.AreEqual(1, workLogs.Count);                             // upsert updated, not inserted
+            Assert.AreEqual(lesterId, workLogs.Single().EmployeeId);        // FK re-pointed
+        }
+
+        [TestMethod]
         public void InsertMultiple_Void_ValuesWithManyToOneAdjacentAndNestedManyToManyNavigationTables_ReturnsExpected()
         {
             var insertFields = new[]

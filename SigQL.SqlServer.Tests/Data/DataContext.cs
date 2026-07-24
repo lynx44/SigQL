@@ -21,6 +21,8 @@ namespace SigQL.SqlServer.Tests.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<EFCompositeKeyTable>(t => t.HasKey(t => new {t.FirstName, t.LastName}));
+            // Category has a client-supplied (non-identity) GUID primary key.
+            modelBuilder.Entity<EFCategory>(t => t.Property(c => c.Id).ValueGeneratedNever());
         }
 
         public DbSet<EFWorkLog> WorkLog { get; set; }
@@ -30,6 +32,25 @@ namespace SigQL.SqlServer.Tests.Data
         //public DbSet<EFStreetAddressCoordinate> StreetAddressCoordinates { get; set; }
         public DbSet<EFCompositeKeyTable> CompositeKeyTable { get; set; }
         public DbSet<EFCompositeForeignKeyTable> CompositeForeignKeyTable { get; set; }
+        public DbSet<EFCategory> Category { get; set; }
+        public DbSet<EFCategoryItem> CategoryItem { get; set; }
+    }
+
+    // Parent table with a client-supplied uniqueidentifier (GUID) primary key.
+    public class EFCategory
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public ICollection<EFCategoryItem> Items { get; set; }
+    }
+
+    // Child table with a many-to-one GUID foreign key to Category.
+    public class EFCategoryItem
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public Guid? CategoryId { get; set; }
+        public EFCategory Category { get; set; }
     }
 
     public class EFWorkLog : WorkLog.IFields

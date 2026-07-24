@@ -52,6 +52,15 @@ namespace SigQL.Tests.Infrastructure
             var employeeAddressTable = new TableDefinition(dbo, nameof(EmployeeAddress), typeof(EmployeeAddress).GetProperties().Select(p => p.Name));
             employeeAddressTable.PrimaryKey =
                 new TableKeyDefinition(employeeAddressTable.Columns.FindByName(nameof(EmployeeAddress.Id)));
+            var categoryTable = new TableDefinition(dbo, nameof(Category), SetupColumns(typeof(Category).GetProperties()));
+            // Category's GUID primary key is client-supplied (non-identity).
+            categoryTable.PrimaryKey = new TableKeyDefinition(categoryTable.Columns.FindByName(nameof(Category.Id)));
+            var categoryItemTable = new TableDefinition(dbo, nameof(CategoryItem), SetupColumns(typeof(CategoryItem).GetProperties()));
+            categoryItemTable.PrimaryKey = new TableKeyDefinition(categoryItemTable.Columns.FindByName(nameof(CategoryItem.Id)));
+            ((ColumnDefinition)categoryItemTable.PrimaryKey.Columns.First()).IsIdentity = true;
+            categoryItemTable.ForeignKeyCollection = new ForeignKeyDefinitionCollection().AddForeignKeys(
+                new ForeignKeyDefinition(categoryTable, new ForeignKeyPair(categoryItemTable.Columns.FindByName(nameof(CategoryItem.CategoryId)), categoryTable.Columns.FindByName(nameof(Category.Id))))
+            );
             workLogTable.ForeignKeyCollection = new ForeignKeyDefinitionCollection().AddForeignKeys(
                 new ForeignKeyDefinition(employeeTable, new ForeignKeyPair(workLogTable.Columns.FindByName(nameof(WorkLog.EmployeeId)), employeeTable.Columns.FindByName(nameof(Employee.Id)))),
                 new ForeignKeyDefinition(locationTable, new ForeignKeyPair(workLogTable.Columns.FindByName(nameof(WorkLog.LocationId)), locationTable.Columns.FindByName(nameof(Location.Id))))
@@ -81,7 +90,9 @@ namespace SigQL.Tests.Infrastructure
                 diagnosticLogTable,
                 itvfGetWorkLogsByEmployeeIdFunction,
                 workLogEmployeeView,
-                employeeStatusesTable
+                employeeStatusesTable,
+                categoryTable,
+                categoryItemTable
             }));
 
             return databaseConfiguration;
@@ -100,6 +111,7 @@ namespace SigQL.Tests.Infrastructure
                 DataTypeDeclaration =
                     property.PropertyType == typeof(int) ? "int" :
                     property.PropertyType == typeof(DateTime) ? "datetime" :
+                    property.PropertyType == typeof(Guid) || property.PropertyType == typeof(Guid?) ? "uniqueidentifier" :
                     "nvarchar(max)"
             };
         }

@@ -338,6 +338,14 @@ namespace SigQL.Tests.Common.Databases.Labor
         void InsertMultipleWorkLogsWithAdjacentAndNestedRelations(IEnumerable<WorkLog.InsertFieldsWithEmployeeAndLocation> employees);
         [Insert]
         IEnumerable<WorkLog> InsertMultipleWorkLogsWithAdjacentAndNestedRelationsAndReturnResult(IEnumerable<WorkLog.InsertFieldsWithEmployeeAndLocation> employees);
+        [Insert]
+        void InsertWorkLogsWithExistingEmployee(IEnumerable<WorkLog.InsertFieldsWithExistingEmployee> worklogs);
+        [Upsert]
+        void UpsertWorkLogsWithExistingEmployee(IEnumerable<WorkLog.UpsertFieldsWithExistingEmployee> worklogs);
+        [Insert]
+        void InsertCategoryItemsWithExistingCategory(IEnumerable<CategoryItem.InsertFieldsWithExistingCategory> items);
+        [Upsert]
+        void UpsertCategoryItemsWithExistingCategory(IEnumerable<CategoryItem.UpsertFieldsWithExistingCategory> items);
         // not yet supported
         // [Insert(TableName = nameof(Employee))]
         // void InsertEmployeeWithAttributeWithValuesByUnknownClass(EmployeeInsertFields values);

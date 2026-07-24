@@ -966,6 +966,38 @@ Insert with relations:
 
 *Note that all relations will be inserted. If updating existing relations is desired, use the [Upsert] attribute*
 
+##### Referencing an existing related record by key
+
+Sometimes a record should point at a related row that already exists, without inserting or
+updating that related row. To do this, type the navigation property as an interface (or class)
+that exposes only the related table's key. SigQL treats a navigation whose supplied columns are
+exactly the related table's key as a foreign-key reference: it sets the foreign key column to the
+provided key and never emits an insert or update against the related table.
+
+    public class WorkLog
+    {
+        // exposes only the key of the related Employee
+        public interface IEmployeeId
+        {
+            int Id { get; set; }
+        }
+
+        public class InsertFieldsWithExistingEmployee
+        {
+            public DateTime? StartDate { get; set; }
+            public DateTime? EndDate { get; set; }
+            public Employee.IEmployeeId Employee { get; set; }
+        }
+    }
+    ...
+    [Insert]
+    void InsertWorkLogs(IEnumerable<WorkLog.InsertFieldsWithExistingEmployee> worklogs);
+
+Here each WorkLog is inserted with its `EmployeeId` set to the referenced `Employee.Id`; the
+`Employee` row itself is left untouched. This works identically under `[Upsert]` and `[Sync]`, and
+supports non-identity keys such as a client-supplied `uniqueidentifier` (GUID) primary key. If the
+navigation property supplies columns beyond the key, the related row is inserted/updated as usual.
+
 #### UpdateByKey
 
 UpdateByKey will update one or multiple rows, including relations, based on a provided primary key.
