@@ -34,6 +34,12 @@
     <PackageReference Include="System.Text.Json" Version="4.7.2" />
   </ItemGroup>
 
+  <!-- DynamicMethod, used to dispatch to default interface method bodies, is not part of
+       netstandard2.0's default reference set. net462/net472 include it in the framework. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
+  </ItemGroup>
+
   <ItemGroup>
     <Folder Include="Contracts\" />
   </ItemGroup>

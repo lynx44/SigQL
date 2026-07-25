@@ -80,6 +80,9 @@ The goal of SigQL is to enable developers precise and concise access to data by 
  
 **Custom SQL**
 
+ - [Custom Method Implementations](#custom-method-implementations)
+   - [Injecting services](#injecting-services)
+   - [Abstract classes](#abstract-classes)
  - [Custom SQL](#custom-sql)
    - [Generating SELECT statements](#generating-select-statements)
   
@@ -1308,6 +1311,82 @@ If you configure a `commandAction` on the `SqlQueryExecutor`, it runs *after* th
         command.CommandTimeout = 60; // overrides any per-method [Command(Timeout)]
         return command;
     });
+
+### Custom Method Implementations
+
+Repository methods normally have no body, and SigQL generates their SQL. A method that *does* supply a body keeps it: SigQL runs your code instead of parsing the method name as a query. This lets a one-off custom query live directly on the interface, without introducing a class or duplicating the other signatures.
+
+    public interface IWorkLogRepository
+    {
+        // no body: SigQL generates the query
+        IEnumerable<WorkLog.IWorkLogId> GetAllIds();
+
+        // has a body: your code runs
+        int CountAllIds() => GetAllIds().Count();
+    }
+
+Calls the body makes back onto the repository still route through SigQL, so custom methods can compose generated ones.
+
+This requires C# 8 default interface methods, so the project declaring the interface must target .NET Core 3.0 / .NET Standard 2.1 or later. On earlier targets, use the abstract class form below.
+
+#### Injecting services
+
+Because interfaces cannot have constructors, dependencies are supplied with the `[Inject]` attribute, either as a parameter or as a property.
+
+An `[Inject]` parameter must be optional, so callers can omit it. SigQL fills it in at call time:
+
+    public interface IWorkLogRepository
+    {
+        IEnumerable<WorkLog.IWorkLogId> GetAllIds();
+
+        IEnumerable<WorkLog.IWorkLogId> GetIdsAbove(int minimumId, [Inject] IQueryMaterializer materializer = null) =>
+            materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
+                "select Id from WorkLog where Id > @minimumId", new { minimumId });
+    }
+
+    // callers do not pass the service
+    var results = repository.GetIdsAbove(5);
+
+Injecting `IQueryMaterializer` is the usual way to run a one-off query that SigQL cannot express. See [Custom SQL](#custom-sql) for what the materializer accepts.
+
+An `[Inject]` parameter that is not optional throws an `InvalidAttributeException`, since callers would otherwise be forced to supply it.
+
+An `[Inject]` property is resolved the same way, and does not appear at the call site:
+
+    public interface IWorkLogRepository
+    {
+        [Inject]
+        IQueryMaterializer Materializer { get; }
+
+        IEnumerable<WorkLog.IWorkLogId> GetIdsAbove(int minimumId) =>
+            Materializer.Materialize<IEnumerable<WorkLog.IWorkLogId>>(
+                "select Id from WorkLog where Id > @minimumId", new { minimumId });
+    }
+
+The tradeoff between the two: a parameter keeps the dependency visible and lets a test pass a substitute directly, while a property keeps call sites clean.
+
+Services come from a resolver, typically backed by a DI container:
+
+    var options = new RepositoryBuilderOptions()
+    {
+        ServiceResolver = serviceType => serviceProvider.GetRequiredService(serviceType)
+    };
+    var repositoryBuilder = new RepositoryBuilder(queryExecutor, databaseConfiguration, materializer, options);
+
+The resolver passed to `RepositoryBuilder.Build(type, resolver)` is used as well, so abstract repositories resolve constructor arguments and `[Inject]` members from the same delegate.
+
+#### Abstract classes
+
+The same rules apply to abstract repository classes, where custom methods are `virtual` and dependencies can also come through the constructor:
+
+    public abstract class WorkLogRepository
+    {
+        // no body: SigQL generates the query
+        public abstract IEnumerable<WorkLog.IWorkLogId> GetAllIds();
+
+        // has a body: your code runs
+        public virtual int CountAllIds() => GetAllIds().Count();
+    }
 
 ### Custom SQL
 

@@ -1,13 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- net8.0 (not netstandard2.0) so test fixtures can declare default interface methods.
+         Consumed only by the net8.0 test projects. -->
+    <TargetFramework>net8.0</TargetFramework>
 
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SigQL.Types\SigQL.Types.csproj" />
+    <!-- so fixtures can inject IQueryMaterializer into custom method bodies -->
+    <ProjectReference Include="..\SigQL\SigQL.csproj" />
   </ItemGroup>
 
 </Project>

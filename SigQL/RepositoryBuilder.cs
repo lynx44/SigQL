@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Castle.DynamicProxy;
 using SigQL.Extensions;
@@ -56,18 +57,29 @@ namespace SigQL
 
         private object CreateProxy(Type tProxy)
         {
+            return CreateProxy(tProxy, options.ServiceResolver);
+        }
+
+        private object CreateProxy(Type tProxy, Func<Type, object> serviceResolver)
+        {
             if (tProxy.IsClass && tProxy.IsAbstract)
             {
                 return new Castle.DynamicProxy.ProxyGenerator().CreateClassProxy(
                     tProxy,
                     new ProxyGenerationOptions(),
-                    new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, options.ForeignKeyResolver, this.sqlLogger)
+                    CreateInterceptor(serviceResolver)
                 );
             }
 
             return new Castle.DynamicProxy.ProxyGenerator().CreateInterfaceProxyWithoutTarget(tProxy,
-                new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, options.ForeignKeyResolver, this.sqlLogger)
+                CreateInterceptor(serviceResolver)
             );
+        }
+
+        private MethodQueryInterceptor CreateInterceptor(Func<Type, object> serviceResolver)
+        {
+            return new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer,
+                options.PluralizationHelper, options.ForeignKeyResolver, serviceResolver ?? options.ServiceResolver, this.sqlLogger);
         }
 
         public TProxy Build<TProxy>(Func<Type, object> constructorParameterResolver)
@@ -83,9 +95,10 @@ namespace SigQL
 
         public object Build(Type tProxy, Func<Type, object> constructorParameterResolver)
         {
+            // the same delegate doubles as the service resolver for [Inject] members
             if (tProxy.IsInterface)
             {
-                return Build(tProxy);
+                return CreateProxy(tProxy, constructorParameterResolver);
             }
 
             object[] constructorArguments = null;
@@ -96,12 +109,12 @@ namespace SigQL
                 var parameterTypes = defaultConstructor.GetParameters().Select(p => p.ParameterType).ToList();
                 constructorArguments = parameterTypes.Select(t => constructorParameterResolver(t)).ToArray();
             }
-            
+
             return new Castle.DynamicProxy.ProxyGenerator().CreateClassProxy(
                 tProxy,
                 new ProxyGenerationOptions(),
                 constructorArguments,
-                new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, options.ForeignKeyResolver, this.sqlLogger)
+                CreateInterceptor(constructorParameterResolver)
             );
         }
 
@@ -111,6 +124,7 @@ namespace SigQL
             private readonly IQueryMaterializer materializer;
             private readonly IPluralizationHelper pluralizationHelper;
             private readonly IForeignKeyResolver foreignKeyResolver;
+            private readonly Func<Type, object> serviceResolver;
             private readonly Action<PreparedSqlStatement> sqlLogger;
             private readonly IQueryExecutor queryExecutor;
 
@@ -120,18 +134,26 @@ namespace SigQL
                 IQueryMaterializer materializer,
                 IPluralizationHelper pluralizationHelper,
                 IForeignKeyResolver foreignKeyResolver,
+                Func<Type, object> serviceResolver = null,
                 Action<PreparedSqlStatement> sqlLogger = null)
             {
                 this.databaseConfiguration = databaseConfiguration;
                 this.materializer = materializer;
                 this.pluralizationHelper = pluralizationHelper;
                 this.foreignKeyResolver = foreignKeyResolver ?? DefaultForeignKeyResolver.Instance;
+                this.serviceResolver = serviceResolver;
                 this.sqlLogger = sqlLogger;
                 this.queryExecutor = queryExecutor;
             }
 
             public void Intercept(IInvocation invocation)
             {
+                // a member that supplies its own implementation is the user's code, not a query
+                if (TryInterceptCustomImplementation(invocation))
+                {
+                    return;
+                }
+
                 var methodParser = new MethodParser(new SqlStatementBuilder(), databaseConfiguration, pluralizationHelper, foreignKeyResolver);
                 var sqlStatement = methodParser.SqlFor(invocation.Method);
                 var methodArgs = invocation.Method.GetParameters().Select((p, i) => new ParameterArg() { Parameter = p, Value = invocation.Arguments[i] });
@@ -169,6 +191,61 @@ namespace SigQL
                     }
                 }
             }
+
+            /// <summary>
+            /// Handles members that are not generated queries: methods with a body (default
+            /// interface methods and virtual methods on abstract repository classes), and
+            /// abstract [Inject] properties. Returns false when the member should have its SQL
+            /// generated as usual.
+            /// </summary>
+            private bool TryInterceptCustomImplementation(IInvocation invocation)
+            {
+                // MethodInvocationTarget is the class implementation for a class proxy, and null
+                // for an interface proxy without a target
+                var implementation = invocation.MethodInvocationTarget ?? invocation.Method;
+
+                if (!implementation.IsAbstract)
+                {
+                    InvokeCustomImplementation(invocation, implementation);
+                    return true;
+                }
+
+                var injectedProperty = CustomMethodInvoker.GetInjectedProperty(invocation.Method);
+                if (injectedProperty != null)
+                {
+                    invocation.ReturnValue = CustomMethodInvoker.ResolveService(
+                        injectedProperty.PropertyType, injectedProperty, this.serviceResolver);
+                    return true;
+                }
+
+                return false;
+            }
+
+            private void InvokeCustomImplementation(IInvocation invocation, MethodInfo implementation)
+            {
+                if (implementation.DeclaringType != null && implementation.DeclaringType.IsInterface)
+                {
+                    // Castle cannot Proceed() into a default interface method, so dispatch directly
+                    var arguments = CustomMethodInvoker.ResolveArguments(
+                        invocation.Method, invocation.Arguments, this.serviceResolver);
+                    invocation.ReturnValue = CustomMethodInvoker.InvokeDefaultInterfaceMethod(
+                        invocation.Proxy, invocation.Method, arguments);
+                    return;
+                }
+
+                // a virtual method on an abstract repository class: Castle can call the base body
+                if (CustomMethodInvoker.HasInjectedParameters(implementation))
+                {
+                    var arguments = CustomMethodInvoker.ResolveArguments(
+                        implementation, invocation.Arguments, this.serviceResolver);
+                    for (var i = 0; i < arguments.Length; i++)
+                    {
+                        invocation.SetArgumentValue(i, arguments[i]);
+                    }
+                }
+
+                invocation.Proceed();
+            }
         }
     }
 
@@ -182,5 +259,12 @@ namespace SigQL
 
         public IPluralizationHelper PluralizationHelper { get; set; }
         public IForeignKeyResolver ForeignKeyResolver { get; set; }
+
+        /// <summary>
+        /// Supplies services for parameters and properties marked with
+        /// <see cref="SigQL.Types.Attributes.InjectAttribute"/>. Typically wired to a DI
+        /// container, for example <c>t => serviceProvider.GetRequiredService(t)</c>.
+        /// </summary>
+        public Func<Type, object> ServiceResolver { get; set; }
     }
 }
