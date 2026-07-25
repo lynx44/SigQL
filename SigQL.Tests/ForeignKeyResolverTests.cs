@@ -124,35 +124,5 @@ namespace SigQL.Tests
             }
         }
 
-        /// <summary>
-        /// Simulates a resolver that infers relationships from column naming conventions
-        /// (a column named "XyzId" references the "Xyz" table's "Id" column), for databases
-        /// that don't declare foreign keys in their schema at all.
-        /// </summary>
-        private class ConventionForeignKeyResolver : IForeignKeyResolver
-        {
-            private readonly IDatabaseConfiguration databaseConfiguration;
-
-            public ConventionForeignKeyResolver(IDatabaseConfiguration databaseConfiguration)
-            {
-                this.databaseConfiguration = databaseConfiguration;
-            }
-
-            public IForeignKeyDefinitionCollection GetForeignKeys(ITableDefinition table)
-            {
-                var foreignKeys = table.Columns
-                    .Where(c => c.Name.EndsWith("Id") && c.Name != "Id")
-                    .Select(c => new
-                    {
-                        Column = c,
-                        ReferencedTable = this.databaseConfiguration.Tables.FindByName(c.Name.Substring(0, c.Name.Length - "Id".Length))
-                    })
-                    .Where(c => c.ReferencedTable?.Columns.FindByName("Id") != null)
-                    .Select(c => new ForeignKeyDefinition(c.ReferencedTable, new ForeignKeyPair(c.Column, c.ReferencedTable.Columns.FindByName("Id"))))
-                    .ToArray();
-
-                return new ForeignKeyDefinitionCollection().AddForeignKeys(foreignKeys);
-            }
-        }
     }
 }
