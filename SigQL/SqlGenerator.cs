@@ -20,13 +20,15 @@ namespace SigQL
     {
         private IDatabaseConfiguration databaseConfiguration;
         private IPluralizationHelper pluralizationHelper;
+        private IForeignKeyResolver foreignKeyResolver;
         private MethodParser methodParser;
 
-        public SqlGenerator(IDatabaseConfiguration databaseConfiguration, IPluralizationHelper pluralizationHelper)
+        public SqlGenerator(IDatabaseConfiguration databaseConfiguration, IPluralizationHelper pluralizationHelper, IForeignKeyResolver foreignKeyResolver = null)
         {
             this.databaseConfiguration = databaseConfiguration;
             this.pluralizationHelper = pluralizationHelper;
-            methodParser = new MethodParser(new SqlStatementBuilder(), databaseConfiguration, pluralizationHelper);
+            this.foreignKeyResolver = foreignKeyResolver ?? DefaultForeignKeyResolver.Instance;
+            methodParser = new MethodParser(new SqlStatementBuilder(), databaseConfiguration, pluralizationHelper, this.foreignKeyResolver);
         }
 
         public SqlGenerator(IDatabaseConfiguration databaseConfiguration) : this(databaseConfiguration,
@@ -44,7 +46,7 @@ namespace SigQL
 
         public Func<Expression<Func<T, object>>, string> GetColumnNameResolver<T>(bool quoted = true)
         {
-            var resolver = new ColumnNameResolver<T>(new DatabaseResolver(this.databaseConfiguration, this.pluralizationHelper));
+            var resolver = new ColumnNameResolver<T>(new DatabaseResolver(this.databaseConfiguration, this.pluralizationHelper, this.foreignKeyResolver));
             if (quoted)
             {
                 return resolver

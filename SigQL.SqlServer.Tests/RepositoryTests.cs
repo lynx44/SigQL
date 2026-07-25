@@ -7632,6 +7632,65 @@ namespace SigQL.SqlServer.Tests
             Assert.AreEqual(workLog.Id, actual.View.WorkLogId);
         }
 
+        [TestMethod]
+        public void GetWithCustomForeignKeyResolver_NavigationPropertyResolvesWithoutSchemaOrAddForeignKey()
+        {
+            var employee = new EFEmployee() { Name = "Name" };
+            var workLog = new EFWorkLog()
+            {
+                Employee = employee,
+                StartDate = new DateTime(2022, 1, 1),
+                EndDate = new DateTime(2022, 2, 2)
+            };
+            this.laborDbContext.WorkLog.Add(workLog);
+            this.laborDbContext.SaveChanges();
+
+            // Build a new repository whose WorkLog -> WorkLogEmployeeView relationship (the view declares
+            // no foreign key in the schema) is resolved entirely by a custom IForeignKeyResolver, instead of
+            // a schema-declared foreign key or the AddForeignKey extension.
+            var queryExecutor = new SqlQueryExecutor(() => laborDbConnection);
+            var sqlDatabaseConfiguration = new SqlDatabaseConfiguration((laborDbConnection as SqlConnection).ConnectionString);
+            var options = new RepositoryBuilderOptions() { ForeignKeyResolver = new WorkLogToViewForeignKeyResolver(sqlDatabaseConfiguration) };
+            var builder = new RepositoryBuilder(queryExecutor, sqlDatabaseConfiguration, new AdoMaterializer(queryExecutor), options);
+            var repo = builder.Build<IMonolithicRepository>();
+
+            var actual = repo.GetWithAddForeignKey().First();
+
+            Assert.AreEqual(workLog.Id, actual.Id);
+            Assert.AreEqual(employee.Id, actual.View.EmployeeId);
+            Assert.AreEqual(employee.Name, actual.View.EmployeeName);
+            Assert.AreEqual(workLog.StartDate, actual.View.StartDate);
+            Assert.AreEqual(workLog.EndDate, actual.View.EndDate);
+            Assert.AreEqual(workLog.Id, actual.View.WorkLogId);
+        }
+
+        /// <summary>
+        /// Resolves the WorkLog -> WorkLogEmployeeView relationship purely in code, since the view
+        /// declares no foreign key in the database schema.
+        /// </summary>
+        private class WorkLogToViewForeignKeyResolver : IForeignKeyResolver
+        {
+            private readonly IDatabaseConfiguration databaseConfiguration;
+
+            public WorkLogToViewForeignKeyResolver(IDatabaseConfiguration databaseConfiguration)
+            {
+                this.databaseConfiguration = databaseConfiguration;
+            }
+
+            public IForeignKeyDefinitionCollection GetForeignKeys(ITableDefinition table)
+            {
+                if (table.Name.Equals("WorkLog", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    var viewTable = this.databaseConfiguration.Tables.FindByName("WorkLogEmployeeView");
+                    return new ForeignKeyDefinitionCollection().AddForeignKeys(
+                        new ForeignKeyDefinition(viewTable,
+                            new ForeignKeyPair(table.Columns.FindByName("EmployeeId"), viewTable.Columns.FindByName("EmployeeId"))));
+                }
+
+                return new ForeignKeyDefinitionCollection();
+            }
+        }
+
         private void AreEquivalent<T>(IEnumerable<T> expected, IEnumerable<T> actual)
         {
             CollectionAssert.AreEquivalent(expected.ToList(), actual.ToList());

@@ -224,7 +224,7 @@ namespace SigQL
                         var primaryKeyColumns = upsertTableRelations.TableRelations.TargetTable.PrimaryKey?.Columns.ToList();
                         if (FindRootArgument(upsertTableRelations.TableRelations.Argument).Type == typeof(void))
                         {
-                            primaryKeyColumns = upsertTableRelations.TableRelations.TargetTable.ForeignKeyCollection
+                            primaryKeyColumns = this.databaseResolver.GetForeignKeys(upsertTableRelations.TableRelations.TargetTable)
                                 .SelectMany(fk => fk.KeyPairs.Select(kp => kp.ForeignTableColumn)).ToList();
                         }
                         merge.WhenNotMatched.Insert.Output = new OutputClause()
@@ -835,13 +835,13 @@ namespace SigQL
             return new Tuple<IEnumerable<OrderedParameterValue>, IEnumerable<TableIndexReference>>(results, parentIndexMappings);
         }
 
-        private static DeclareStatement BuildDeclareInsertedTableParameterStatement(string outputParameterTableName,
+        private DeclareStatement BuildDeclareInsertedTableParameterStatement(string outputParameterTableName,
             UpsertTableRelations insertTableRelations)
         {
             var primaryKeyColumns = insertTableRelations.TableRelations.TargetTable.PrimaryKey?.Columns.ToList();
             if (FindRootArgument(insertTableRelations.TableRelations.Argument).Type == typeof(void))
             {
-                primaryKeyColumns = insertTableRelations.TableRelations.TargetTable.ForeignKeyCollection
+                primaryKeyColumns = this.databaseResolver.GetForeignKeys(insertTableRelations.TableRelations.TargetTable)
                     .SelectMany(fk => fk.KeyPairs.Select(kp => kp.ForeignTableColumn)).ToList();
             }
             var declareOutputParameterStatement = new DeclareStatement()
@@ -927,7 +927,7 @@ namespace SigQL
             var primaryKeyColumns = tableRelations.TargetTable.PrimaryKey?.Columns.ToList();
             if (FindRootArgument(tableRelations.Argument).Type == typeof(void))
             {
-                primaryKeyColumns = tableRelations.TargetTable.ForeignKeyCollection
+                primaryKeyColumns = this.databaseResolver.GetForeignKeys(tableRelations.TargetTable)
                     .SelectMany(fk => fk.KeyPairs.Select(kp => kp.ForeignTableColumn)).ToList();
             }
             if ((primaryKeyColumns?.Any()).GetValueOrDefault(false))

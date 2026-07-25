@@ -85,7 +85,7 @@ namespace SigQL
                                                             }
                                                         }.SetArgs(
                                                             new PartitionByClause().SetArgs(
-                                                                tableRelations.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
+                                                                this.databaseResolver.GetForeignKeys(tableRelations.TargetTable).GetAllForeignColumns()
                                                                     .Select(c =>
                                                                         new ColumnIdentifier().SetArgs(
                                                                             new RelationalColumn()
@@ -95,7 +95,7 @@ namespace SigQL
                                                                     ).ToList()
                                                             ),
                                                             new OrderByClause().SetArgs(
-                                                                tableRelations.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
+                                                                this.databaseResolver.GetForeignKeys(tableRelations.TargetTable).GetAllForeignColumns()
                                                                     .Select(c =>
                                                                         new ColumnIdentifier().SetArgs(
                                                                             new RelationalColumn()
@@ -191,7 +191,7 @@ namespace SigQL
                                                             }
                                                         }.SetArgs(
                                                             new PartitionByClause().SetArgs(
-                                                                tableRelations.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
+                                                                this.databaseResolver.GetForeignKeys(tableRelations.TargetTable).GetAllForeignColumns()
                                                                     .Select(c =>
                                                                         new ColumnIdentifier().SetArgs(
                                                                             new RelationalColumn()
@@ -201,7 +201,7 @@ namespace SigQL
                                                                     ).ToList()
                                                             ),
                                                             new OrderByClause().SetArgs(
-                                                                tableRelations.TargetTable.ForeignKeyCollection.GetAllForeignColumns()
+                                                                this.databaseResolver.GetForeignKeys(tableRelations.TargetTable).GetAllForeignColumns()
                                                                     .Select(c =>
                                                                         new ColumnIdentifier().SetArgs(
                                                                             new RelationalColumn()
@@ -222,7 +222,7 @@ namespace SigQL
                                     )),
                                             WhereClause = new WhereClause().SetArgs(
                                                 new AndOperator().SetArgs(
-                                                    tableRelations.TargetTable.ForeignKeyCollection.GetAllForeignColumns().Select(c =>
+                                                    this.databaseResolver.GetForeignKeys(tableRelations.TargetTable).GetAllForeignColumns().Select(c =>
                                                         
                                                             new EqualsOperator().SetArgs(
                                                                 new ColumnIdentifier().SetArgs(

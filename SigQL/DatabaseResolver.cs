@@ -17,11 +17,22 @@ namespace SigQL
     {
         private readonly IDatabaseConfiguration databaseConfiguration;
         private readonly IPluralizationHelper pluralizationHelper;
+        private readonly IForeignKeyResolver foreignKeyResolver;
 
-        public DatabaseResolver(IDatabaseConfiguration databaseConfiguration, IPluralizationHelper pluralizationHelper)
+        public DatabaseResolver(IDatabaseConfiguration databaseConfiguration, IPluralizationHelper pluralizationHelper, IForeignKeyResolver foreignKeyResolver = null)
         {
             this.databaseConfiguration = databaseConfiguration;
             this.pluralizationHelper = pluralizationHelper;
+            this.foreignKeyResolver = foreignKeyResolver ?? DefaultForeignKeyResolver.Instance;
+        }
+
+        /// <summary>
+        /// Resolves the foreign keys for a table through the configured <see cref="IForeignKeyResolver"/>.
+        /// All foreign key lookups in SigQL route through here so that code-defined relationships are honored.
+        /// </summary>
+        public IForeignKeyDefinitionCollection GetForeignKeys(ITableDefinition table)
+        {
+            return this.foreignKeyResolver.GetForeignKeys(table);
         }
 
         public IEnumerable<ColumnDefinitionWithPropertyPath> ResolveColumnsForSelectStatement(
@@ -229,31 +240,34 @@ namespace SigQL
 
         public IForeignKeyDefinition FindPrimaryForeignKeyMatchForTables(ITableDefinition tableDefinition, ITableDefinition navigationTable)
         {
-            return tableDefinition.ForeignKeyCollection.FindPrimaryMatchForTable(navigationTable.Name) ?? navigationTable.ForeignKeyCollection.FindPrimaryMatchForTable(tableDefinition.Name);
+            return GetForeignKeys(tableDefinition).FindPrimaryMatchForTable(navigationTable.Name) ?? GetForeignKeys(navigationTable).FindPrimaryMatchForTable(tableDefinition.Name);
         }
 
         public IEnumerable<IForeignKeyDefinition> FindManyToManyForeignKeyMatchesForTables(ITableDefinition primaryTable, ITableDefinition navigationTable)
         {
-            var tablesReferencingPrimary = this.databaseConfiguration.Tables.Where(t => t.ForeignKeyCollection.FindForTable(primaryTable.Name).Any());
-            var tablesReferencingNavigation = this.databaseConfiguration.Tables.Where(t => t.ForeignKeyCollection.FindForTable(navigationTable.Name).Any());
+            var tablesReferencingPrimary = this.databaseConfiguration.Tables.Where(t => GetForeignKeys(t).FindForTable(primaryTable.Name).Any());
+            var tablesReferencingNavigation = this.databaseConfiguration.Tables.Where(t => GetForeignKeys(t).FindForTable(navigationTable.Name).Any());
 
             var tablesReferencingBoth = tablesReferencingPrimary.Where(t => tablesReferencingNavigation.Any(n => TableEqualityComparer.Default.Equals(t, n)));
 
             // try to find a table that has exactly one reference to each of the target tables
             // with the fewest number of columns. this is likely the many-to-many table
-            var manyToManyTable = 
+            var manyToManyTable =
                 tablesReferencingBoth
                     .OrderBy(t => t.Columns.Count())
-                    .FirstOrDefault(t => t.ForeignKeyCollection.FindForTable(primaryTable.Name).Count() == 1 &&
-                                t.ForeignKeyCollection.FindForTable(navigationTable.Name).Count() == 1);
+                    .FirstOrDefault(t => GetForeignKeys(t).FindForTable(primaryTable.Name).Count() == 1 &&
+                                GetForeignKeys(t).FindForTable(navigationTable.Name).Count() == 1);
 
-            var foreignKeys = new[]
+            if (manyToManyTable == null)
             {
-                manyToManyTable?.ForeignKeyCollection.FindForTable(primaryTable.Name).FirstOrDefault(),
-                manyToManyTable?.ForeignKeyCollection.FindForTable(navigationTable.Name).FirstOrDefault()
-            };
+                return null;
+            }
 
-            return manyToManyTable != null ? foreignKeys : null;
+            return new[]
+            {
+                GetForeignKeys(manyToManyTable).FindForTable(primaryTable.Name).FirstOrDefault(),
+                GetForeignKeys(manyToManyTable).FindForTable(navigationTable.Name).FirstOrDefault()
+            };
         }
 
         public string GetColumnName(IArgument argument)

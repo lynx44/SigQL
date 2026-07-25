@@ -61,12 +61,12 @@ namespace SigQL
                 return new Castle.DynamicProxy.ProxyGenerator().CreateClassProxy(
                     tProxy,
                     new ProxyGenerationOptions(),
-                    new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, this.sqlLogger)
+                    new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, options.ForeignKeyResolver, this.sqlLogger)
                 );
             }
 
             return new Castle.DynamicProxy.ProxyGenerator().CreateInterfaceProxyWithoutTarget(tProxy,
-                new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, this.sqlLogger)
+                new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, options.ForeignKeyResolver, this.sqlLogger)
             );
         }
 
@@ -101,7 +101,7 @@ namespace SigQL
                 tProxy,
                 new ProxyGenerationOptions(),
                 constructorArguments,
-                new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, this.sqlLogger)
+                new MethodQueryInterceptor(this.queryExecutor, databaseConfiguration, this.queryMaterializer, options.PluralizationHelper, options.ForeignKeyResolver, this.sqlLogger)
             );
         }
 
@@ -110,26 +110,29 @@ namespace SigQL
             private readonly IDatabaseConfiguration databaseConfiguration;
             private readonly IQueryMaterializer materializer;
             private readonly IPluralizationHelper pluralizationHelper;
+            private readonly IForeignKeyResolver foreignKeyResolver;
             private readonly Action<PreparedSqlStatement> sqlLogger;
             private readonly IQueryExecutor queryExecutor;
 
             public MethodQueryInterceptor(
-                IQueryExecutor queryExecutor, 
+                IQueryExecutor queryExecutor,
                 IDatabaseConfiguration databaseConfiguration,
                 IQueryMaterializer materializer,
                 IPluralizationHelper pluralizationHelper,
+                IForeignKeyResolver foreignKeyResolver,
                 Action<PreparedSqlStatement> sqlLogger = null)
             {
                 this.databaseConfiguration = databaseConfiguration;
                 this.materializer = materializer;
                 this.pluralizationHelper = pluralizationHelper;
+                this.foreignKeyResolver = foreignKeyResolver ?? DefaultForeignKeyResolver.Instance;
                 this.sqlLogger = sqlLogger;
                 this.queryExecutor = queryExecutor;
             }
 
             public void Intercept(IInvocation invocation)
             {
-                var methodParser = new MethodParser(new SqlStatementBuilder(), databaseConfiguration, pluralizationHelper);
+                var methodParser = new MethodParser(new SqlStatementBuilder(), databaseConfiguration, pluralizationHelper, foreignKeyResolver);
                 var sqlStatement = methodParser.SqlFor(invocation.Method);
                 var methodArgs = invocation.Method.GetParameters().Select((p, i) => new ParameterArg() { Parameter = p, Value = invocation.Arguments[i] });
                 if (OutputFactory.UnwrapType(sqlStatement.ReturnType) != typeof(void))
@@ -174,8 +177,10 @@ namespace SigQL
         public RepositoryBuilderOptions()
         {
             this.PluralizationHelper = DefaultPluralizationHelper.Instance;
+            this.ForeignKeyResolver = DefaultForeignKeyResolver.Instance;
         }
 
         public IPluralizationHelper PluralizationHelper { get; set; }
+        public IForeignKeyResolver ForeignKeyResolver { get; set; }
     }
 }

@@ -1533,6 +1533,53 @@ Composite (multi-column) foreign keys are also supported:
             addressTable.Columns.FindByName("State")
         });
 
+### Custom Foreign Key Resolution
+
+`AddForeignKey` mutates a single `ITableDefinition`, which works well for a handful of one-off relationships. For databases that don't declare foreign keys at all (or declare them in a way SigQL can't read), relationships can instead be resolved entirely in code by implementing `IForeignKeyResolver`:
+
+    public interface IForeignKeyResolver
+    {
+        IForeignKeyDefinitionCollection GetForeignKeys(ITableDefinition table);
+    }
+
+SigQL calls `GetForeignKeys` every time it needs a table's foreign keys, instead of reading `table.ForeignKeyCollection` directly. The default implementation, `DefaultForeignKeyResolver`, simply returns `table.ForeignKeyCollection` (i.e. whatever the schema declared, plus anything added via `AddForeignKey`).
+
+A custom resolver can, for example, infer relationships from a column naming convention:
+
+    public class ConventionForeignKeyResolver : IForeignKeyResolver
+    {
+        private readonly IDatabaseConfiguration databaseConfiguration;
+
+        public ConventionForeignKeyResolver(IDatabaseConfiguration databaseConfiguration)
+        {
+            this.databaseConfiguration = databaseConfiguration;
+        }
+
+        public IForeignKeyDefinitionCollection GetForeignKeys(ITableDefinition table)
+        {
+            // a column named "XyzId" references the "Xyz" table's "Id" column
+            var foreignKeys = table.Columns
+                .Where(c => c.Name.EndsWith("Id") && c.Name != "Id")
+                .Select(c => new
+                {
+                    Column = c,
+                    ReferencedTable = databaseConfiguration.Tables.FindByName(c.Name.Substring(0, c.Name.Length - "Id".Length))
+                })
+                .Where(c => c.ReferencedTable?.Columns.FindByName("Id") != null)
+                .Select(c => new ForeignKeyDefinition(c.ReferencedTable, new ForeignKeyPair(c.Column, c.ReferencedTable.Columns.FindByName("Id"))))
+                .ToArray();
+
+            return new ForeignKeyDefinitionCollection().AddForeignKeys(foreignKeys);
+        }
+    }
+
+Pass the resolver via `RepositoryBuilderOptions`:
+
+    var options = new RepositoryBuilderOptions() { ForeignKeyResolver = new ConventionForeignKeyResolver(sqlDatabaseConfiguration) };
+    var builder = new RepositoryBuilder(queryExecutor, sqlDatabaseConfiguration, new AdoMaterializer(queryExecutor), options);
+
+Because `GetForeignKeys` is called per-table, a resolver only needs the `IDatabaseConfiguration` in its constructor if it has to look up other tables (as the convention-based example above does) — a resolver hardcoding a fixed set of relationships for one or two specific tables can ignore it entirely.
+
 ### Logging
 
 The RepositoryBuilder constructor contains a sqlLogger arg for logging SQL statements:
