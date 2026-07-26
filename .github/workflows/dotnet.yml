@@ -22,4 +22,4 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Test
-      run: dotnet test --filter "FullyQualifiedName~SigQL.Tests" --no-build --verbosity normal
+      run: dotnet test --filter "FullyQualifiedName~SigQL.Tests|FullyQualifiedName~SigQL.DependencyInjection.Tests" --no-build --verbosity normal

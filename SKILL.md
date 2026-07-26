@@ -39,9 +39,10 @@ SigQL is a .NET ORM where method signatures are the query language. Developers d
 ## Installation
 
 ```
-install-package SigQL           # core + DI builder
-install-package SigQL.SqlServer # SQL Server executor and schema reader
-install-package SigQL.Types     # attributes, return-type interfaces, filter helpers
+install-package SigQL                    # core + DI builder
+install-package SigQL.SqlServer          # SQL Server executor and schema reader
+install-package SigQL.Types              # attributes, return-type interfaces, filter helpers
+install-package SigQL.DependencyInjection # optional: Microsoft.Extensions.DependencyInjection registration
 ```
 
 Namespaces you will use:
@@ -71,22 +72,37 @@ var repo = repositoryBuilder.Build<IMyRepository>();
 
 ### ASP.NET Core
 
+With `SigQL.DependencyInjection` (the extension methods are in the `Microsoft.Extensions.DependencyInjection` namespace):
+
 ```csharp
 // Program.cs / Startup.cs
-services.AddSingleton(sp =>
-    new SqlDatabaseConfiguration(connectionString));
+builder.Services.AddSigQL(connectionString)
+    .AddRepositoriesFromAssemblyContaining<IMyRepository>();
+```
 
-services.AddSingleton(sp =>
-{
-    var dbConfig = sp.GetRequiredService<SqlDatabaseConfiguration>();
-    return new RepositoryBuilder(
-        new SqlQueryExecutor(() => new SqlConnection(connectionString)),
-        dbConfig);
-});
+That registers `IDatabaseConfiguration`, `IQueryExecutor`, `IQueryMaterializer`, and `RepositoryBuilder` as singletons, and every repository interface/abstract class in the assembly as scoped. Other entry points:
 
-// Register each repository interface
-services.AddSingleton<IMyRepository>(sp =>
-    sp.GetRequiredService<RepositoryBuilder>().Build<IMyRepository>());
+```csharp
+builder.Services.AddSigQL()
+    .UseSqlServer(sp => sp.GetRequiredService<IConfiguration>().GetConnectionString("Db"))
+    .LogSqlWith(statement => Console.WriteLine(statement.CommandText))
+    .ConfigureOptions((options, sp) => options.PluralizationHelper = myHelper)
+    .WithLifetime(ServiceLifetime.Singleton)      // default is Scoped
+    .AddRepository<IMyRepository>()               // one type
+    .AddRepositoriesFromNamespaceOf<IMyRepository>();
+```
+
+An abstract class that implements a repository interface is paired with it by the scanning methods, so injecting the interface runs the class's custom method bodies.
+
+Without the package, register by hand — the resolver handed to `Build` must be the current scope's:
+
+```csharp
+services.AddSingleton<IDatabaseConfiguration>(sp => new SqlDatabaseConfiguration(connectionString));
+services.AddSingleton(sp => new RepositoryBuilder(
+    new SqlQueryExecutor(() => new SqlConnection(connectionString)),
+    sp.GetRequiredService<IDatabaseConfiguration>()));
+services.AddScoped<IMyRepository>(sp =>
+    (IMyRepository) sp.GetRequiredService<RepositoryBuilder>().Build(typeof(IMyRepository), sp.GetService));
 ```
 
 ### RepositoryBuilder overloads

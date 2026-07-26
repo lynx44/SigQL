@@ -90,7 +90,14 @@ The goal of SigQL is to enable developers precise and concise access to data by 
   **Configuration**
   
  - [Installation](#installation)
+ - [Dependency Injection](#dependency-injection)
+   - [What gets registered](#what-gets-registered)
+   - [Choosing what to register](#choosing-what-to-register)
+   - [Interfaces backed by an abstract class](#interfaces-backed-by-an-abstract-class)
+   - [Options](#options)
+   - [Registering without the package](#registering-without-the-package)
  - [Adding Foreign Keys](#adding-foreign-keys)
+ - [Custom Foreign Key Resolution](#custom-foreign-key-resolution)
  - [Logging](#logging)
 
 **More Information**
@@ -1451,7 +1458,7 @@ Services come from a resolver, typically backed by a DI container:
     };
     var repositoryBuilder = new RepositoryBuilder(queryExecutor, databaseConfiguration, materializer, options);
 
-The resolver passed to `RepositoryBuilder.Build(type, resolver)` is used as well, so abstract repositories resolve constructor arguments and `[Inject]` members from the same delegate.
+The resolver passed to `RepositoryBuilder.Build(type, resolver)` is used as well, so abstract repositories resolve constructor arguments and `[Inject]` members from the same delegate. The `SigQL.DependencyInjection` package wires this up automatically — see [Dependency Injection](#dependency-injection).
 
 #### Abstract classes
 
@@ -1583,70 +1590,107 @@ Create an instance of RepositoryBuilder:
     var repositoryBuilder = new RepositoryBuilder(new SqlQueryExecutor(() => new SqlConnection(connectionString)), sqlDatabaseConfiguration);
     var employeeRepository = repositoryBuilder.Build<EmployeeRepository>();
 
-For Dependency Injection in ASP.NET MVC Core:
+### Dependency Injection
 
-    services.AddSingleton(s =>
-    {
-        var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(connectionString);
-        return sqlDatabaseConfiguration;
-    });
-    services.AddSingleton(s =>
-    {
-        var sqlDatabaseConfiguration = s.GetService(typeof(SqlDatabaseConfiguration)) as SqlDatabaseConfiguration;
-        var repositoryBuilder = new RepositoryBuilder(new SqlQueryExecutor(() => new SqlConnection(connectionString)), sqlDatabaseConfiguration);
-        return repositoryBuilder;
-    });
-    services.AddSingleton(type, s =>
-    {
-        var repositoryBuilder = s.GetService(typeof(RepositoryBuilder)) as RepositoryBuilder;
-        return repositoryBuilder.Build(typeof(EmployeeRepository), s.GetService);
-    });
+`SigQL.DependencyInjection` registers repositories with `Microsoft.Extensions.DependencyInjection`. It is a separate package so that the core packages take no dependency on a container:
 
-For a more generic approach, this code can be adapted to scan and register all interfaces and abstract classes in the same namespace as a specified repository class (in this case, *LocationRepository*):
+    install-package SigQL.DependencyInjection
 
-        builder.Services.AddSingleton(s =>
+Registration is two lines in `Program.cs`/`Startup.cs`:
+
+    builder.Services.AddSigQL(connectionString)
+        .AddRepositoriesFromAssemblyContaining<IEmployeeRepository>();
+
+That reads the schema, wires up the `RepositoryBuilder`, and registers every repository in that assembly. Injecting `IEmployeeRepository` anywhere in the app now works.
+
+The extension methods live in the `Microsoft.Extensions.DependencyInjection` namespace, so no additional `using` is needed.
+
+#### What gets registered
+
+`AddSigQL` registers as singletons:
+
+ - `IDatabaseConfiguration` — the schema, read the first time a repository is resolved (not at startup)
+ - `IQueryExecutor`
+ - `IQueryMaterializer` — so `[Inject] IQueryMaterializer` works in custom methods
+ - `RepositoryBuilder`
+
+Repositories themselves are registered **scoped** by default. Scoped matters: each repository is built with the resolving scope's service provider, so `[Inject]` members and abstract class constructor arguments get that scope's services rather than the root container's.
+
+#### Choosing what to register
+
+    // everything in an assembly
+    .AddRepositoriesFromAssemblyContaining<IEmployeeRepository>()
+
+    // everything in one namespace
+    .AddRepositoriesFromNamespaceOf<IEmployeeRepository>()
+
+    // one at a time
+    .AddRepository<IEmployeeRepository>()
+    .AddRepositories(typeof(ILocationRepository), typeof(LocationRepository))
+
+A scan considers public interfaces and public abstract classes only — a concrete class has nothing for SigQL to generate, and proxying one would intercept a working implementation. Of those, a type is treated as a repository when it implements `SigQL.Types.IRepository` or its name ends in `Repository`. A different rule can be supplied instead:
+
+    .AddRepositoriesFromAssemblyContaining<IEmployeeRepository>(t => t.Namespace.EndsWith(".Data"))
+
+Registrations use `TryAdd`, so a repository already registered by hand is left alone — a generated repository can be swapped for a hand written implementation without excluding it from the scan.
+
+#### Interfaces backed by an abstract class
+
+When an abstract repository class implements a repository interface, a scan pairs the two: the interface resolves to the proxy built for the class, and both resolve to the same instance.
+
+    public interface IEmployeeRepository
     {
-        var sqlDatabaseConfiguration = new SqlDatabaseConfiguration(connectionString);
-        return sqlDatabaseConfiguration;
-    });
-    builder.Services.AddSingleton(s =>
-    {
-        var sqlDatabaseConfiguration = s.GetService(typeof(SqlDatabaseConfiguration)) as SqlDatabaseConfiguration;
-        var repositoryBuilder = new RepositoryBuilder(new SqlQueryExecutor(() => new SqlConnection(connectionString)), sqlDatabaseConfiguration);
-        return repositoryBuilder;
-    });
-    var registeredInterfaces = new List<Type>();
-    // register abstract repositories
-    foreach (var type in Assembly.GetAssembly(typeof(LocationRepository)).GetTypes().Where(t => (t.Namespace == typeof(LocationRepository).Namespace && t.Name.EndsWith("Repository") && t.Name != "Repository")))
-    {
-        if ((type.IsAbstract && type.IsClass))
-        {
-            var interfaceType = type.GetInterfaces().SingleOrDefault(i => i.Name.EndsWith("Repository"));
-            if (interfaceType != null)
-            {
-                builder.Services.AddScoped(interfaceType, s =>
-                {
-                    var repositoryBuilder = s.GetService(typeof(RepositoryBuilder)) as RepositoryBuilder;
-                    return repositoryBuilder.Build(type, t => s.GetService(t));
-                });
-                registeredInterfaces.Add(interfaceType);            
-            }
-        }
+        IEnumerable<Employee.IName> GetAll();
+        int CountAll();
     }
-    
-    // register interfaces without an implementation
-    foreach (var type in Assembly.GetAssembly(typeof(LocationRepository)).GetTypes().Where(t => (t.Namespace == typeof(LocationRepository).Namespace && t.Name.EndsWith("Repository") && t.Name != "Repository")))
+
+    public abstract class EmployeeRepository : IEmployeeRepository
     {
-        if (!registeredInterfaces.Contains(type))
-        {
-            builder.Services.AddScoped(type, s =>
-            {
-                var repositoryBuilder = s.GetService(typeof(RepositoryBuilder)) as RepositoryBuilder;
-                return repositoryBuilder.Build(type, t => s.GetService(t));
-            });
-            registeredInterfaces.Add(type);
-        }
+        // no body: SigQL generates the query
+        public abstract IEnumerable<Employee.IName> GetAll();
+
+        // has a body: your code runs, even when the caller injected IEmployeeRepository
+        public virtual int CountAll() => GetAll().Count();
     }
+
+This pairing is what makes the custom implementations run. Registering the interface *alone* builds an interface proxy, which has no class body to call, so SigQL would generate a query for `CountAll` instead. Registering the class alone leaves `IEmployeeRepository` unresolvable. `AddRepositoriesFromAssemblyContaining`, `AddRepositoriesFromNamespaceOf`, and `AddRepositories(...)` handle the pairing; `AddRepository<T>()` registers exactly the one type it is given.
+
+If two abstract classes in the scan implement the same repository interface, the interface is ambiguous and registration throws, naming both classes.
+
+#### Options
+
+    builder.Services.AddSigQL()
+        // a connection string from configuration
+        .UseSqlServer(sp => sp.GetRequiredService<IConfiguration>().GetConnectionString("Labor"))
+        // log every statement SigQL executes
+        .LogSqlWith(sp => statement => sp.GetRequiredService<ILogger<Program>>().LogDebug(statement.CommandText))
+        // pluralization, foreign key resolution
+        .ConfigureOptions((options, sp) =>
+            options.ForeignKeyResolver = new ConventionForeignKeyResolver(sp.GetRequiredService<IDatabaseConfiguration>()))
+        // singleton or transient repositories instead of scoped
+        .WithLifetime(ServiceLifetime.Singleton)
+        .AddRepositoriesFromAssemblyContaining<IEmployeeRepository>();
+
+`AddRepository` and the scanning methods also take a per-registration `ServiceLifetime`, and `builder.Services` is available for anything else. For a database other than SQL Server, or for connection handling `UseSqlServer` does not cover, supply the two services directly:
+
+    .UseDatabase(sp => myDatabaseConfiguration, sp => myQueryExecutor)
+
+The whole configuration can also be passed as a delegate, which returns the `IServiceCollection` for chaining:
+
+    builder.Services.AddSigQL(sigql => sigql
+        .UseSqlServer(connectionString)
+        .AddRepositoriesFromAssemblyContaining<IEmployeeRepository>());
+
+#### Registering without the package
+
+Any container can register repositories directly, as long as the resolver it hands to `Build` is the one for the current scope:
+
+    services.AddSingleton<IDatabaseConfiguration>(s => new SqlDatabaseConfiguration(connectionString));
+    services.AddSingleton(s => new RepositoryBuilder(
+        new SqlQueryExecutor(() => new SqlConnection(connectionString)),
+        s.GetRequiredService<IDatabaseConfiguration>()));
+    services.AddScoped(typeof(IEmployeeRepository), s =>
+        s.GetRequiredService<RepositoryBuilder>().Build(typeof(EmployeeRepository), s.GetService));
 
 ### Adding Foreign Keys
 
