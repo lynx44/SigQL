@@ -252,6 +252,33 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void GetProjectionWithOnlyRelations_ReturnsExpectedSql()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWorkLogRelationsOnly());
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\", \"Location\".\"Id\" \"Location.Id\", \"Location\".\"Name\" \"Location.Name\", \"Location\".\"AddressId\" \"Location.AddressId\" from \"WorkLog\" left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") left outer join \"Location\" on (\"WorkLog\".\"LocationId\" = \"Location\".\"Id\")", sql);
+        }
+
+        [TestMethod]
+        public void GetProjectionWithOnlyRelationsViaJoinRelation_ReturnsExpectedSql()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWorkLogRelationsOnlyViaJoinRelation());
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"Employee.Id\", \"Employee\".\"Name\" \"Employee.Name\", \"Location\".\"Id\" \"Location.Id\", \"Location\".\"Name\" \"Location.Name\", \"Location\".\"AddressId\" \"Location.AddressId\" from \"WorkLog\" left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") left outer join \"Location\" on (\"WorkLog\".\"LocationId\" = \"Location\".\"Id\")", sql);
+        }
+
+        [TestMethod]
+        public void GetViewProjectionWithOnlyRelations_ReturnsExpectedSql()
+        {
+            // a view has no primary key, so its identity comes from a synthesized ROW_NUMBER column.
+            // that needs something to order by - a projection selecting only relations contributes no
+            // column of its own, so the view's first column is used.
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWorkLogEmployeeViewRelationsOnly());
+
+            Assert.AreEqual("select \"WorkLogEmployeeView\".\"RowNumber\" \"RowNumber\", \"Employee\".\"Id\" \"Employees.Id\", \"Employee\".\"Name\" \"Employees.Name\", \"WorkLog\".\"Id\" \"WorkLogs.Id\" from (select ROW_NUMBER() over(order by \"WorkLogId\") \"RowNumber\", \"WorkLogId\", \"StartDate\", \"EndDate\", \"EmployeeId\", \"EmployeeName\" from \"WorkLogEmployeeView\") \"WorkLogEmployeeView\" left outer join \"Employee\" on (\"WorkLogEmployeeView\".\"EmployeeId\" = \"Employee\".\"Id\") left outer join \"WorkLog\" on (\"WorkLogEmployeeView\".\"WorkLogId\" = \"WorkLog\".\"Id\")", sql);
+        }
+
+        [TestMethod]
         public void GetJoinRelationAttributeOnTableWithViewNavigationCollection_ReturnsExpectedSql()
         {
             var sql = this.GetSqlForCall(() => this.monolithicRepository.GetWithJoinRelationAttributeOnTableWithViewNavigationCollection());
@@ -1424,6 +1451,100 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void Offset_EmptyDynamicOrderByList_RetainsOffset()
+        {
+            // an order by list that resolves to nothing must not take the OFFSET with it - dropping the
+            // clause silently returned every row instead of the requested page.
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithOrder(1, new List<IOrderBy>()));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" order by (select 1) offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
+        }
+
+        [TestMethod]
+        public void Offset_NullDynamicOrderByList_RetainsOffset()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithOrder(1, null));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" order by (select 1) offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
+        }
+
+        [TestMethod]
+        public void OffsetFetch_EmptyDynamicOrderByList_RetainsFetch()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SkipTakeWorkLogsWithOrder(1, 2, new List<IOrderBy>()));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" order by (select 1) offset @skip rows fetch next @take rows only) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\")", sql);
+        }
+
+        [TestMethod]
+        public void OffsetFetch_PopulatedDynamicOrderByList_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SkipTakeWorkLogsWithOrder(1, 2,
+                new List<IOrderBy>() { new OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate), OrderByDirection.Descending) }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" order by \"WorkLog\".\"StartDate\" desc offset @skip rows fetch next @take rows only) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") order by \"WorkLog\".\"StartDate\" desc", sql);
+        }
+
+        [TestMethod]
+        public void Offset_OrderByRelationCollectionParameter_ReturnsExpectedSql()
+        {
+            // IEnumerable<OrderByRelation> - not just IEnumerable<IOrderBy> - is a dynamic order by,
+            // not a filter class whose properties map to database columns.
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithOrderByRelations(1,
+                new List<OrderByRelation>() { new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name)) }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") order by \"Employee\".\"Name\" asc offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") order by \"Employee\".\"Name\" asc", sql);
+        }
+
+        [TestMethod]
+        public void Offset_OrderByConcreteListParameter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithOrderByList(1,
+                new List<IOrderBy>() { new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name)) }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") order by \"Employee\".\"Name\" asc offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") order by \"Employee\".\"Name\" asc", sql);
+        }
+
+        [TestMethod]
+        public void Offset_SingleOrderByRelationParameter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetNextWorkLogsWithSingleOrderByRelation(1,
+                new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") order by \"Employee\".\"Name\" asc offset @skip rows) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") order by \"Employee\".\"Name\" asc", sql);
+        }
+
+        [TestMethod]
+        public void OffsetFetch_OrderByRelationWithNavigationFilter_ReturnsExpectedSql()
+        {
+            // the offset subquery's where clause and its (relation-derived) from clause have to agree
+            // on the primary table's alias.
+            var sql = GetSqlForCall(() => this.monolithicRepository.SkipTakeWorkLogsWithFilterAndOrder(1, 2,
+                new WorkLog.GetByEmployeeNameFilter() { Employee = new Employee.EmployeeNameFilter() { Name = "bob" } },
+                new List<IOrderBy>() { new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name), OrderByDirection.Descending) }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\", \"Employee\".\"Id\" \"EmployeeNames.Id\", \"Employee\".\"Name\" \"EmployeeNames.Name\" from (select \"WorkLog\".\"Id\" from \"WorkLog\" left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" = @Employee0Name)))) order by \"Employee\".\"Name\" desc offset @skip rows fetch next @take rows only) \"offset_WorkLog\" inner join \"WorkLog\" on (\"offset_WorkLog\".\"Id\" = \"WorkLog\".\"Id\") left outer join \"Employee\" on (\"WorkLog\".\"EmployeeId\" = \"Employee\".\"Id\") order by \"Employee\".\"Name\" desc", sql);
+        }
+
+        [TestMethod]
+        public void OffsetFetch_WithCompositeKey_JoinsConditionsWithAnd()
+        {
+            // the offset subquery is joined back on every primary key column. without a single
+            // AndOperator wrapping them the conditions render space separated - invalid sql.
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetNextCompositeKeyTables(1, 2));
+
+            Assert.AreEqual("select \"CompositeKeyTable\".\"FirstName\" \"FirstName\", \"CompositeKeyTable\".\"LastName\" \"LastName\", \"CompositeForeignKeyTable\".\"Id\" \"CompositeForeignKeyTables.Id\" from (select \"CompositeKeyTable\".\"FirstName\", \"CompositeKeyTable\".\"LastName\" from \"CompositeKeyTable\" order by (select 1) offset @skip rows fetch next @take rows only) \"offset_CompositeKeyTable\" inner join \"CompositeKeyTable\" on ((\"offset_CompositeKeyTable\".\"FirstName\" = \"CompositeKeyTable\".\"FirstName\") and (\"offset_CompositeKeyTable\".\"LastName\" = \"CompositeKeyTable\".\"LastName\")) left outer join \"CompositeForeignKeyTable\" on ((\"CompositeForeignKeyTable\".\"EFCompositeKeyTableFirstName\" = \"CompositeKeyTable\".\"FirstName\") and (\"CompositeForeignKeyTable\".\"EFCompositeKeyTableLastName\" = \"CompositeKeyTable\".\"LastName\"))", sql);
+        }
+
+        [TestMethod]
+        public void Get_WithCompositeForeignKey_JoinsConditionsWithAnd()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetCompositeForeignKeyTablesWithParent());
+
+            Assert.AreEqual("select \"CompositeForeignKeyTable\".\"Id\" \"Id\", \"CompositeKeyTable\".\"FirstName\" \"CompositeKeyTable.FirstName\", \"CompositeKeyTable\".\"LastName\" \"CompositeKeyTable.LastName\" from \"CompositeForeignKeyTable\" left outer join \"CompositeKeyTable\" on ((\"CompositeForeignKeyTable\".\"EFCompositeKeyTableFirstName\" = \"CompositeKeyTable\".\"FirstName\") and (\"CompositeForeignKeyTable\".\"EFCompositeKeyTableLastName\" = \"CompositeKeyTable\".\"LastName\"))", sql);
+        }
+
+        [TestMethod]
         public void Offset_RetainsPrimaryWhereClause_ReturnsExpectedSql()
         {
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetNextWorkLogsWithPrimaryTableFilter));
@@ -2246,6 +2367,24 @@ update ""WorkLog$employees$WorkLog$Lookup"" set ""Id"" = ""insertedWorkLog$emplo
             var sql = GetSqlForCall(() => this.monolithicRepository.DeleteEmployeeWithAttributeTableNameWithValuesByParams("bob"));
 
             AssertSqlEqual("delete from \"Employee\" where (\"Employee\".\"Name\" = @name)", sql);
+        }
+
+        [TestMethod]
+        public void Delete_WithEmptyGuidCollection_ReturnsTypeCompatibleEmptySet()
+        {
+            // the empty set has to be untyped ("select null"); "select 1" clashes with any
+            // non-int key column - "Operand type clash: uniqueidentifier is incompatible with int".
+            var sql = GetSqlForCall(() => this.monolithicRepository.DeleteCategoriesByIds(new List<Guid>()));
+
+            AssertSqlEqual("delete from \"Category\" where (\"Category\".\"Id\" in (select null where (0 = 1)))", sql);
+        }
+
+        [TestMethod]
+        public void Delete_WithEmptyIntCollectionAndAdditionalFilter_ReturnsTypeCompatibleEmptySet()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.DeleteCategoryItemsByCategoryAndIds(Guid.Empty, new List<int>()));
+
+            AssertSqlEqual("delete from \"CategoryItem\" where ((\"CategoryItem\".\"CategoryId\" = @categoryId) and (\"CategoryItem\".\"Id\" in (select null where (0 = 1))))", sql);
         }
 
         #endregion Delete

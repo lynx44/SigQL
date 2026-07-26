@@ -36,6 +36,15 @@ namespace SigQL.Tests.Common.Databases.Labor
             string EmployeeName { get; }
         }
 
+        // A view projection that selects no columns of its own - only joined relations.
+        public interface IRelationsOnly
+        {
+            [JoinRelation("WorkLogEmployeeView(EmployeeId)->(Id)Employee")]
+            IEnumerable<Employee.IEmployeeFields> Employees { get; set; }
+            [JoinRelation("WorkLogEmployeeView(WorkLogId)->(Id)WorkLog")]
+            IEnumerable<WorkLog.IWorkLogId> WorkLogs { get; set; }
+        }
+
         public interface IDataFieldsWithWorkLogs
         {
             DateTime StartDate { get; }

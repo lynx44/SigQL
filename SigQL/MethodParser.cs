@@ -335,8 +335,12 @@ namespace SigQL
                         {
                             RightNode = primaryTableArg
                         }.SetArgs(
-                            primaryKey.Columns.Select(c =>
-                                new AndOperator().SetArgs(
+                            // all key comparisons belong to a single AndOperator. one AndOperator per
+                            // column renders them space separated - "on (a = b) (c = d)" - which is
+                            // invalid sql for a composite primary key. a single-column key is
+                            // unaffected, since an AndOperator with one arg omits the parentheses.
+                            new AndOperator().SetArgs(
+                                primaryKey.Columns.Select(c =>
                                     new EqualsOperator().SetArgs(
                                         new ColumnIdentifier().SetArgs(
                                             new Alias() {Label = offsetTableAliasName},
@@ -423,14 +427,7 @@ namespace SigQL
 
         private IEnumerable<IArgument> FindDynamicOrderByParameterPaths(IEnumerable<IArgument> arguments)
         {
-            var orderByArguments = arguments.Filter(a => a.Type.IsAssignableFrom(typeof(OrderBy)) ||
-                                                           a.Type.IsAssignableFrom(typeof(IEnumerable<OrderBy>)));
-            var matchingArgs = orderByArguments.Select(a =>
-            {
-                return a;
-            }).ToList();
-
-            return matchingArgs;
+            return arguments.Filter(ColumnAttributes.IsDynamicOrderByType).ToList();
         }
         
         private static ParameterPath GetParameterPathWithAttribute<TAttribute>(IEnumerable<IArgument> arguments)
@@ -495,11 +492,8 @@ namespace SigQL
             }
             else
             {
-                var defaultSelect = new Select();
-                defaultSelect.SelectClause = new SelectClause().SetArgs(new Literal() {Value = "1"});
                 offsetOrderByClause =
-                    new OrderByClause().SetArgs(
-                        new OrderByIdentifier().SetArgs(new LogicalGrouping().SetArgs(defaultSelect)));
+                    new OrderByClause().SetArgs(BuildConstantOrderByIdentifier());
             }
 
             var offsetClause = new OffsetClause();
@@ -526,6 +520,15 @@ namespace SigQL
 
             offsetOrderByClause.Offset = offsetClause;
             return offsetOrderByClause;
+        }
+
+        // "order by (select 1)" - a constant sort, used when OFFSET/FETCH has to be emitted but the
+        // caller supplied no ordering. sql server rejects OFFSET/FETCH without an ORDER BY.
+        private static OrderByIdentifier BuildConstantOrderByIdentifier()
+        {
+            var constantSelect = new Select();
+            constantSelect.SelectClause = new SelectClause().SetArgs(new Literal() { Value = "1" });
+            return new OrderByIdentifier().SetArgs(new LogicalGrouping().SetArgs(constantSelect));
         }
 
         private static bool IsOrderByDirectionParameter(IArgument arg)
@@ -1575,9 +1578,10 @@ namespace SigQL
             OrderBySpec p,
             object parameterValue, string tokenName)
         {
-            var orderBys = p.IsCollection
+            // a null entry carries no table/column to sort by, so drop it rather than dereference it
+            var orderBys = (p.IsCollection
                 ? parameterValue as IEnumerable<IOrderBy>
-                : (parameterValue as IOrderBy).AsEnumerable();
+                : (parameterValue as IOrderBy).AsEnumerable())?.Where(o => o != null).ToList();
 
             if (orderBys == null || !orderBys.Any())
             {
@@ -1651,6 +1655,14 @@ namespace SigQL
             }).ToList();
 
             orderByClause.Args = (orderByClause.Args ?? new List<AstNode>()).Concat(orderByIdentifiers.Select(i => i.OrderByIdentifier)).ToList();
+
+            // an order by clause with no sort columns is not written out at all. when the clause also
+            // carries OFFSET/FETCH that silently dropped the paging along with it, returning every row.
+            // fall back to a constant sort so the caller still gets the page they asked for.
+            if (!orderByClause.Args.Any() && orderByClause.Offset != null)
+            {
+                orderByClause.Args = BuildConstantOrderByIdentifier().AsEnumerable<AstNode>().ToList();
+            }
 
             return new OrderByResultCollection()
             {
@@ -1740,11 +1752,17 @@ namespace SigQL
         private static AstNode BuildRowNumberProjectionTableReference(TableRelations tableRelations)
         {
             var selectStatement = new Select();
+            // ROW_NUMBER() needs something to order by. a projection that selects only relations
+            // (no columns of its own) leaves nothing but the synthesized row number column behind,
+            // so fall back to the first column of the underlying object.
+            var rowNumberOrderByColumn =
+                tableRelations.ProjectedColumns.FirstOrDefault(c => !(c is TableRelationColumnRowNumberFunctionDefinition)) ??
+                tableRelations.TargetTable.Columns.FirstOrDefault();
             var selectClause = new SelectClause()
                 .SetArgs(
                     tableRelations.PrimaryKey.Where(c => c is TableRelationColumnRowNumberFunctionDefinition).Select(column =>
-                        BuildFromClauseSelectColumn(column, tableRelations.ProjectedColumns)
-                    ).Concat(tableRelations.TargetTable.Columns.Select(c => BuildFromClauseSelectColumn(c, tableRelations.TargetTable.Columns)).ToList()).ToList()
+                        BuildFromClauseSelectColumn(column, rowNumberOrderByColumn)
+                    ).Concat(tableRelations.TargetTable.Columns.Select(c => BuildFromClauseSelectColumn(c, rowNumberOrderByColumn)).ToList()).ToList()
                 );
 
             AstNode tableIdentifier = new TableIdentifier().SetArgs(new RelationalTable()
@@ -1768,12 +1786,22 @@ namespace SigQL
             }.SetArgs(new LogicalGrouping().SetArgs(selectStatement));
         }
 
-        private static AstNode BuildFromClauseSelectColumn(IColumnDefinition column, IEnumerable<IColumnDefinition> allColumns)
+        private static AstNode BuildFromClauseSelectColumn(IColumnDefinition column, IColumnDefinition rowNumberOrderByColumn)
         {
             // this is a ROW_NUMBER column
             if (column is TableRelationColumnRowNumberFunctionDefinition)
             {
-                var firstTableColumn = allColumns.First(c => !(c is TableRelationColumnRowNumberFunctionDefinition));
+                // a column-less object still needs a legal ORDER BY; a constant works there.
+                AstNode orderByArg = rowNumberOrderByColumn != null
+                    ? (AstNode) new ColumnIdentifier().SetArgs(
+                        new RelationalColumn()
+                        {
+                            Label = rowNumberOrderByColumn.Name
+                        })
+                    : new LogicalGrouping().SetArgs(new Select()
+                    {
+                        SelectClause = new SelectClause().SetArgs(new Literal() { Value = "1" })
+                    });
                 return new Alias()
                 {
                     Label = column.Name
@@ -1785,12 +1813,7 @@ namespace SigQL
                                 Name = "ROW_NUMBER"
                             }
                         }.SetArgs(
-                            new OrderByClause().SetArgs(
-                                new ColumnIdentifier().SetArgs(
-                                    new RelationalColumn()
-                                    {
-                                        Label = firstTableColumn.Name
-                                    })))
+                            new OrderByClause().SetArgs(orderByArg))
                 );
             }
 

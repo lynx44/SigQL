@@ -52,6 +52,19 @@ namespace SigQL.Tests.Infrastructure
             var employeeAddressTable = new TableDefinition(dbo, nameof(EmployeeAddress), typeof(EmployeeAddress).GetProperties().Select(p => p.Name));
             employeeAddressTable.PrimaryKey =
                 new TableKeyDefinition(employeeAddressTable.Columns.FindByName(nameof(EmployeeAddress.Id)));
+            // two column primary key, with a child table referencing it through a two column foreign key
+            var compositeKeyTable = new TableDefinition(dbo, nameof(CompositeKeyTable), SetupColumns(typeof(CompositeKeyTable).GetProperties()));
+            compositeKeyTable.PrimaryKey = new TableKeyDefinition(
+                compositeKeyTable.Columns.FindByName(nameof(CompositeKeyTable.FirstName)),
+                compositeKeyTable.Columns.FindByName(nameof(CompositeKeyTable.LastName)));
+            var compositeForeignKeyTable = new TableDefinition(dbo, nameof(CompositeForeignKeyTable), SetupColumns(typeof(CompositeForeignKeyTable).GetProperties()));
+            compositeForeignKeyTable.PrimaryKey = new TableKeyDefinition(compositeForeignKeyTable.Columns.FindByName(nameof(CompositeForeignKeyTable.Id)));
+            ((ColumnDefinition)compositeForeignKeyTable.PrimaryKey.Columns.First()).IsIdentity = true;
+            compositeForeignKeyTable.ForeignKeyCollection = new ForeignKeyDefinitionCollection().AddForeignKeys(
+                new ForeignKeyDefinition(compositeKeyTable,
+                    new ForeignKeyPair(compositeForeignKeyTable.Columns.FindByName(nameof(CompositeForeignKeyTable.EFCompositeKeyTableFirstName)), compositeKeyTable.Columns.FindByName(nameof(CompositeKeyTable.FirstName))),
+                    new ForeignKeyPair(compositeForeignKeyTable.Columns.FindByName(nameof(CompositeForeignKeyTable.EFCompositeKeyTableLastName)), compositeKeyTable.Columns.FindByName(nameof(CompositeKeyTable.LastName))))
+            );
             var categoryTable = new TableDefinition(dbo, nameof(Category), SetupColumns(typeof(Category).GetProperties()));
             // Category's GUID primary key is client-supplied (non-identity).
             categoryTable.PrimaryKey = new TableKeyDefinition(categoryTable.Columns.FindByName(nameof(Category.Id)));
@@ -92,7 +105,9 @@ namespace SigQL.Tests.Infrastructure
                 workLogEmployeeView,
                 employeeStatusesTable,
                 categoryTable,
-                categoryItemTable
+                categoryItemTable,
+                compositeKeyTable,
+                compositeForeignKeyTable
             }));
 
             return databaseConfiguration;

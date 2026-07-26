@@ -3935,6 +3935,208 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void OffsetFetch_WithEmptyDynamicOrderByList_StillPages()
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() });
+            }
+            this.laborDbContext.SaveChanges();
+
+            // an order by list that resolves to nothing previously dropped the whole ORDER BY clause,
+            // taking OFFSET/FETCH with it and returning every row.
+            var actual = this.monolithicRepository.SkipTakeWorkLogsWithOrder(1, 2, new List<IOrderBy>()).Select(wl => wl.Id).ToList();
+
+            Assert.AreEqual(2, actual.Count);
+        }
+
+        [TestMethod]
+        public void Offset_WithEmptyDynamicOrderByList_StillSkips()
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() });
+            }
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetNextWorkLogsWithOrder(2, new List<IOrderBy>()).Select(wl => wl.Id).ToList();
+
+            Assert.AreEqual(3, actual.Count);
+        }
+
+        [TestMethod]
+        public void Offset_WithOrderByRelationCollectionParameter_OrdersResults()
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                this.laborDbContext.WorkLog.Add(new EFWorkLog()
+                {
+                    Employee = new EFEmployee() { Name = $"Bob{(i % 2 == 0 ? i : i + 10)}" }
+                });
+            }
+            this.laborDbContext.SaveChanges();
+
+            // IEnumerable<OrderByRelation> - previously rejected, because the parameter was resolved
+            // as a filter class instead of a dynamic order by.
+            var actual = this.monolithicRepository.GetNextWorkLogsWithOrderByRelations(1,
+                new List<OrderByRelation>()
+                {
+                    new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name))
+                }).Select(w => w.Id).ToList();
+
+            AreSame(new[] { 2, 4, 3, 5 }, actual);
+        }
+
+        [TestMethod]
+        public void Offset_WithSingleOrderByRelationParameter_OrdersResults()
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                this.laborDbContext.WorkLog.Add(new EFWorkLog()
+                {
+                    Employee = new EFEmployee() { Name = $"Bob{(i % 2 == 0 ? i : i + 10)}" }
+                });
+            }
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetNextWorkLogsWithSingleOrderByRelation(1,
+                new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name)))
+                .Select(w => w.Id).ToList();
+
+            AreSame(new[] { 2, 4, 3, 5 }, actual);
+        }
+
+        [TestMethod]
+        public void OffsetFetch_OrderByRelationWithNavigationFilter_ReturnsOrderedPage()
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                this.laborDbContext.WorkLog.Add(new EFWorkLog()
+                {
+                    Employee = new EFEmployee() { Name = "Bob" }
+                });
+            }
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() { Name = "Sue" } });
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.SkipTakeWorkLogsWithFilterAndOrder(1, 2,
+                new WorkLog.GetByEmployeeNameFilter() { Employee = new Employee.EmployeeNameFilter() { Name = "Bob" } },
+                new List<IOrderBy>()
+                {
+                    new OrderByRelation(nameof(WorkLog) + "->" + nameof(Employee), nameof(Employee.Name), OrderByDirection.Descending)
+                }).Select(w => w.Id).ToList();
+
+            Assert.AreEqual(2, actual.Count);
+            CollectionAssert.IsSubsetOf(actual, new[] { 1, 2, 3, 4, 5 });
+        }
+
+        [TestMethod]
+        public void OffsetFetch_WithCompositeKey_ReturnsPagedRows()
+        {
+            this.laborDbContext.CompositeKeyTable.AddRange(
+                new EFCompositeKeyTable() { FirstName = "Ann", LastName = "Adams" },
+                new EFCompositeKeyTable() { FirstName = "Ben", LastName = "Brooks" },
+                new EFCompositeKeyTable() { FirstName = "Cal", LastName = "Carter" },
+                new EFCompositeKeyTable() { FirstName = "Dee", LastName = "Dunn" });
+            this.laborDbContext.SaveChanges();
+
+            // joining the offset subquery back on a two column primary key requires an AND between
+            // the key comparisons; without it the statement is not valid sql.
+            var actual = this.monolithicRepository.GetNextCompositeKeyTables(1, 2).ToList();
+
+            Assert.AreEqual(2, actual.Count);
+        }
+
+        [TestMethod]
+        public void Get_WithCompositeForeignKey_JoinsRelatedRows()
+        {
+            var parent = new EFCompositeKeyTable()
+            {
+                FirstName = "Ann",
+                LastName = "Adams",
+                EFCompositeForeignKeyTables = new List<EFCompositeForeignKeyTable>()
+                {
+                    new EFCompositeForeignKeyTable(),
+                    new EFCompositeForeignKeyTable()
+                }
+            };
+            this.laborDbContext.CompositeKeyTable.Add(parent);
+            this.laborDbContext.CompositeKeyTable.Add(new EFCompositeKeyTable() { FirstName = "Ben", LastName = "Brooks" });
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetCompositeForeignKeyTablesWithParent().ToList();
+
+            Assert.AreEqual(2, actual.Count);
+            Assert.IsTrue(actual.All(c => c.CompositeKeyTable.FirstName == "Ann" && c.CompositeKeyTable.LastName == "Adams"));
+        }
+
+        [TestMethod]
+        public void Get_ViewProjectionWithOnlyRelations_ReturnsRows()
+        {
+            this.laborDbContext.WorkLog.Add(new EFWorkLog()
+            {
+                StartDate = new DateTime(2021, 1, 1),
+                EndDate = new DateTime(2021, 1, 2),
+                Employee = new EFEmployee() { Name = "Joe" }
+            });
+            this.laborDbContext.SaveChanges();
+
+            // a projection that selects only relations - the view has no primary key, so its
+            // synthesized ROW_NUMBER column previously had no column left to order by and threw.
+            var actual = this.monolithicRepository.GetWorkLogEmployeeViewRelationsOnly().ToList();
+
+            Assert.AreEqual(1, actual.Count);
+            Assert.AreEqual("Joe", actual.Single().Employees.Single().Name);
+            Assert.AreEqual(1, actual.Single().WorkLogs.Single().Id);
+        }
+
+        [TestMethod]
+        public void Get_ProjectionWithOnlyRelations_ReturnsRows()
+        {
+            this.laborDbContext.WorkLog.Add(new EFWorkLog()
+            {
+                Employee = new EFEmployee() { Name = "Joe" },
+                Location = new EFLocation() { Name = "Seattle" }
+            });
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetWorkLogRelationsOnly().ToList();
+
+            Assert.AreEqual(1, actual.Count);
+            Assert.AreEqual("Joe", actual.Single().Employee.Name);
+            Assert.AreEqual("Seattle", actual.Single().Location.Name);
+        }
+
+        [TestMethod]
+        public void Delete_WithEmptyGuidCollection_DoesNotThrow()
+        {
+            var categoryId = Guid.NewGuid();
+            this.laborDbContext.Category.Add(new EFCategory() { Id = categoryId, Name = "Kept" });
+            this.laborDbContext.SaveChanges();
+
+            // an empty collection produces an empty-set subquery. that subquery must stay untyped -
+            // "select 1 where 0 = 1" clashes with a uniqueidentifier key column.
+            this.monolithicRepository.DeleteCategoriesByIds(new List<Guid>());
+
+            Assert.AreEqual(1, this.laborDbContext.Category.AsNoTracking().Count());
+        }
+
+        [TestMethod]
+        public void Delete_WithPopulatedGuidCollection_DeletesMatchingRows()
+        {
+            var deletedId = Guid.NewGuid();
+            this.laborDbContext.Category.Add(new EFCategory() { Id = deletedId, Name = "Deleted" });
+            this.laborDbContext.Category.Add(new EFCategory() { Id = Guid.NewGuid(), Name = "Kept" });
+            this.laborDbContext.SaveChanges();
+
+            this.monolithicRepository.DeleteCategoriesByIds(new List<Guid>() { deletedId });
+
+            var remaining = this.laborDbContext.Category.AsNoTracking().ToList();
+            Assert.AreEqual(1, remaining.Count);
+            Assert.AreEqual("Kept", remaining.Single().Name);
+        }
+
+        [TestMethod]
         public void ViaAttribute_ManyToOne()
         {
             var location1 = new EFLocation();

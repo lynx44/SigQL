@@ -556,9 +556,36 @@ namespace SigQL
         public static bool IsDynamicOrderBy(IArgument property)
         {
             return
-                property.GetCallsiteTypeName() != "table" && (((property?.Type)?.IsAssignableFrom(typeof(OrderBy))).GetValueOrDefault(false) ||
-                                                              ((property?.Type)?.IsAssignableFrom(
-                                                                  typeof(IEnumerable<OrderBy>))).GetValueOrDefault(false));
+                property.GetCallsiteTypeName() != "table" && IsDynamicOrderByType(property);
+        }
+
+        // Any argument that is an IOrderBy, or a collection of them, drives a dynamic order by.
+        // Matching on assignability from the concrete OrderBy type instead missed every other
+        // shape - IEnumerable of OrderByRelation, List of IOrderBy, a bare OrderByRelation - and
+        // those fell through to the filter/column resolver, which reported the parameter as a
+        // missing database column.
+        public static bool IsDynamicOrderByType(IArgument property)
+        {
+            var type = property?.Type;
+            if (type == null)
+            {
+                return false;
+            }
+
+            if (typeof(IOrderBy).IsAssignableFrom(type))
+            {
+                return true;
+            }
+
+            if (type.IsCollectionType())
+            {
+                var elementType = type.IsArray
+                    ? type.GetElementType()
+                    : type.GetGenericArguments().FirstOrDefault();
+                return elementType != null && typeof(IOrderBy).IsAssignableFrom(elementType);
+            }
+
+            return false;
         }
 
         public static bool IsSetArgument(IArgument argument)

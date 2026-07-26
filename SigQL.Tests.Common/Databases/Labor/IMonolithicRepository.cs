@@ -277,6 +277,14 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithOrder([Offset] int skip, [Column(nameof(WorkLog.StartDate))] OrderByDirection order = OrderByDirection.Ascending);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithOrder([Offset] int skip, IEnumerable<IOrderBy> order);
         IEnumerable<WorkLog> GetNextWorkLogsWithDynamicOrder([Offset] int skip, IEnumerable<IOrderBy> order);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> SkipTakeWorkLogsWithOrder([Offset] int skip, [Fetch] int take, IEnumerable<IOrderBy> order);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithOrderByRelations([Offset] int skip, IEnumerable<OrderByRelation> order);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> SkipTakeWorkLogsWithFilterAndOrder([Offset] int skip, [Fetch] int take, WorkLog.GetByEmployeeNameFilter filter, IEnumerable<IOrderBy> order);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithOrderByList([Offset] int skip, List<IOrderBy> order);
+        IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithSingleOrderByRelation([Offset] int skip, OrderByRelation order);
+        // OFFSET/FETCH over a table whose primary key spans two columns
+        IEnumerable<CompositeKeyTable.IFieldsWithChildren> GetNextCompositeKeyTables([Offset] int skip, [Fetch] int take);
+        IEnumerable<CompositeForeignKeyTable.IFieldsWithParent> GetCompositeForeignKeyTablesWithParent();
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithPrimaryTableFilter([Offset] int skip, DateTime startDate);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithNavigationTableFilter([Offset] int skip, WorkLog.GetByEmployeeNameFilter filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> TakeWorkLogs([Fetch] int take);
@@ -310,6 +318,10 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogToViewViaAddForeignKey> GetWithAddForeignKey();
         IEnumerable<WorkLog.IWorkLogToViewMismatchingCase> GetWithJoinRelationAttributeMismatchingKeyCase();
         IEnumerable<WorkLog.IWorkLogToViewToEmployee> GetWithJoinRelationAttributeAndFilterToSameTable([ViaRelation("WorkLog(EmployeeId)->(Id)Employee", "Id")] int id);
+        // projections that select no columns of their own - only joined relations
+        IEnumerable<WorkLog.IWorkLogRelationsOnly> GetWorkLogRelationsOnly();
+        IEnumerable<WorkLog.IWorkLogRelationsOnlyViaJoinRelation> GetWorkLogRelationsOnlyViaJoinRelation();
+        IEnumerable<WorkLogEmployeeView.IRelationsOnly> GetWorkLogEmployeeViewRelationsOnly();
 
         // view
         IEnumerable<WorkLogEmployeeView.IFields> GetWorkLogEmployeeView();
@@ -478,6 +490,12 @@ namespace SigQL.Tests.Common.Databases.Labor
         // delete
         [Delete(TableName = nameof(Employee))]
         void DeleteEmployeeWithAttributeTableNameWithValuesByParams(string name);
+        // delete filtered by a collection of non-int (uniqueidentifier) keys - an empty collection
+        // must still produce type-compatible sql
+        [Delete(TableName = nameof(CategoryItem))]
+        void DeleteCategoryItemsByCategoryAndIds(Guid categoryId, [Column(nameof(CategoryItem.Id))] IEnumerable<int> id);
+        [Delete(TableName = nameof(Category))]
+        void DeleteCategoriesByIds([Column(nameof(Category.Id))] IEnumerable<Guid> id);
 
         IEnumerable<EFAddressEFEmployee> GetEFAddressEFEmployees();
     }

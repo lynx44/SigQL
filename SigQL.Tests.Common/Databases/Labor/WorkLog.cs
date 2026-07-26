@@ -563,6 +563,22 @@ namespace SigQL.Tests.Common.Databases.Labor
             WorkLogEmployeeView.IFields View { get; }
         }
 
+        // A projection that selects no columns of its own - only joined relations.
+        public interface IWorkLogRelationsOnly
+        {
+            Labor.Employee.IEmployeeFields Employee { get; }
+            Labor.Location.ILocationFields Location { get; }
+        }
+
+        // Same shape, but reaching the relations through explicit [JoinRelation] paths.
+        public interface IWorkLogRelationsOnlyViaJoinRelation
+        {
+            [JoinRelation("WorkLog(EmployeeId)->(Id)Employee")]
+            Labor.Employee.IEmployeeFields Employee { get; }
+            [JoinRelation("WorkLog(LocationId)->(Id)Location")]
+            Labor.Location.ILocationFields Location { get; }
+        }
+
         public interface IWorkLogToViewMismatchingCase
         {
             int Id { get; }

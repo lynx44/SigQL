@@ -508,6 +508,17 @@ To dynamically order by a column in a related table, use the `OrderByRelation` c
     var workLogs = repository.GetOrderedWorkLogs(
         new OrderByRelation("WorkLog->Employee", "Name", OrderByDirection.Ascending));
 
+**Accepted parameter types:**
+
+Any parameter whose type is an `IOrderBy` — or a collection of them — is treated as a dynamic order by. All of the following are equivalent in how SigQL handles them:
+
+    IEnumerable<IOrderBy> order
+    List<IOrderBy> order
+    IOrderBy[] order
+    IEnumerable<OrderByRelation> order
+    OrderByRelation order
+    OrderBy order
+
 **Dynamic order in class filters:**
 
     public class WorkLog
@@ -534,6 +545,8 @@ Dynamic order also works with Offset and Fetch:
     IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogs(
         [Offset] int skip,
         IEnumerable<IOrderBy> order);
+
+If the dynamic order list is empty or null, the paging still applies — SigQL falls back to `order by (select 1)`, which leaves the row order up to the database but keeps the requested `[Offset]`/`[Fetch]` window.
 
 #### Single Result
 
@@ -636,6 +649,19 @@ Returning related tables is supported:
 *Note that the name of the property WorkLogs is not important. SigQL understands to use the WorkLog table because IWorkLogWithStartDate is an inner class of WorkLog.*
 
 *Note also that joined rows are de-duplicated into a single instance based on their primary key.*
+
+A projection may consist of nothing but relations — it does not have to select any column of its own:
+
+    public class WorkLog
+    {
+        public interface IRelationsOnly
+        {
+            Employee.IEmployeeFields Employee { get; }
+            Location.ILocationFields Location { get; }
+        }
+    }
+    ...
+    IEnumerable<WorkLog.IRelationsOnly> GetWorkLogRelations();
 
 ##### Flattening Relations with ViaRelation
 

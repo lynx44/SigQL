@@ -483,6 +483,13 @@ var logs = repo.GetOrdered(
     new OrderByRelation("WorkLog->Employee", "Name", OrderByDirection.Ascending));
 ```
 
+Any parameter that is an `IOrderBy`, or a collection of them, is a dynamic ORDER BY —
+`IEnumerable<IOrderBy>`, `List<IOrderBy>`, `IOrderBy[]`, `IEnumerable<OrderByRelation>`,
+and a bare `OrderByRelation` all work.
+
+With `[Offset]`/`[Fetch]`, an empty or null order list still pages: SigQL emits
+`order by (select 1)` so the OFFSET/FETCH window is preserved.
+
 ---
 
 ## Joins and Related Data
