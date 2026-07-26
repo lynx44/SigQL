@@ -266,6 +266,11 @@ namespace SigQL
         internal SqlStatementBuilder SqlBuilder { get; set; }
         internal bool IsTotalCountWithResult { get; set; }
         /// <summary>
+        /// When set, the statement projects this single column as the method's return value, rather
+        /// than materializing a projection class. Sourced from the method's [Select] attribute.
+        /// </summary>
+        public string ScalarColumnName { get; set; }
+        /// <summary>
         /// The command timeout, in seconds, to apply when executing this statement. Sourced from the
         /// method's [Command(Timeout = n)] attribute. Null means use the provider/global default.
         /// </summary>

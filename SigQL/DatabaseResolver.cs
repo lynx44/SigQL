@@ -147,7 +147,7 @@ namespace SigQL
             return columns;
         }
 
-        private static bool IsColumnType(Type propertyType)
+        internal static bool IsColumnType(Type propertyType)
         {
             return propertyType.Namespace == "System" || propertyType.IsEnum;
         }

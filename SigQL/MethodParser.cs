@@ -102,19 +102,23 @@ namespace SigQL
 
             projectionType = OutputFactory.UnwrapType(returnType);
 
+            var scalarSelect = GetScalarSelectSpec(methodInfo, projectionType, isCountResult, isTotalCount);
 
             var methodParameters = methodInfo.GetParameters();
             var arguments = methodParameters.AsArguments(this.databaseResolver);
 
-            var tableDefinition = this.databaseResolver.DetectTable(projectionType);
+            var tableDefinition = scalarSelect?.Table ?? this.databaseResolver.DetectTable(projectionType);
             var tablePrimaryKeyDefinitions = new ConcurrentDictionary<string, IEnumerable<string>>();
 
             TableRelations allTableRelations;
-            
+
             TableRelations projectionTableRelations;
             List<TableRelations> parameterRelations;
             {
-                projectionTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TypeArgument(projectionType, this.databaseResolver),
+                var projectionArgument = scalarSelect != null
+                    ? (IArgument) new ScalarSelectTableArgument(tableDefinition, scalarSelect.ColumnName, projectionType)
+                    : new TypeArgument(projectionType, this.databaseResolver);
+                projectionTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, projectionArgument,
                     TableRelationsColumnSource.ReturnType, tablePrimaryKeyDefinitions);
                 //var parametersTableRelations = this.databaseResolver.BuildTableRelations(tableDefinition, new TableArgument(tableDefinition, arguments),
                 //    TableRelationsColumnSource.Parameters, new ConcurrentDictionary<string, IEnumerable<string>>());
@@ -420,9 +424,88 @@ namespace SigQL
                 Tokens = tokens,
                 TargetTablePrimaryKey = !isAnyCountType ? new TableKeyDefinition(allTableRelations.PrimaryKey.ToArray()) : new TableKeyDefinition(),
                 TablePrimaryKeyDefinitions = !isAnyCountType ? tablePrimaryKeyDefinitions : new ConcurrentDictionary<string, IEnumerable<string>>(),
-                IsTotalCountWithResult = isTotalCountResult
+                IsTotalCountWithResult = isTotalCountResult,
+                ScalarColumnName = scalarSelect?.ColumnName
             };
             return sqlStatement;
+        }
+
+        /// <summary>
+        /// Resolves the [Select(TableName, ColumnName)] scalar projection for this method, or null
+        /// when the method projects a class in the usual way.
+        /// </summary>
+        private ScalarSelectSpec GetScalarSelectSpec(MethodInfo methodInfo, Type projectionType, bool isCountResult,
+            bool isTotalCount)
+        {
+            // GetCustomAttributes(Type, bool) rather than the generic extension, for the same reason
+            // as GetCommandTimeout: synthetic MethodInfo implementations only override this overload.
+            var selectAttribute = methodInfo.GetCustomAttributes(typeof(SelectAttribute), false)
+                .OfType<SelectAttribute>()
+                .FirstOrDefault();
+            if (selectAttribute == null)
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(selectAttribute.TableName) ||
+                string.IsNullOrWhiteSpace(selectAttribute.ColumnName))
+            {
+                throw new InvalidAttributeException(typeof(SelectAttribute), methodInfo.AsEnumerable(),
+                    $"[Select] on method {methodInfo.DeclaringType?.Name}.{methodInfo.Name} requires both TableName and ColumnName.");
+            }
+
+            if (isCountResult || isTotalCount)
+            {
+                throw new InvalidAttributeException(typeof(SelectAttribute), methodInfo.AsEnumerable(),
+                    $"[Select] cannot be used with {methodInfo.ReturnType.Name} on method {methodInfo.DeclaringType?.Name}.{methodInfo.Name}, since the result is a count rather than the projected column.");
+            }
+
+            // byte[] reads two ways - one varbinary value, or a collection of tinyint values - and
+            // nothing in the signature distinguishes them. Say so rather than failing on the
+            // conversion later.
+            var declaredReturnType = methodInfo.ReturnType;
+            if (declaredReturnType.IsTask() && declaredReturnType.IsGenericType)
+            {
+                declaredReturnType = declaredReturnType.GetGenericArguments().First();
+            }
+
+            if (declaredReturnType == typeof(byte[]))
+            {
+                throw new InvalidAttributeException(typeof(SelectAttribute), methodInfo.AsEnumerable(),
+                    $"[Select] on method {methodInfo.DeclaringType?.Name}.{methodInfo.Name} cannot return byte[], since it is ambiguous between a single binary column value and a collection of byte values. Use IEnumerable<byte> to project a byte column across rows.");
+            }
+
+            if (!DatabaseResolver.IsColumnType(projectionType) || this.databaseResolver.IsTableOrTableProjection(projectionType))
+            {
+                throw new InvalidAttributeException(typeof(SelectAttribute), methodInfo.AsEnumerable(),
+                    $"[Select] on method {methodInfo.DeclaringType?.Name}.{methodInfo.Name} requires a scalar return type. {projectionType.Name} is a projection type, which already identifies its own table and columns.");
+            }
+
+            var table = this.databaseConfiguration.Tables.FindByName(selectAttribute.TableName);
+            if (table == null)
+            {
+                throw new InvalidIdentifierException(
+                    $"Unable to identify matching database table for [Select] on method {methodInfo.DeclaringType?.Name}.{methodInfo.Name}. Table {selectAttribute.TableName} does not exist.");
+            }
+
+            var column = table.Columns.FindByName(selectAttribute.ColumnName);
+            if (column == null)
+            {
+                throw new InvalidIdentifierException(
+                    $"Unable to identify matching database column for [Select] on method {methodInfo.DeclaringType?.Name}.{methodInfo.Name}. Column {selectAttribute.ColumnName} does not exist in table {table.Name}.");
+            }
+
+            return new ScalarSelectSpec()
+            {
+                Table = table,
+                ColumnName = column.Name
+            };
+        }
+
+        private class ScalarSelectSpec
+        {
+            public ITableDefinition Table { get; set; }
+            public string ColumnName { get; set; }
         }
 
         private IEnumerable<IArgument> FindDynamicOrderByParameterPaths(IEnumerable<IArgument> arguments)

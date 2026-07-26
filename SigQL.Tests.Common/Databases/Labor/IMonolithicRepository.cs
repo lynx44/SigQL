@@ -241,6 +241,49 @@ namespace SigQL.Tests.Common.Databases.Labor
         /// which is the sort column for the query
         /// </summary>
         //IEnumerable<WorkLog.IWorkLogId> ILLEGAL_GetOrderedWorkLogs(OrderBy<WorkLog.ILocationIdAndEmployeeId> direction);
+        // scalar select
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+        string GetEmployeeNameScalar(int id);
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+        Task<string> GetEmployeeNameScalarAsync(int id);
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Id))]
+        int GetEmployeeIdScalar(string name);
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Id))]
+        int? GetNullableEmployeeIdScalar(string name);
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+        IEnumerable<string> GetAllEmployeeNamesScalar();
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Id))]
+        IEnumerable<int> GetAllEmployeeIdsScalar();
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+        IEnumerable<string> GetEmployeeNamesScalarByIds(IEnumerable<int> id);
+        [Select(TableName = nameof(WorkLog), ColumnName = nameof(WorkLog.StartDate))]
+        IEnumerable<DateTime?> GetWorkLogStartDatesScalar();
+        [Select(TableName = nameof(Address), ColumnName = nameof(Address.Classification))]
+        IEnumerable<AddressClassification> GetAddressClassificationsScalar();
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+        IEnumerable<string> GetEmployeeNamesScalarViaWorkLog([ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), nameof(WorkLog.Id))] int workLogId);
+        [Select(TableName = nameof(WorkLog), ColumnName = nameof(WorkLog.Id))]
+        IEnumerable<int> GetWorkLogIdsScalarWithOffsetFetch([Offset] int skip, [Fetch] int take, IEnumerable<IOrderBy> order);
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+        string GetEmployeeNameScalarIgnoreIfNull([IgnoreIfNull] int? id);
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+        ITotalCountResult<IEnumerable<string>> GetEmployeeNamesScalarWithTotalCount([Offset] int skip, [Fetch] int take);
+
+        [Select(TableName = nameof(Employee))]
+        string INVALID_ScalarSelectMissingColumnName(int id);
+        [Select(ColumnName = nameof(Employee.Name))]
+        string INVALID_ScalarSelectMissingTableName(int id);
+        [Select(TableName = "UnknownTableName", ColumnName = nameof(Employee.Name))]
+        string INVALID_ScalarSelectNonExistingTableName(int id);
+        [Select(TableName = nameof(Employee), ColumnName = "UnknownColumnName")]
+        string INVALID_ScalarSelectNonExistingColumnName(int id);
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+        Employee.IEmployeeFields INVALID_ScalarSelectProjectionReturnType(int id);
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+        ICountResult<Employee.IEmployeeFields> INVALID_ScalarSelectCountResult(int id);
+        [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+        byte[] INVALID_ScalarSelectByteArray(int id);
+
         IEnumerable<Labor.WorkLog.IInvalidColumn> INVALID_NonExistingColumnName();
         IEnumerable<Labor.NonExistingTable.IId> INVALID_NonExistingTableName();
         IEnumerable<Labor.WorkLog.INVALID_MismatchingColumnType> INVALID_MismatchingColumnType();

@@ -151,6 +151,95 @@ namespace SigQL
         }
     }
 
+    /// <summary>
+    /// Root argument for a [Select(TableName, ColumnName)] scalar projection. Stands in for the
+    /// projection class that a normal select method would return, exposing exactly one column as
+    /// its only "property" so the standard table relations pipeline can build the select clause
+    /// (including the primary key columns the materializer needs to keep rows distinct).
+    /// </summary>
+    internal class ScalarSelectTableArgument : IArgument
+    {
+        private readonly ITableDefinition tableDefinition;
+        private readonly string columnName;
+        private readonly Type scalarType;
+
+        public ScalarSelectTableArgument(ITableDefinition tableDefinition, string columnName, Type scalarType)
+        {
+            this.tableDefinition = tableDefinition;
+            this.columnName = columnName;
+            this.scalarType = scalarType;
+        }
+
+        // there is no CLR type behind the table itself. void is returned rather than throwing
+        // because the type is read speculatively when building diagnostic messages.
+        public Type Type => typeof(void);
+        public string Name => tableDefinition.Name;
+
+        public TAttribute GetCustomAttribute<TAttribute>() where TAttribute : Attribute
+        {
+            return null;
+        }
+
+        public IEnumerable<IArgument> ClassProperties =>
+            new IArgument[] { new ScalarSelectColumnArgument(columnName, scalarType, this) };
+
+        public IArgument Parent => null;
+
+        public ParameterInfo GetParameterInfo()
+        {
+            throw new InvalidOperationException("Argument is a table, not a parameter");
+        }
+
+        public PropertyInfo GetPropertyInfo()
+        {
+            throw new InvalidOperationException("Argument is a table, not a property");
+        }
+
+        public string GetCallsiteTypeName()
+        {
+            return "table";
+        }
+    }
+
+    /// <summary>
+    /// The single column projected by a [Select(TableName, ColumnName)] scalar method.
+    /// </summary>
+    internal class ScalarSelectColumnArgument : IArgument
+    {
+        public ScalarSelectColumnArgument(string columnName, Type scalarType, IArgument parent)
+        {
+            Name = columnName;
+            Type = scalarType;
+            Parent = parent;
+        }
+
+        public Type Type { get; }
+        public string Name { get; }
+
+        public TAttribute GetCustomAttribute<TAttribute>() where TAttribute : Attribute
+        {
+            return null;
+        }
+
+        public IEnumerable<IArgument> ClassProperties => Array.Empty<IArgument>();
+        public IArgument Parent { get; }
+
+        public ParameterInfo GetParameterInfo()
+        {
+            throw new InvalidOperationException("Argument is a column, not a parameter");
+        }
+
+        public PropertyInfo GetPropertyInfo()
+        {
+            throw new InvalidOperationException("Argument is a column, not a property");
+        }
+
+        public string GetCallsiteTypeName()
+        {
+            return "method";
+        }
+    }
+
     internal static class MethodInfoExtensions
     {
         public static IEnumerable<IArgument> AsArguments(this IEnumerable<ParameterInfo> parameters, DatabaseResolver databaseResolver)

@@ -7893,6 +7893,185 @@ namespace SigQL.SqlServer.Tests
             }
         }
 
+        #region ScalarSelect
+
+        [TestMethod]
+        public void ScalarSelect_SingleValue()
+        {
+            var allEmployees = new[] { 1, 2, 3 }.Select(i => new EFEmployee() { Name = "Name" + i }).ToList();
+            this.laborDbContext.Employee.AddRange(allEmployees);
+            this.laborDbContext.SaveChanges();
+            var expected = allEmployees.First(e => e.Name == "Name2");
+
+            Assert.AreEqual("Name2", this.monolithicRepository.GetEmployeeNameScalar(expected.Id));
+        }
+
+        [TestMethod]
+        public async Task ScalarSelect_SingleValueAsync()
+        {
+            var allEmployees = new[] { 1, 2, 3 }.Select(i => new EFEmployee() { Name = "Name" + i }).ToList();
+            this.laborDbContext.Employee.AddRange(allEmployees);
+            this.laborDbContext.SaveChanges();
+            var expected = allEmployees.First(e => e.Name == "Name2");
+
+            Assert.AreEqual("Name2", await this.monolithicRepository.GetEmployeeNameScalarAsync(expected.Id));
+        }
+
+        [TestMethod]
+        public void ScalarSelect_SingleValue_WhenNoResults_ReturnsNull()
+        {
+            Assert.IsNull(this.monolithicRepository.GetEmployeeNameScalar(1));
+        }
+
+        [TestMethod]
+        public void ScalarSelect_Collection()
+        {
+            var allEmployees = new[] { 1, 2, 3 }.Select(i => new EFEmployee() { Name = "Name" + i }).ToList();
+            this.laborDbContext.Employee.AddRange(allEmployees);
+            this.laborDbContext.SaveChanges();
+
+            AreEquivalent(new[] { "Name1", "Name2", "Name3" },
+                this.monolithicRepository.GetAllEmployeeNamesScalar().ToList());
+        }
+
+        /// <summary>
+        /// Every row must produce a value, even when the projected column repeats. The primary key
+        /// columns are selected alongside the projected column to keep the rows distinct.
+        /// </summary>
+        [TestMethod]
+        public void ScalarSelect_Collection_WithDuplicateValues_ReturnsEveryRow()
+        {
+            var allEmployees = new[] { 1, 2, 3 }.Select(i => new EFEmployee() { Name = "SameName" }).ToList();
+            this.laborDbContext.Employee.AddRange(allEmployees);
+            this.laborDbContext.SaveChanges();
+
+            AreEquivalent(new[] { "SameName", "SameName", "SameName" },
+                this.monolithicRepository.GetAllEmployeeNamesScalar().ToList());
+        }
+
+        [TestMethod]
+        public void ScalarSelect_Collection_WhenNoRecords_ReturnsEmpty()
+        {
+            Assert.AreEqual(0, this.monolithicRepository.GetAllEmployeeNamesScalar().Count());
+        }
+
+        [TestMethod]
+        public void ScalarSelect_OfPrimaryKeyColumn()
+        {
+            var allEmployees = new[] { 1, 2, 3 }.Select(i => new EFEmployee() { Name = "Name" + i }).ToList();
+            this.laborDbContext.Employee.AddRange(allEmployees);
+            this.laborDbContext.SaveChanges();
+
+            AreEquivalent(allEmployees.Select(e => e.Id).ToList(),
+                this.monolithicRepository.GetAllEmployeeIdsScalar().ToList());
+        }
+
+        [TestMethod]
+        public void ScalarSelect_WithCollectionFilter()
+        {
+            var allEmployees = new[] { 1, 2, 3 }.Select(i => new EFEmployee() { Name = "Name" + i }).ToList();
+            this.laborDbContext.Employee.AddRange(allEmployees);
+            this.laborDbContext.SaveChanges();
+            var expected = allEmployees.Where(e => e.Name != "Name3").ToList();
+
+            AreEquivalent(new[] { "Name1", "Name2" },
+                this.monolithicRepository.GetEmployeeNamesScalarByIds(expected.Select(e => e.Id)).ToList());
+        }
+
+        [TestMethod]
+        public void ScalarSelect_OfNullableColumn_ReturnsNullForNullValues()
+        {
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = new DateTime(2021, 1, 1) });
+            this.laborDbContext.WorkLog.Add(new EFWorkLog() { StartDate = null });
+            this.laborDbContext.SaveChanges();
+
+            AreEquivalent(new DateTime?[] { new DateTime(2021, 1, 1), null },
+                this.monolithicRepository.GetWorkLogStartDatesScalar().ToList());
+        }
+
+        [TestMethod]
+        public void ScalarSelect_OfEnumColumn()
+        {
+            this.laborDbContext.Address.Add(new EFAddress() { StreetAddress = "1", Classification = AddressClassification.Work });
+            this.laborDbContext.Address.Add(new EFAddress() { StreetAddress = "2", Classification = AddressClassification.Home });
+            this.laborDbContext.SaveChanges();
+
+            AreEquivalent(new[] { AddressClassification.Work, AddressClassification.Home },
+                this.monolithicRepository.GetAddressClassificationsScalar().ToList());
+        }
+
+        [TestMethod]
+        public void ScalarSelect_WithViaRelationFilter()
+        {
+            var employee = new EFEmployee() { Name = "Name1" };
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.Employee.Add(new EFEmployee() { Name = "Name2" });
+            this.laborDbContext.SaveChanges();
+            var workLog = new EFWorkLog() { EmployeeId = employee.Id, StartDate = DateTime.Today };
+            this.laborDbContext.WorkLog.Add(workLog);
+            this.laborDbContext.SaveChanges();
+
+            AreEquivalent(new[] { "Name1" },
+                this.monolithicRepository.GetEmployeeNamesScalarViaWorkLog(workLog.Id).ToList());
+        }
+
+        [TestMethod]
+        public void ScalarSelect_WithOffsetFetchAndOrder()
+        {
+            var workLogs = new[] { 1, 2, 3, 4, 5 }
+                .Select(i => new EFWorkLog() { StartDate = new DateTime(2021, 1, i) }).ToList();
+            this.laborDbContext.WorkLog.AddRange(workLogs);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetWorkLogIdsScalarWithOffsetFetch(1, 2,
+                new List<IOrderBy>() { new OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate), OrderByDirection.Ascending) }).ToList();
+
+            AreSame(workLogs.OrderBy(w => w.StartDate).Skip(1).Take(2).Select(w => w.Id).ToList(), actual);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_WithTotalCountResult()
+        {
+            var allEmployees = new[] { 1, 2, 3, 4, 5 }.Select(i => new EFEmployee() { Name = "Name" + i }).ToList();
+            this.laborDbContext.Employee.AddRange(allEmployees);
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetEmployeeNamesScalarWithTotalCount(1, 2);
+
+            Assert.AreEqual(5, actual.TotalCount);
+            Assert.AreEqual(2, actual.Result.Count());
+        }
+
+        [TestMethod]
+        public void ScalarSelect_NonNullableValueType_WhenNoResults_ThrowsException()
+        {
+            var ex = Assert.ThrowsException<NullScalarValueException>(() =>
+                this.monolithicRepository.GetEmployeeIdScalar("DoesNotExist"));
+
+            Assert.AreEqual(
+                "No rows were returned for column Id, which cannot be represented by the return type Int32. Declare the return type as Int32? to allow no result.",
+                ex.Message);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_NullableValueType_WhenNoResults_ReturnsNull()
+        {
+            Assert.IsNull(this.monolithicRepository.GetNullableEmployeeIdScalar("DoesNotExist"));
+        }
+
+        [TestMethod]
+        public void ScalarSelect_NonExistingColumnName_ThrowsException()
+        {
+            var ex = Assert.ThrowsException<InvalidIdentifierException>(() =>
+                this.monolithicRepository.INVALID_ScalarSelectNonExistingColumnName(1));
+
+            Assert.AreEqual(
+                "Unable to identify matching database column for [Select] on method IMonolithicRepository.INVALID_ScalarSelectNonExistingColumnName. Column UnknownColumnName does not exist in table Employee.",
+                ex.Message);
+        }
+
+        #endregion ScalarSelect
+
         private void AreEquivalent<T>(IEnumerable<T> expected, IEnumerable<T> actual)
         {
             CollectionAssert.AreEquivalent(expected.ToList(), actual.ToList());

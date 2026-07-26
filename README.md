@@ -35,6 +35,7 @@ The goal of SigQL is to enable developers precise and concise access to data by 
    - [POCOs](#pocos)
    - [SqlIdentifier Attribute](#sqlidentifier-attribute)
    - [Ignoring Properties](#ignoring-properties)
+   - [Scalar Results](#scalar-results)
  - [WHERE Clause](#where-clause) 
    - [Parameter Alias](#parameter-alias)
    - [Logical Operators](#logical-operators)
@@ -194,6 +195,55 @@ If a projection property should be ignored by SigQL, use the ClrOnly attribute:
 	    }
 	    
     }
+
+##### Scalar Results
+
+When only a single column is needed, the [Select] attribute projects that column directly as the return value, with no projection class:
+
+    [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+    string GetEmployeeName(int id);
+
+    [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+    IEnumerable<string> GetAllEmployeeNames();
+
+Both TableName and ColumnName are required. A scalar return type carries no information about which table or column it maps to, so - unlike a projection class - it cannot be inferred.
+
+Everything else about the method works normally. Filter parameters, [ViaRelation], [IgnoreIfNull], order by, and offset/fetch all behave the same as they do for a projection:
+
+    [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Name))]
+    IEnumerable<string> GetEmployeeNames(
+        IEnumerable<int> id,
+        [Offset] int skip,
+        [Fetch] int take);
+
+Enums, nullable types, and all other column types are supported.
+
+byte[] is rejected, since it reads two ways - one binary column value, or a collection of byte values - and nothing in the signature distinguishes them. Use IEnumerable\<byte\> to project a byte column across rows.
+
+###### Null and missing values
+
+A scalar method declaring a non-nullable value type has no way to express "no value". Rather than silently returning 0, SigQL throws a NullScalarValueException when:
+
+ - the query returns no rows, or
+ - the projected column is null for the returned row
+
+Declare the return type as nullable to allow either case:
+
+    [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Id))]
+    int GetEmployeeId(string name);        // throws if no employee matches
+
+    [Select(TableName = nameof(Employee), ColumnName = nameof(Employee.Id))]
+    int? GetEmployeeIdOrNull(string name); // returns null if no employee matches
+
+Reference types such as string are already nullable, so they simply return null.
+
+###### Implementation detail
+
+The generated SELECT includes the target table's primary key columns alongside the projected column:
+
+    select "Employee"."Id" "Id", "Employee"."Name" "Name" from "Employee"
+
+SigQL keys rows on the primary key when materializing results. Without those columns, rows with the same scalar value would collapse into one - `GetAllEmployeeNames()` would return a single name for three employees who happen to share it. The key columns are not part of the returned value.
 
 #### WHERE Clause
 
@@ -944,6 +994,8 @@ The below list documents all features applicable to return types. All other feat
 | [Column] | Yes | Yes |
 | [JoinRelation] | Yes | Yes |
 | [ViaRelation] | Yes | Yes |
+
+[Select] is applied to the method rather than to a class or property, and returns a [scalar result](#scalar-results) instead of a projection. It cannot be combined with a projection return type, or with the ICountResult\<T\> / ITotalCount\<T\> count return types.
 
 ### Insert, Update, Upsert, Sync, and Delete
 

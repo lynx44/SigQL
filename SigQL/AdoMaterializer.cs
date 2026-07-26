@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
+using SigQL.Exceptions;
 using SigQL.Extensions;
 using SigQL.Schema;
 using SigQL.Types;
@@ -55,7 +56,8 @@ namespace SigQL
             var returnType = methodInvocation.SqlStatement.ReturnType;
             var isTotalCountWithResult = methodInvocation.SqlStatement.IsTotalCountWithResult;
 
-            return MaterializeAsync(statement, targetTablePrimaryKey, tablePrimaryKeyDefinitions, returnType, isTotalCountWithResult);
+            return MaterializeAsync(statement, targetTablePrimaryKey, tablePrimaryKeyDefinitions, returnType, isTotalCountWithResult,
+                methodInvocation.SqlStatement.ScalarColumnName);
         }
         
         public Task<object> MaterializeAsync(Type outputType, PreparedSqlStatement sqlStatement)
@@ -101,7 +103,8 @@ namespace SigQL
         }
 
         private async Task<object> MaterializeAsync(PreparedSqlStatement statement, ITableKeyDefinition targetTablePrimaryKey,
-            IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions, Type returnType, bool isTotalCountWithResult = false)
+            IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions, Type returnType, bool isTotalCountWithResult = false,
+            string scalarColumnName = null)
         {
             RowValueCollection rowValueCollection;
             var outputInvocations = new List<object>();
@@ -154,13 +157,10 @@ namespace SigQL
                 var innerResultType = unwrappedReturnType.GetGenericArguments().First();
                 var rootOutputType = OutputFactory.UnwrapType(innerResultType);
                 var orderedRowValues = rowValueCollection.Rows.Values.OrderBy(v => v.RowNumber).ToList();
-                foreach (var rowValue in orderedRowValues)
-                {
-                    var target = new RowProjectionBuilder().Build(rootOutputType, rowValue);
-                    outputInvocations.Add(target);
-                }
+                AddProjections(outputInvocations, rootOutputType, orderedRowValues, scalarColumnName);
 
                 object dataResult = OutputFactory.Cast(outputInvocations, innerResultType);
+                EnsureScalarResultPresent(dataResult, innerResultType, scalarColumnName);
 
                 var totalCountResultType = typeof(TotalCountResult<>).MakeGenericType(innerResultType);
                 var totalCountResult = Activator.CreateInstance(totalCountResultType);
@@ -172,14 +172,11 @@ namespace SigQL
 
             var rootOutputType2 = OutputFactory.UnwrapType(returnType);
             var orderedRowValues2 = rowValueCollection.Rows.Values.OrderBy(v => v.RowNumber).ToList();
-            foreach (var rowValue in orderedRowValues2)
-            {
-                var target = new RowProjectionBuilder().Build(rootOutputType2, rowValue);
-                outputInvocations.Add(target);
-            }
+            AddProjections(outputInvocations, rootOutputType2, orderedRowValues2, scalarColumnName);
 
             object result = outputInvocations;
             result = OutputFactory.Cast(result, unwrappedReturnType);
+            EnsureScalarResultPresent(result, unwrappedReturnType, scalarColumnName);
 
             return result;
         }
@@ -269,7 +266,8 @@ namespace SigQL
         }
 
         private object Materialize(PreparedSqlStatement statement, ITableKeyDefinition targetTablePrimaryKey,
-            IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions, Type returnType, bool isTotalCountWithResult = false)
+            IDictionary<string, IEnumerable<string>> tablePrimaryKeyDefinitions, Type returnType, bool isTotalCountWithResult = false,
+            string scalarColumnName = null)
         {
             RowValueCollection rowValueCollection;
             var outputInvocations = new List<object>();
@@ -322,13 +320,10 @@ namespace SigQL
                 var innerResultType = unwrappedReturnType.GetGenericArguments().First();
                 var rootOutputType = OutputFactory.UnwrapType(innerResultType);
                 var orderedRowValues = rowValueCollection.Rows.Values.OrderBy(v => v.RowNumber).ToList();
-                foreach (var rowValue in orderedRowValues)
-                {
-                    var target = new RowProjectionBuilder().Build(rootOutputType, rowValue);
-                    outputInvocations.Add(target);
-                }
+                AddProjections(outputInvocations, rootOutputType, orderedRowValues, scalarColumnName);
 
                 object dataResult = OutputFactory.Cast(outputInvocations, innerResultType);
+                EnsureScalarResultPresent(dataResult, innerResultType, scalarColumnName);
 
                 var totalCountResultType = typeof(TotalCountResult<>).MakeGenericType(innerResultType);
                 var totalCountResult = Activator.CreateInstance(totalCountResultType);
@@ -340,14 +335,11 @@ namespace SigQL
 
             var rootOutputType2 = OutputFactory.UnwrapType(returnType);
             var orderedRowValues2 = rowValueCollection.Rows.Values.OrderBy(v => v.RowNumber).ToList();
-            foreach (var rowValue in orderedRowValues2)
-            {
-                var target = new RowProjectionBuilder().Build(rootOutputType2, rowValue);
-                outputInvocations.Add(target);
-            }
+            AddProjections(outputInvocations, rootOutputType2, orderedRowValues2, scalarColumnName);
 
             object result = outputInvocations;
             result = OutputFactory.Cast(result, unwrappedReturnType);
+            EnsureScalarResultPresent(result, unwrappedReturnType, scalarColumnName);
 
             return result;
         }
@@ -362,7 +354,8 @@ namespace SigQL
             var returnType = methodInvocation.SqlStatement.ReturnType;
             var isTotalCountWithResult = methodInvocation.SqlStatement.IsTotalCountWithResult;
 
-            return Materialize(statement, targetTablePrimaryKey, tablePrimaryKeyDefinitions, returnType, isTotalCountWithResult);
+            return Materialize(statement, targetTablePrimaryKey, tablePrimaryKeyDefinitions, returnType, isTotalCountWithResult,
+                methodInvocation.SqlStatement.ScalarColumnName);
         }
 
         public object Materialize(Type outputType, PreparedSqlStatement sqlStatement)
@@ -395,6 +388,74 @@ namespace SigQL
         public T Materialize<T>(string commandText)
         {
             return Materialize<T>(commandText, new { });
+        }
+
+        /// <summary>
+        /// Projects each row into the output list. A scalar select reads the single named column out
+        /// of the row rather than building a projection object; the row values still carry the
+        /// primary key columns, which is what keeps rows distinct in <see cref="ReadRow"/>.
+        /// </summary>
+        private static void AddProjections(List<object> outputInvocations, Type rootOutputType,
+            IEnumerable<RowValues> orderedRowValues, string scalarColumnName)
+        {
+            foreach (var rowValue in orderedRowValues)
+            {
+                var target = scalarColumnName != null
+                    ? ConvertScalarValue(rootOutputType, rowValue, scalarColumnName)
+                    : new RowProjectionBuilder().Build(rootOutputType, rowValue);
+                outputInvocations.Add(target);
+            }
+        }
+
+        private static object ConvertScalarValue(Type scalarType, RowValues rowValues, string scalarColumnName)
+        {
+            if (!rowValues.Values.TryGetValue(scalarColumnName, out var value))
+            {
+                throw new InvalidIdentifierException(
+                    $"Unable to find column {scalarColumnName} in the results of this query.");
+            }
+
+            var underlyingType = Nullable.GetUnderlyingType(scalarType) ?? scalarType;
+
+            if (value == null || value == DBNull.Value)
+            {
+                if (underlyingType != scalarType || !scalarType.IsValueType)
+                {
+                    return null;
+                }
+
+                throw new NullScalarValueException(
+                    $"Column {scalarColumnName} returned null, which cannot be represented by the return type {scalarType.Name}. Declare the return type as {scalarType.Name}? to allow null values.");
+            }
+
+            if (underlyingType.IsEnum)
+            {
+                return value is string enumName
+                    ? Enum.Parse(underlyingType, enumName)
+                    : Enum.ToObject(underlyingType, value);
+            }
+
+            return underlyingType.IsInstanceOfType(value)
+                ? value
+                : Convert.ChangeType(value, underlyingType);
+        }
+
+        /// <summary>
+        /// A scalar method declaring a non-nullable value type has no way to express "no row".
+        /// Returning default(T) would silently read as 0 / false, so the caller is told instead.
+        /// </summary>
+        private static void EnsureScalarResultPresent(object result, Type returnType, string scalarColumnName)
+        {
+            if (scalarColumnName == null || result != null || returnType.IsCollectionType())
+            {
+                return;
+            }
+
+            if (returnType.IsValueType && Nullable.GetUnderlyingType(returnType) == null)
+            {
+                throw new NullScalarValueException(
+                    $"No rows were returned for column {scalarColumnName}, which cannot be represented by the return type {returnType.Name}. Declare the return type as {returnType.Name}? to allow no result.");
+            }
         }
     }
 }

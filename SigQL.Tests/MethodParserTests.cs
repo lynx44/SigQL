@@ -3365,6 +3365,197 @@ update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",'')
 
         #endregion Exceptions
 
+        #region ScalarSelect
+
+        [TestMethod]
+        public void ScalarSelect_SingleValueWithFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeeNameScalar(1));
+
+            Assert.AreEqual(
+                "select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where (\"Employee\".\"Id\" = @id)",
+                sql);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_Collection_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetAllEmployeeNamesScalar());
+
+            Assert.AreEqual(
+                "select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\"",
+                sql);
+        }
+
+        /// <summary>
+        /// The primary key columns are always selected - the materializer keys rows on them to keep
+        /// duplicate scalar values distinct - but they must not be selected twice when the projected
+        /// column is itself the primary key.
+        /// </summary>
+        [TestMethod]
+        public void ScalarSelect_OfPrimaryKeyColumn_DoesNotSelectKeyTwice()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetAllEmployeeIdsScalar());
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\"", sql);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_WithCollectionFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeeNamesScalarByIds(new[] { 1, 2 }));
+
+            Assert.AreEqual(
+                "select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where (\"Employee\".\"Id\" in (@id0, @id1))",
+                sql);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_OfNullableColumn_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogStartDatesScalar());
+
+            Assert.AreEqual(
+                "select \"WorkLog\".\"Id\" \"Id\", \"WorkLog\".\"StartDate\" \"StartDate\" from \"WorkLog\"",
+                sql);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_OfEnumColumn_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetAddressClassificationsScalar());
+
+            Assert.AreEqual(
+                "select \"Address\".\"Id\" \"Id\", \"Address\".\"Classification\" \"Classification\" from \"Address\"",
+                sql);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_WithViaRelationFilter_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeeNamesScalarViaWorkLog(1));
+
+            Assert.AreEqual(
+                "select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where (exists (select 1 from \"WorkLog\" \"WorkLog0\" where ((\"WorkLog0\".\"EmployeeId\" = \"Employee\".\"Id\") and (\"WorkLog0\".\"Id\" = @WorkLog0Id))))",
+                sql);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_WithOffsetFetchAndOrder_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogIdsScalarWithOffsetFetch(1, 2,
+                new List<IOrderBy>() { new OrderBy(nameof(WorkLog), nameof(WorkLog.StartDate), OrderByDirection.Descending) }));
+
+            Assert.AreEqual(
+                "select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by \"WorkLog\".\"StartDate\" desc offset @skip rows fetch next @take rows only",
+                sql);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_WithIgnoreIfNullOmitted_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetEmployeeNameScalarIgnoreIfNull(null));
+
+            Assert.AreEqual(
+                "select \"Employee\".\"Id\" \"Id\", \"Employee\".\"Name\" \"Name\" from \"Employee\" where (1 = 1)",
+                sql);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_SetsScalarColumnNameOnStatement()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetEmployeeNameScalar));
+            var statement = this.methodParser.SqlFor(methodInfo);
+
+            Assert.AreEqual(nameof(Employee.Name), statement.ScalarColumnName);
+        }
+
+        [TestMethod]
+        public void ProjectionSelect_LeavesScalarColumnNameUnset()
+        {
+            var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetAllEmployeeFields));
+            var statement = this.methodParser.SqlFor(methodInfo);
+
+            Assert.IsNull(statement.ScalarColumnName);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_MissingColumnName_ThrowsException()
+        {
+            var ex = Assert.ThrowsException<InvalidAttributeException>(() =>
+                GetSqlFor(typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_ScalarSelectMissingColumnName))));
+
+            Assert.AreEqual(
+                "[Select] on method IMonolithicRepository.INVALID_ScalarSelectMissingColumnName requires both TableName and ColumnName.",
+                ex.Message);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_MissingTableName_ThrowsException()
+        {
+            var ex = Assert.ThrowsException<InvalidAttributeException>(() =>
+                GetSqlFor(typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_ScalarSelectMissingTableName))));
+
+            Assert.AreEqual(
+                "[Select] on method IMonolithicRepository.INVALID_ScalarSelectMissingTableName requires both TableName and ColumnName.",
+                ex.Message);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_NonExistingTableName_ThrowsException()
+        {
+            var ex = Assert.ThrowsException<InvalidIdentifierException>(() =>
+                GetSqlFor(typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_ScalarSelectNonExistingTableName))));
+
+            Assert.AreEqual(
+                "Unable to identify matching database table for [Select] on method IMonolithicRepository.INVALID_ScalarSelectNonExistingTableName. Table UnknownTableName does not exist.",
+                ex.Message);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_NonExistingColumnName_ThrowsException()
+        {
+            var ex = Assert.ThrowsException<InvalidIdentifierException>(() =>
+                GetSqlFor(typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_ScalarSelectNonExistingColumnName))));
+
+            Assert.AreEqual(
+                "Unable to identify matching database column for [Select] on method IMonolithicRepository.INVALID_ScalarSelectNonExistingColumnName. Column UnknownColumnName does not exist in table Employee.",
+                ex.Message);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_WithProjectionReturnType_ThrowsException()
+        {
+            var ex = Assert.ThrowsException<InvalidAttributeException>(() =>
+                GetSqlFor(typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_ScalarSelectProjectionReturnType))));
+
+            Assert.AreEqual(
+                "[Select] on method IMonolithicRepository.INVALID_ScalarSelectProjectionReturnType requires a scalar return type. IEmployeeFields is a projection type, which already identifies its own table and columns.",
+                ex.Message);
+        }
+
+        [TestMethod]
+        public void ScalarSelect_WithCountResult_ThrowsException()
+        {
+            var ex = Assert.ThrowsException<InvalidAttributeException>(() =>
+                GetSqlFor(typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_ScalarSelectCountResult))));
+
+            StringAssert.Contains(ex.Message, "since the result is a count rather than the projected column");
+        }
+
+        [TestMethod]
+        public void ScalarSelect_WithByteArrayReturnType_ThrowsException()
+        {
+            var ex = Assert.ThrowsException<InvalidAttributeException>(() =>
+                GetSqlFor(typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_ScalarSelectByteArray))));
+
+            Assert.AreEqual(
+                "[Select] on method IMonolithicRepository.INVALID_ScalarSelectByteArray cannot return byte[], since it is ambiguous between a single binary column value and a collection of byte values. Use IEnumerable<byte> to project a byte column across rows.",
+                ex.Message);
+        }
+
+        #endregion ScalarSelect
+
         private void AssertSqlEqual(string expected, string actual)
         {
             var expectedCleaned = RemoveExtraWhitespace(expected);
