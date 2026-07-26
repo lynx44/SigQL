@@ -2,9 +2,12 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
+using SigQL.Exceptions;
 using SigQL.Extensions;
 using SigQL.Schema;
+using SigQL.Types.Attributes;
 
 namespace SigQL
 {
@@ -123,16 +126,27 @@ namespace SigQL
             var targetTable = upsertTableRelations.TableRelations.TargetTable;
             var primaryKeyColumns = upsertTableRelations.KeyColumns ?? targetTable.PrimaryKey.Columns;
             var foreignValueLookupStatements = BuildForeignValueLookupStatements(upsertTableRelations, lookupTableName);
+            var settableColumns = upsertTableRelations.ColumnParameters
+                .Where(c =>
+                {
+                    return !c.Column.IsIdentity &&
+                           !primaryKeyColumns.Any(pkc =>
+                               ColumnEqualityComparer.Default.Equals(c.Column, pkc));
+                }).ToList();
+
+            // every value is a key value, so there is nothing left to assign. an update with an
+            // empty set clause is not valid sql, and the caller almost certainly meant to include
+            // at least one non-key column.
+            if (!settableColumns.Any() && !foreignValueLookupStatements.Any())
+            {
+                throw new InvalidAttributeException(typeof(UpdateByKeyAttribute), Array.Empty<MemberInfo>(),
+                    $"Unable to build an update for {targetTable.Name}: every supplied column ({string.Join(", ", upsertTableRelations.ColumnParameters.Select(c => c.Column.Name))}) is part of the key ({string.Join(", ", primaryKeyColumns.Select(c => c.Name))}), leaving nothing to update. Include at least one non-key column in the values class.");
+            }
+
             var ast = new Update()
             {
                 SetClause =
-                    upsertTableRelations.ColumnParameters
-                        .Where(c =>
-                        {
-                            return !c.Column.IsIdentity &&
-                                !primaryKeyColumns.Any(pkc =>
-                                    ColumnEqualityComparer.Default.Equals(c.Column, pkc));
-                        })
+                    settableColumns
                         .Select(c => new SetEqualOperator()
                             .SetArgs(
                                 new ColumnIdentifier().SetArgs(

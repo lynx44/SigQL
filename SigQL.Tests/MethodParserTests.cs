@@ -415,6 +415,26 @@ namespace SigQL.Tests
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" = @Employee0Name))))", sql);
         }
 
+        // a navigation filter class the caller left null resolves to a null column value
+        // rather than throwing
+        [TestMethod]
+        public void Where_ByNullNavigationFilterClass_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogByEmployeeName(
+                new WorkLog.GetByEmployeeNameFilter() { Employee = null }));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (exists (select 1 from \"Employee\" \"Employee0\" where ((\"Employee0\".\"Id\" = \"WorkLog\".\"EmployeeId\") and (\"Employee0\".\"Name\" is null))))", sql);
+        }
+
+        [TestMethod]
+        public void Delete_ByNullNavigationFilterClass_DoesNotThrow()
+        {
+            GetSqlForCall(() => this.monolithicRepository.DeleteWorkLogsByEmployeeName(
+                new WorkLog.GetByEmployeeNameFilter() { Employee = null }));
+
+            Assert.AreEqual(DBNull.Value, this.preparedSqlStatements.Single().Parameters["Employee0Name"]);
+        }
+
         // consider if this behavior is desired
         // [TestMethod]
         // public void Where_ByDirectNavigationProperty_ReturnsExpectedSql()
@@ -450,6 +470,38 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() => monolithicRepository.GetEmployeesByNameWithNotLike(Like.FromUnsafeRawValue("name")));
 
             Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where (\"Employee\".\"Name\" not like @name)", sql);
+        }
+
+        [TestMethod]
+        public void Where_LikeCollection_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => monolithicRepository.GetEmployeesByNamesWithLike(
+                new[] { Like.FromUnsafeRawValue("bo%"), Like.FromUnsafeRawValue("%sue") }));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((\"Employee\".\"Name\" like @names0) or (\"Employee\".\"Name\" like @names1))", sql);
+            var parameters = this.preparedSqlStatements.Single().Parameters;
+            Assert.AreEqual("bo%", parameters["names0"]);
+            Assert.AreEqual("%sue", parameters["names1"]);
+        }
+
+        [TestMethod]
+        public void Where_NotLikeCollection_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => monolithicRepository.GetEmployeesByNamesWithNotLike(
+                new[] { Like.FromUnsafeRawValue("bo%"), Like.FromUnsafeRawValue("%sue") }));
+
+            Assert.AreEqual("select \"Employee\".\"Id\" \"Id\" from \"Employee\" where ((\"Employee\".\"Name\" not like @names0) and (\"Employee\".\"Name\" not like @names1))", sql);
+        }
+
+        [TestMethod]
+        public void Where_ComparisonOperatorOnCollection_ThrowsException()
+        {
+            var exception = Assert.ThrowsException<InvalidAttributeException>(() =>
+                GetSqlFor(typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_GreaterThanCollection))));
+
+            Assert.AreEqual(
+                "Comparison attributes ([GreaterThan], [GreaterThanOrEqual], [LessThan], [LessThanOrEqual]) cannot be applied to collection parameter startDate, since a range comparison requires a single value.",
+                exception.Message);
         }
 
         [TestMethod]
@@ -499,6 +551,15 @@ namespace SigQL.Tests
             var sql = GetSqlForCall(() => this.monolithicRepository.GetWorkLogsWithAnyId(new List<int?>() { null }));
 
             Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" where (\"WorkLog\".\"Id\" is null)", sql);
+        }
+
+        [TestMethod]
+        public void InParameter_CompositeKey_EmptyCollection_ReturnsNoRows()
+        {
+            var sql = this.GetSqlForCall(() => this.monolithicRepository.GetInWithCompositeKeys(
+                new List<Address.CityAndState>()));
+
+            Assert.AreEqual("select \"Address\".\"Id\" \"Id\", \"Address\".\"StreetAddress\" \"StreetAddress\" from \"Address\" where (0 = 1)", sql);
         }
 
         [TestMethod]
@@ -1608,6 +1669,69 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void OffsetFetch_NullableWithValues_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SkipTakeWorkLogsNullable(1, 2));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by (select 1) offset @skip rows fetch next @take rows only", sql);
+        }
+
+        [TestMethod]
+        public void OffsetFetch_NullableWithNullFetch_OmitsFetch()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SkipTakeWorkLogsNullable(1, null));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by (select 1) offset @skip rows", sql);
+        }
+
+        [TestMethod]
+        public void OffsetFetch_NullableWithNullOffset_UsesZeroOffset()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SkipTakeWorkLogsNullable(null, 2));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by (select 1) offset 0 rows fetch next @take rows only", sql);
+        }
+
+        [TestMethod]
+        public void OffsetFetch_NullableWithBothNull_OmitsPaging()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.SkipTakeWorkLogsNullable(null, null));
+
+            Assert.AreEqual("select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\" order by (select 1) offset 0 rows", sql);
+        }
+
+        [TestMethod]
+        public void OffsetFetch_OnKeylessTableWithJoinedRelations_ThrowsException()
+        {
+            var exception = Assert.ThrowsException<InvalidTypeException>(() =>
+                GetSqlFor(typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_ViewWithJoinRelationOffsetFetch))));
+
+            Assert.AreEqual(
+                "Unable to apply OFFSET/FETCH to WorkLogEmployeeView on method IMonolithicRepository.INVALID_ViewWithJoinRelationOffsetFetch, because WorkLogEmployeeView has no primary key and the projection joins related tables. Remove the related tables from the projection, or page a table that has a primary key.",
+                exception.Message);
+        }
+
+        // a view without joined relations pages fine - no parent key subquery is needed
+        [TestMethod]
+        public void OffsetFetch_OnKeylessTableWithoutRelations_ReturnsExpectedSql()
+        {
+            var sql = GetSqlFor(typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.GetWorkLogEmployeeViewPaged)));
+
+            Assert.IsTrue(sql.Contains("offset @skip rows fetch next @take rows only"), sql);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_WithOnlyKeyColumns_ThrowsException()
+        {
+            var exception = Assert.ThrowsException<InvalidAttributeException>(() =>
+                GetSqlFor(typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.INVALID_UpdateByKeyWithOnlyKeyColumns))));
+
+            Assert.AreEqual(
+                "Unable to build an update for CompositeKeyTable: every supplied column (FirstName, LastName) is part of the key (FirstName, LastName), leaving nothing to update. Include at least one non-key column in the values class.",
+                exception.Message);
+        }
+
+        [TestMethod]
         public void Fetch_OneTableOnly_ReturnsExpectedSql()
         {
             var methodInfo = typeof(IMonolithicRepository).GetMethod(nameof(IMonolithicRepository.TakeWorkLogsOnly));
@@ -1802,6 +1926,32 @@ namespace SigQL.Tests
         }
 
         [TestMethod]
+        public void CountAsync_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.CountWorkLogsAsync());
+
+            Assert.AreEqual("select count(1) \"Count\" from (select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\") Subquery", sql);
+        }
+
+        [TestMethod]
+        public void TotalCountAsync_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.TotalCountWorkLogsAsync());
+
+            Assert.AreEqual("select count(1) \"TotalCount\" from (select \"WorkLog\".\"Id\" \"Id\" from \"WorkLog\") Subquery", sql);
+        }
+
+        [TestMethod]
+        public void TotalCountWithResultAsync_WithOffsetFetch_ReturnsExpectedSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.TotalCountWithResultWorkLogsAsync(2, 1));
+
+            Assert.IsTrue(sql.Contains("offset @offset rows fetch next @fetch rows only"), "Data query should contain offset/fetch");
+            Assert.IsTrue(sql.Contains("select count(1) \"TotalCount\" from"), "Should contain count query");
+            Assert.IsFalse(sql.Substring(sql.IndexOf("select count(1)")).Contains("offset"), "Count query should not contain offset");
+        }
+
+        [TestMethod]
         public void TotalCount_ReturnsExpectedSql()
         {
             var sql = GetSqlForCall(() => this.monolithicRepository.TotalCountWorkLogs());
@@ -1906,6 +2056,124 @@ merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup ""Emp
  insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
 update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
 select ""Employee"".""Id"" ""Id"" from ""Employee"" inner join @EmployeeLookup ""EmployeeLookup"" on (""Employee"".""Id"" = ""EmployeeLookup"".""Id"") order by ""EmployeeLookup"".""_index""", sql);
+        }
+
+        // a null many-to-one reference has no lookup index to point at, so the index column
+        // must still receive a value - a null literal
+        [TestMethod]
+        public void InsertMultiple_NullManyToOneReference_WritesNullForeignIndex()
+        {
+            GetSqlForCall(() => this.monolithicRepository.InsertWorkLogsWithExistingEmployee(
+                new[] { new WorkLog.InsertFieldsWithExistingEmployee() { StartDate = new DateTime(2021, 1, 1), Employee = null } }));
+
+            var sql = this.preparedSqlStatements.Single().CommandText;
+            Assert.IsTrue(
+                sql.Contains("insert @WorkLogLookup(\"StartDate\", \"EndDate\", \"_index\", \"EmployeeId_index\") values(@worklogsStartDate0, @worklogsEndDate0, 0, null)"),
+                sql);
+        }
+
+        [TestMethod]
+        public void UpsertMultiple_NullManyToOneReference_WritesNullForeignIndex()
+        {
+            GetSqlForCall(() => this.monolithicRepository.UpsertWorkLogsWithExistingEmployee(
+                new[] { new WorkLog.UpsertFieldsWithExistingEmployee() { StartDate = new DateTime(2021, 1, 1), Employee = null } }));
+
+            var sql = this.preparedSqlStatements.Single().CommandText;
+            Assert.IsTrue(
+                sql.Contains("\"_index\", \"EmployeeId_index\") values(@worklogsId0, @worklogsStartDate0, @worklogsEndDate0, 0, null)"),
+                sql);
+        }
+
+        [TestMethod]
+        public void Sync_NullNestedNavigationRecord_WritesNullForeignIndex()
+        {
+            GetSqlForCall(() => this.monolithicRepository.SyncLocationWithAddress(
+                new Location.UpsertWithAddress() { Name = "HQ", Address = null }));
+
+            var sql = this.preparedSqlStatements.Single().CommandText;
+            Assert.IsTrue(
+                sql.Contains("insert @LocationLookup(\"Id\", \"Name\", \"_index\", \"AddressId_index\") values(@valuesId0, @valuesName0, 0, null)"),
+                sql);
+        }
+
+        [TestMethod]
+        public void InsertMultiple_EmptyCollection_ReturnsNoOpSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleEmployeesWithAttributeWithValuesByDetectedClass(
+                new Employee.InsertFields[0]));
+
+            AssertSqlEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Name"", ""_index"") select null, null where (1 = 0)
+merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"") as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");", sql);
+            Assert.AreEqual(0, this.preparedSqlStatements.Single().Parameters.Count);
+        }
+
+        [TestMethod]
+        public void InsertMultiple_NullCollection_ReturnsNoOpSql()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleEmployeesWithAttributeWithValuesByDetectedClass(null));
+
+            AssertSqlEqual(@"declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Name"", ""_index"") select null, null where (1 = 0)
+merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"") as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");", sql);
+            Assert.AreEqual(0, this.preparedSqlStatements.Single().Parameters.Count);
+        }
+
+        [TestMethod]
+        public void InsertMultiple_NullNavigationCollection_InsertsParentOnly()
+        {
+            var sql = GetSqlForCall(() => this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(
+                new[] { new Employee.InsertFieldsWithWorkLogs() { Name = "bah", WorkLogs = null } }));
+
+            AssertSqlEqual(@"declare @insertedWorkLog table(""Id"" int, ""_index"" int)
+declare @insertedEmployee table(""Id"" int, ""_index"" int)
+declare @EmployeeLookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
+insert @EmployeeLookup(""Name"", ""_index"") values(@employeesName0, 0)
+merge ""Employee"" using (select ""Name"", ""_index"" from @EmployeeLookup ""EmployeeLookup"") as i (""Name"",""_index"") on (1 = 0)
+ when not matched then
+ insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee(""Id"", ""_index"");
+update ""EmployeeLookup"" set ""Id"" = ""insertedEmployee"".""Id"" from @EmployeeLookup ""EmployeeLookup"" inner join @insertedEmployee ""insertedEmployee"" on (""EmployeeLookup"".""_index"" = ""insertedEmployee"".""_index"");
+declare @WorkLogLookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int)
+insert @WorkLogLookup(""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"") select null, null, null, null where (1 = 0)
+merge ""WorkLog"" using (select ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"" from @WorkLogLookup ""WorkLogLookup"") as i (""StartDate"",""EndDate"",""_index"",""EmployeeId_index"") on (1 = 0)
+ when not matched then
+ insert (""StartDate"", ""EndDate"", ""EmployeeId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @EmployeeLookup ""EmployeeLookup"" where (""EmployeeLookup"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog(""Id"", ""_index"");
+update ""WorkLogLookup"" set ""Id"" = ""insertedWorkLog"".""Id"" from @WorkLogLookup ""WorkLogLookup"" inner join @insertedWorkLog ""insertedWorkLog"" on (""WorkLogLookup"".""_index"" = ""insertedWorkLog"".""_index"");", sql);
+        }
+
+        [TestMethod]
+        public void UpsertMultiple_EmptyCollection_DoesNotThrow()
+        {
+            GetSqlForCall(() => this.monolithicRepository.UpsertMultipleEmployeesWithWorkLogs(
+                new Employee.UpsertFieldsWithWorkLogs[0]));
+
+            Assert.AreEqual(0, this.preparedSqlStatements.Single().Parameters.Count);
+        }
+
+        [TestMethod]
+        public void UpdateByKeyMultiple_EmptyCollection_DoesNotThrow()
+        {
+            GetSqlForCall(() => this.monolithicRepository.UpdateByKeyMultipleEmployeesWithWorkLogs(
+                new Employee.UpdateByKeyFieldsWithWorkLogs[0]));
+
+            Assert.AreEqual(0, this.preparedSqlStatements.Single().Parameters.Count);
+        }
+
+        [TestMethod]
+        public void Sync_NullNavigationCollection_DoesNotThrow()
+        {
+            GetSqlForCall(() => this.monolithicRepository.SyncEmployeeWithWorkLogs(
+                new Employee.SyncFieldsWithWorkLogs() { Id = 1, Name = "bah", WorkLogs = null }));
+
+            Assert.IsTrue(this.preparedSqlStatements.Single().CommandText.Contains("WorkLogLookup"));
         }
 
         [TestMethod]
@@ -2301,45 +2569,28 @@ select ""WorkLog<WorkLog>"".""Id"" ""Id"", ""WorkLog<WorkLog>"".""StartDate"" ""
         }
 
         [TestMethod]
-        public void InsertRepeatedChildren_ReturnsExpectedSql()
+        public void InsertRepeatedChildren_ThrowsException()
         {
-            var sql = GetSqlForCall(() => this.monolithicRepository.InsertSingleEmployeeWithAddresses(
-                new Employee.InsertEmployeeTwice()
-                {
-                    Name = "John",
-                    WorkLog = new WorkLog.InsertFieldsWithEmployee()
+            // WorkLog.EmployeeId is the foreign key for both the parent Employee being inserted
+            // and the WorkLog.Employee reference, so there is no single source for the column
+            var exception = Assert.ThrowsException<InvalidIdentifierException>(() =>
+                GetSqlForCall(() => this.monolithicRepository.InsertSingleEmployeeWithAddresses(
+                    new Employee.InsertEmployeeTwice()
                     {
-                        StartDate = DateTime.Today,
-                        Employee = new Employee.InsertFields()
+                        Name = "John",
+                        WorkLog = new WorkLog.InsertFieldsWithEmployee()
                         {
-                            Name = "Joe"
+                            StartDate = DateTime.Today,
+                            Employee = new Employee.InsertFields()
+                            {
+                                Name = "Joe"
+                            }
                         }
-                    }
-                }
+                    })));
 
-            ));
-
-            AssertSqlEqual(@"declare @insertedWorkLog$employees$WorkLog$ table(""Id"" int, ""_index"" int)
-declare @insertedEmployee$employees$WorkLog$Employee$ table(""Id"" int, ""_index"" int)
-declare @insertedEmployee$Employee$ table(""Id"" int, ""_index"" int)
-declare @Employee$Employee$Lookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
-insert @Employee$Employee$Lookup(""Name"", ""_index"") values(@employeesName0, 0)
-merge ""Employee"" using (select ""Name"", ""_index"" from @Employee$Employee$Lookup ""Employee$Employee$Lookup"") as i (""Name"",""_index"") on (1 = 0)
- when not matched then
- insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee$Employee$(""Id"", ""_index"");
-update ""Employee$Employee$Lookup"" set ""Id"" = ""insertedEmployee$Employee$"".""Id"" from @Employee$Employee$Lookup ""Employee$Employee$Lookup"" inner join @insertedEmployee$Employee$ ""insertedEmployee$Employee$"" on (""Employee$Employee$Lookup"".""_index"" = ""insertedEmployee$Employee$"".""_index"");
-declare @Employee$employees$WorkLog$Employee$Lookup table(""Id"" int, ""Name"" nvarchar(max), ""_index"" int)
-insert @Employee$employees$WorkLog$Employee$Lookup(""Name"", ""_index"") values(@employeesWorkLog_Employee_Name0, 0)
-merge ""Employee"" using (select ""Name"", ""_index"" from @Employee$employees$WorkLog$Employee$Lookup ""Employee$employees$WorkLog$Employee$Lookup"") as i (""Name"",""_index"") on (1 = 0)
- when not matched then
- insert (""Name"") values(""i"".""Name"") output ""inserted"".""Id"", ""i"".""_index"" into @insertedEmployee$employees$WorkLog$Employee$(""Id"", ""_index"");
-update ""Employee$employees$WorkLog$Employee$Lookup"" set ""Id"" = ""insertedEmployee$employees$WorkLog$Employee$"".""Id"" from @Employee$employees$WorkLog$Employee$Lookup ""Employee$employees$WorkLog$Employee$Lookup"" inner join @insertedEmployee$employees$WorkLog$Employee$ ""insertedEmployee$employees$WorkLog$Employee$"" on (""Employee$employees$WorkLog$Employee$Lookup"".""_index"" = ""insertedEmployee$employees$WorkLog$Employee$"".""_index"");
-declare @WorkLog$employees$WorkLog$Lookup table(""Id"" int, ""StartDate"" nvarchar(max), ""EndDate"" nvarchar(max), ""_index"" int, ""EmployeeId_index"" int, ""EmployeeId_index"" int)
-insert @WorkLog$employees$WorkLog$Lookup(""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""EmployeeId_index"") values(@employeesWorkLog_StartDate0, @employeesWorkLog_EndDate0, 0, 0, 0, 0, 0)
-merge ""WorkLog"" using (select ""StartDate"", ""EndDate"", ""_index"", ""EmployeeId_index"", ""EmployeeId_index"" from @WorkLog$employees$WorkLog$Lookup ""WorkLog$employees$WorkLog$Lookup"") as i (""StartDate"",""EndDate"",""_index"",""EmployeeId_index"",""EmployeeId_index"") on (1 = 0)
- when not matched then
- insert (""StartDate"", ""EndDate"", ""EmployeeId"", ""EmployeeId"") values(""i"".""StartDate"", ""i"".""EndDate"", (select ""Id"" from @Employee$employees$WorkLog$Employee$Lookup ""Employee$employees$WorkLog$Employee$Lookup"" where (""Employee$employees$WorkLog$Employee$Lookup"".""_index"" = ""i"".""EmployeeId_index"")), (select ""Id"" from @Employee$Employee$Lookup ""Employee$Employee$Lookup"" where (""Employee$Employee$Lookup"".""_index"" = ""i"".""EmployeeId_index""))) output ""inserted"".""Id"", ""i"".""_index"" into @insertedWorkLog$employees$WorkLog$(""Id"", ""_index"");
-update ""WorkLog$employees$WorkLog$Lookup"" set ""Id"" = ""insertedWorkLog$employees$WorkLog$"".""Id"" from @WorkLog$employees$WorkLog$Lookup ""WorkLog$employees$WorkLog$Lookup"" inner join @insertedWorkLog$employees$WorkLog$ ""insertedWorkLog$employees$WorkLog$"" on (""WorkLog$employees$WorkLog$Lookup"".""_index"" = ""insertedWorkLog$employees$WorkLog$"".""_index"");", sql);
+            Assert.AreEqual(
+                "Unable to write WorkLog.EmployeeId: it is the foreign key for more than one relation on this values class (Employee). Reference the related record once, so that the foreign key has a single source.",
+                exception.Message);
         }
 
         // [TestMethod]
@@ -3339,6 +3590,32 @@ update ""Employee"" set ""Name"" = IsNull(NullIf(""EmployeeLookup"".""Name"",'')
                     }
                 });
             });
+        }
+
+        // a table that exists in the database but is not joined into this query cannot be sorted on
+        [TestMethod]
+        public void OrderByDynamic_TableNotInQuery_ThrowsException()
+        {
+            var exception = Assert.ThrowsException<InvalidOrderByException>(() =>
+                GetSqlForCall(() =>
+                    this.monolithicRepository.GetOrderedWorkLogsWithDynamicOrderBy(
+                        new OrderBy(nameof(Employee), nameof(Employee.Name), OrderByDirection.Ascending))));
+
+            Assert.AreEqual(
+                "Unable to order by Employee.Name for order by parameter order. Table Employee is not referenced by this query. Use OrderByRelation to sort by a table that is not part of the projection.",
+                exception.Message);
+        }
+
+        [TestMethod]
+        public void OrderByDynamicEnumerable_TableNotInQuery_ThrowsException()
+        {
+            Assert.ThrowsException<InvalidOrderByException>(() =>
+                GetSqlForCall(() =>
+                    this.monolithicRepository.GetOrderedWorkLogsWithDynamicEnumerableOrderBy(
+                        new List<OrderBy>()
+                        {
+                            new OrderBy(nameof(Employee), nameof(Employee.Name), OrderByDirection.Ascending)
+                        })));
         }
 
         [TestMethod]

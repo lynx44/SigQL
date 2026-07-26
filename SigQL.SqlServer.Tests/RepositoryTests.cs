@@ -151,6 +151,40 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public async Task CountWorkLogsAsync_ReturnsExpectedCount()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = await monolithicRepository.CountWorkLogsAsync();
+
+            Assert.AreEqual(expected.Count, actual.Count);
+        }
+
+        [TestMethod]
+        public async Task TotalCountWorkLogsAsync_ReturnsExpectedCount()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = await monolithicRepository.TotalCountWorkLogsAsync();
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+        }
+
+        [TestMethod]
+        public async Task TotalCountWithResultAsync_WithOffsetFetch_ReturnsPageAndTotalCount()
+        {
+            var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
+            this.laborDbContext.WorkLog.AddRange(expected);
+            this.laborDbContext.SaveChanges();
+            var actual = await monolithicRepository.TotalCountWithResultWorkLogsAsync(2, 1);
+
+            Assert.AreEqual(expected.Count, actual.TotalCount);
+            Assert.AreEqual(2, actual.Result.Count());
+        }
+
+        [TestMethod]
         public void TotalCount_ReturnsExpectedCount()
         {
             var expected = Enumerable.Range(1, 5).Select(i => new EFWorkLog() { }).ToList();
@@ -569,7 +603,11 @@ namespace SigQL.SqlServer.Tests
             var allEmployees = new[] {1, 2}.Select(i => new EFEmployee() { Name = "Name" }).ToList();
             this.laborDbContext.Employee.AddRange(allEmployees);
             this.laborDbContext.SaveChanges();
-            Assert.ThrowsException<InvalidOperationException>(() => this.monolithicRepository.GetByName("Name"));
+            var exception = Assert.ThrowsException<MultipleResultsException>(() => this.monolithicRepository.GetByName("Name"));
+
+            Assert.AreEqual(
+                "Expected at most one IEmployeeFields, but the query returned 2 rows. Return a collection of IEmployeeFields, or narrow the query with a filter or [Fetch] parameter.",
+                exception.Message);
         }
 
         [TestMethod]
@@ -869,12 +907,64 @@ namespace SigQL.SqlServer.Tests
             this.laborDbContext.Employee.Add(employee);
             this.laborDbContext.SaveChanges();
             var actual = this.monolithicRepository.GetEmployeesWithArrayAddresses();
-            
+
             var addressIds = employee.Addresses.Select(a => a.Id).ToList();
 
             AreEquivalent(addressIds, actual.First().Addresses.Select(a => a.Id).ToList());
         }
-        
+
+        [TestMethod]
+        public void GetWithICollectionNavigationProperty()
+        {
+            var employee = new EFEmployee() { Name = "A Name", Addresses = new List<EFAddress>()
+            {
+                new EFAddress()
+                {
+                    StreetAddress = "123 fake st"
+                }
+            }};
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetEmployeesWithICollectionAddresses();
+
+            var addressIds = employee.Addresses.Select(a => a.Id).ToList();
+
+            AreEquivalent(addressIds, actual.First().Addresses.Select(a => a.Id).ToList());
+        }
+
+        [TestMethod]
+        public void GetWithIReadOnlyListNavigationProperty()
+        {
+            var employee = new EFEmployee() { Name = "A Name", Addresses = new List<EFAddress>()
+            {
+                new EFAddress()
+                {
+                    StreetAddress = "123 fake st"
+                }
+            }};
+            this.laborDbContext.Employee.Add(employee);
+            this.laborDbContext.SaveChanges();
+            var actual = this.monolithicRepository.GetEmployeesWithIReadOnlyListAddresses();
+
+            var addressIds = employee.Addresses.Select(a => a.Id).ToList();
+
+            AreEquivalent(addressIds, actual.First().Addresses.Select(a => a.Id).ToList());
+        }
+
+        [TestMethod]
+        public void GetCollectionReturnTypes()
+        {
+            this.laborDbContext.Employee.Add(new EFEmployee() { Name = "A Name" });
+            this.laborDbContext.SaveChanges();
+
+            Assert.AreEqual(1, this.monolithicRepository.GetAllEmployeeFieldsAsList().Count);
+            Assert.AreEqual(1, this.monolithicRepository.GetAllEmployeeFieldsAsIList().Count);
+            Assert.AreEqual(1, this.monolithicRepository.GetAllEmployeeFieldsAsICollection().Count);
+            Assert.AreEqual(1, this.monolithicRepository.GetAllEmployeeFieldsAsIReadOnlyList().Count);
+            Assert.AreEqual(1, this.monolithicRepository.GetAllEmployeeFieldsAsIReadOnlyCollection().Count);
+            Assert.AreEqual(1, this.monolithicRepository.GetAllEmployeeFieldsAsArray().Length);
+        }
+
         [TestMethod]
         public void GetWithSingleNavigationProperty_WhenJoinRowNull_ReturnsNull()
         {
@@ -998,7 +1088,8 @@ namespace SigQL.SqlServer.Tests
             Assert.AreEqual(expected.Id, actual.Id);
             Assert.AreEqual(0, actual.Locations.Count());
         }
-        
+
+
         [TestMethod]
         public void GetWithAliasedOneToManyCollection_ReturnsExpectedCollection()
         {
@@ -1369,9 +1460,40 @@ namespace SigQL.SqlServer.Tests
             this.laborDbContext.WorkLog.Add(otherWorkLog);
             this.laborDbContext.SaveChanges();
             var expected = employee;
-            var actual = this.monolithicRepository.GetWorkLogByEmployeeName(new WorkLog.GetByEmployeeNameFilter() { Employee = new Employee.EmployeeNameFilter() { Name = "Joe" }});
+            var actual = this.monolithicRepository.GetWorkLogByEmployeeName(new WorkLog.GetByEmployeeNameFilter() { Employee = new Employee.EmployeeNameFilter() { Name = "Joe" } });
 
             Assert.AreEqual(expected.Id, actual.Id);
+        }
+
+        [TestMethod]
+        public void GetViaNullNestedNavigationPropertyParameter()
+        {
+            var workLog = new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" } };
+            var workLogWithUnnamedEmployee = new EFWorkLog() { Employee = new EFEmployee() { Name = null } };
+            this.laborDbContext.WorkLog.Add(workLog);
+            this.laborDbContext.WorkLog.Add(workLogWithUnnamedEmployee);
+            this.laborDbContext.SaveChanges();
+
+            // a null navigation filter class behaves the same as one whose properties are null
+            var actual = this.monolithicRepository.GetWorkLogByEmployeeName(
+                new WorkLog.GetByEmployeeNameFilter() { Employee = null });
+
+            Assert.AreEqual(workLogWithUnnamedEmployee.Id, actual.Id);
+        }
+
+        [TestMethod]
+        public void DeleteByNullNestedNavigationPropertyParameter()
+        {
+            var workLog = new EFWorkLog() { Employee = new EFEmployee() { Name = "Joe" } };
+            var workLogWithUnnamedEmployee = new EFWorkLog() { Employee = new EFEmployee() { Name = null } };
+            this.laborDbContext.WorkLog.Add(workLog);
+            this.laborDbContext.WorkLog.Add(workLogWithUnnamedEmployee);
+            this.laborDbContext.SaveChanges();
+
+            this.monolithicRepository.DeleteWorkLogsByEmployeeName(
+                new WorkLog.GetByEmployeeNameFilter() { Employee = null });
+
+            AreSame(new List<int>() { workLog.Id }, this.laborDbContext.WorkLog.Select(wl => wl.Id).ToList());
         }
 
         [TestMethod]
@@ -1408,6 +1530,24 @@ namespace SigQL.SqlServer.Tests
             var actual = this.monolithicRepository.GetEmployeesByNameWithLike(Like.FromUnsafeRawValue("J%e")).Select(e => e.Id);
             
             Assert.AreEqual(2, actual.Count());
+            AreEquivalent(expected, actual);
+        }
+
+        [TestMethod]
+        public void LikeCollectionByParameter()
+        {
+            this.laborDbContext.Employee.AddRange(
+                new EFEmployee() { Name = "Joe" },
+                new EFEmployee() { Name = "Jake" },
+                new EFEmployee() { Name = "Jam" },
+                new EFEmployee() { Name = "Kaylee" }
+                );
+            this.laborDbContext.SaveChanges();
+
+            var expected = laborDbContext.Employee.Where(e => e.Name == "Jam" || e.Name == "Kaylee").Select(e => e.Id).ToList();
+            var actual = this.monolithicRepository.GetEmployeesByNamesWithLike(
+                new[] { Like.FromUnsafeRawValue("Ja_"), Like.FromUnsafeRawValue("K%") }).Select(e => e.Id);
+
             AreEquivalent(expected, actual);
         }
 
@@ -2308,6 +2448,19 @@ namespace SigQL.SqlServer.Tests
 
             Assert.AreEqual(2, actual.Count());
             AreEquivalent(expected.Select(e => e.Id), actual.Select(a => a.Id));
+        }
+
+        [TestMethod]
+        public void InWithCompositeKeys_EmptyCollection_ReturnsNoRows()
+        {
+            this.laborDbContext.Address.AddRange(
+                new EFAddress() { City = "Seattle", State = "WA" },
+                new EFAddress() { City = "Concord", State = "MA" });
+            this.laborDbContext.SaveChanges();
+
+            var actual = this.monolithicRepository.GetInWithCompositeKeys(new List<Address.CityAndState>());
+
+            Assert.AreEqual(0, actual.Count());
         }
 
         [TestMethod]
@@ -3902,6 +4055,31 @@ namespace SigQL.SqlServer.Tests
         }
 
         [TestMethod]
+        public void OffsetFetch_Nullable_ReturnsExpected()
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                this.laborDbContext.WorkLog.Add(new EFWorkLog() { Employee = new EFEmployee() });
+            }
+            this.laborDbContext.SaveChanges();
+            var allIds = this.laborDbContext.WorkLog.Select(wl => wl.Id).ToList();
+
+            AreSame(allIds.Skip(3).Take(2).ToList(),
+                this.monolithicRepository.SkipTakeWorkLogsNullable(3, 2).Select(wl => wl.Id).ToList());
+            // null fetch means no limit
+            AreSame(allIds.Skip(3).ToList(),
+                this.monolithicRepository.SkipTakeWorkLogsNullable(3, null).Select(wl => wl.Id).ToList());
+            // null offset means start at the beginning
+            AreSame(allIds.Take(2).ToList(),
+                this.monolithicRepository.SkipTakeWorkLogsNullable(null, 2).Select(wl => wl.Id).ToList());
+            AreSame(allIds, this.monolithicRepository.SkipTakeWorkLogsNullable(null, null).Select(wl => wl.Id).ToList());
+            // the offset/fetch nodes are mutated per invocation - make sure a null call does not
+            // leave the cached statement without its paging clauses
+            AreSame(allIds.Skip(3).Take(2).ToList(),
+                this.monolithicRepository.SkipTakeWorkLogsNullable(3, 2).Select(wl => wl.Id).ToList());
+        }
+
+        [TestMethod]
         public void OffsetFetch_WithPrimaryAndNavigationTableFilter()
         {
             for (int i = 0; i < 5; i++)
@@ -4444,6 +4622,44 @@ namespace SigQL.SqlServer.Tests
             CustomAssert.AreEquivalent<dynamic>(expected, actual);
         }
 
+        [TestMethod]
+        public void GetViewPaged()
+        {
+            var workLogs = new[] { 1, 2, 3 }.Select(i => new EFWorkLog()
+            {
+                Employee = new EFEmployee() { Name = "EmployeeName" + i },
+                StartDate = new DateTime(2021, 1, i + 1),
+                EndDate = new DateTime(2021, 1, i + 2)
+            }).ToList();
+            this.laborDbContext.WorkLog.AddRange(workLogs);
+            this.laborDbContext.SaveChanges();
+
+            var result = this.monolithicRepository.GetWorkLogEmployeeViewPaged(1, 1).ToList();
+
+            Assert.AreEqual(1, result.Count);
+        }
+
+        [TestMethod]
+        public void GetViewWithJoinRelationPaged_ThrowsDescriptiveException()
+        {
+            var exception = Assert.ThrowsException<InvalidTypeException>(
+                () => this.monolithicRepository.INVALID_ViewWithJoinRelationOffsetFetch(0, 1).ToList());
+
+            Assert.IsTrue(exception.Message.Contains("has no primary key"), exception.Message);
+        }
+
+        [TestMethod]
+        public void UpdateByKey_WithOnlyKeyColumns_ThrowsDescriptiveException()
+        {
+            var exception = Assert.ThrowsException<InvalidAttributeException>(
+                () => this.monolithicRepository.INVALID_UpdateByKeyWithOnlyKeyColumns(new[]
+                {
+                    new CompositeKeyTable.Fields() { FirstName = "first", LastName = "last" }
+                }));
+
+            Assert.IsTrue(exception.Message.Contains("leaving nothing to update"), exception.Message);
+        }
+
         #endregion
 
         #region Function
@@ -4684,6 +4900,58 @@ namespace SigQL.SqlServer.Tests
             var workLogs = this.laborDbContext.WorkLog.ToList();
             Assert.AreEqual(1, workLogs.Count);
             Assert.AreEqual(existingEmployeeId, workLogs.Single().EmployeeId);
+        }
+
+        // an optional relation the caller left null must produce a null foreign key rather than
+        // a values list that is shorter than the lookup table's column list
+        [TestMethod]
+        public void InsertMultiple_Void_ManyToOneNullReference_InsertsNullForeignKey()
+        {
+            this.monolithicRepository.InsertWorkLogsWithExistingEmployee(new[]
+            {
+                new WorkLog.InsertFieldsWithExistingEmployee()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee = null
+                }
+            });
+
+            var workLogs = this.laborDbContext.WorkLog.ToList();
+            Assert.AreEqual(1, workLogs.Count);
+            Assert.IsNull(workLogs.Single().EmployeeId);
+            Assert.AreEqual(0, this.laborDbContext.Employee.Count());
+        }
+
+        [TestMethod]
+        public void Upsert_Void_ManyToOneNullReference_InsertsNullForeignKey()
+        {
+            this.monolithicRepository.UpsertWorkLogsWithExistingEmployee(new[]
+            {
+                new WorkLog.UpsertFieldsWithExistingEmployee()
+                {
+                    StartDate = new DateTime(2021, 1, 1), EndDate = new DateTime(2021, 1, 2),
+                    Employee = null
+                }
+            });
+
+            var workLogs = this.laborDbContext.WorkLog.ToList();
+            Assert.AreEqual(1, workLogs.Count);
+            Assert.IsNull(workLogs.Single().EmployeeId);
+        }
+
+        [TestMethod]
+        public void Sync_Void_NullNestedNavigationRecord_SyncsParentWithNullForeignKey()
+        {
+            this.monolithicRepository.SyncLocationWithAddress(new Location.UpsertWithAddress()
+            {
+                Name = "HQ",
+                Address = null
+            });
+
+            var locations = this.laborDbContext.Location.ToList();
+            Assert.AreEqual(1, locations.Count);
+            Assert.IsNull(locations.Single().AddressId);
+            Assert.AreEqual(0, this.laborDbContext.Address.Count());
         }
 
         [TestMethod]
@@ -5176,7 +5444,89 @@ namespace SigQL.SqlServer.Tests
 
         }
 
-        // test insert when empty collections are passed
+        [TestMethod]
+        public void InsertMultiple_EmptyCollection_InsertsNothing()
+        {
+            this.monolithicRepository.InsertMultipleEmployeesWithAttributeWithValuesByDetectedClass(
+                new List<Employee.InsertFields>());
+
+            Assert.AreEqual(0, this.laborDbContext.Employee.Count());
+        }
+
+        [TestMethod]
+        public void InsertMultiple_NullCollection_InsertsNothing()
+        {
+            this.monolithicRepository.InsertMultipleEmployeesWithAttributeWithValuesByDetectedClass(null);
+
+            Assert.AreEqual(0, this.laborDbContext.Employee.Count());
+        }
+
+        [TestMethod]
+        public void InsertMultiple_EmptyCollection_OutputIds_ReturnsEmpty()
+        {
+            var output = this.monolithicRepository.InsertMultipleEmployeesAndReturnIds(new List<Employee.InsertFields>());
+
+            Assert.AreEqual(0, output.Count());
+            Assert.AreEqual(0, this.laborDbContext.Employee.Count());
+        }
+
+        [TestMethod]
+        public void InsertMultiple_NullNavigationCollection_InsertsParentOnly()
+        {
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(new[]
+            {
+                new Employee.InsertFieldsWithWorkLogs() { Name = "Mike", WorkLogs = null }
+            });
+
+            var actual = this.laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+            Assert.AreEqual(1, actual.Count);
+            Assert.AreEqual(0, actual.Single().WorkLogs.Count);
+            Assert.AreEqual(0, this.laborDbContext.WorkLog.Count());
+        }
+
+        [TestMethod]
+        public void InsertMultiple_EmptyNavigationCollection_InsertsParentOnly()
+        {
+            this.monolithicRepository.InsertMultipleEmployeesWithWorkLogs(new[]
+            {
+                new Employee.InsertFieldsWithWorkLogs() { Name = "Mike", WorkLogs = new List<WorkLog.DataFields>() }
+            });
+
+            var actual = this.laborDbContext.Employee.Include(e => e.WorkLogs).ToList();
+            Assert.AreEqual(1, actual.Count);
+            Assert.AreEqual(0, actual.Single().WorkLogs.Count);
+        }
+
+        [TestMethod]
+        public void UpsertMultiple_EmptyCollection_UpsertsNothing()
+        {
+            this.monolithicRepository.UpsertMultipleEmployeesWithWorkLogs(
+                new List<Employee.UpsertFieldsWithWorkLogs>());
+
+            Assert.AreEqual(0, this.laborDbContext.Employee.Count());
+        }
+
+        [TestMethod]
+        public void UpdateByKeyMultiple_EmptyCollection_UpdatesNothing()
+        {
+            this.monolithicRepository.UpdateByKeyMultipleEmployeesWithWorkLogs(
+                new List<Employee.UpdateByKeyFieldsWithWorkLogs>());
+
+            Assert.AreEqual(0, this.laborDbContext.Employee.Count());
+        }
+
+        [TestMethod]
+        public void Sync_NullNavigationCollection_SyncsParentOnly()
+        {
+            this.monolithicRepository.SyncEmployeeWithWorkLogs(new Employee.SyncFieldsWithWorkLogs()
+            {
+                Name = "Mike",
+                WorkLogs = null
+            });
+
+            Assert.AreEqual(1, this.laborDbContext.Employee.Count());
+            Assert.AreEqual(0, this.laborDbContext.WorkLog.Count());
+        }
 
         [TestMethod]
         public void InsertMultiple_OutputIds_ReturnsExpected()

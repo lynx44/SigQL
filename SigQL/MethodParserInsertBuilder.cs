@@ -578,14 +578,14 @@ namespace SigQL
                                             };
                                         }).Cast<AstNode>().AppendOne(new Literal() { Value = param.Index.ToString() })
                                             .Concat(
-                                                OrderIndexReferences(insertTableRelations, parentIndexMappings)
-                                                    .Where(p => p.InsertedIndex == param.Index)
-                                                    .Select(p =>
-                                                        new Literal() { Value = p.PrimaryTableIndex.ToString() }).ToList()));
+                                                BuildForeignIndexValues(insertTableRelations, parentIndexMappings, param.Index)));
                                 }));
                             }
                             else
                             {
+                                // no rows means no per-column sql parameters, so drop the paths that would
+                                // otherwise be resolved against the (empty or null) values collection
+                                RemoveColumnParameterPaths(parameterPaths, insertTableRelations);
                                 // if there are no values to insert, then fake the insert with an empty set
                                 lookupParameterTableInsert.ValuesList = null;
                                 lookupParameterTableInsert.SetArgs(new Select()
@@ -633,14 +633,12 @@ namespace SigQL
                                                 };
                                             }).Cast<AstNode>().AppendOne(new Literal() { Value = i.ToString() })
                                             .Concat<AstNode>(
-                                                OrderIndexReferences(insertTableRelations, parentIndexMappings)
-                                                    .Where(p => p.InsertedIndex == i)
-                                                    .Select(p =>
-                                                        new Literal() { Value = p.PrimaryTableIndex.ToString() }).ToList()));
+                                                BuildForeignIndexValues(insertTableRelations, parentIndexMappings, i)));
                                 }));
                             }
                             else
                             {
+                                RemoveColumnParameterPaths(parameterPaths, insertTableRelations);
                                 lookupParameterTableInsert.ValuesList = null;
                                 lookupParameterTableInsert.SetArgs(new Select()
                                 {
@@ -664,6 +662,13 @@ namespace SigQL
                 };
                 return new Tuple<AstNode, TokenPath>(lookupParameterTableInsert, tokenPath);
             }
+        }
+
+        private static void RemoveColumnParameterPaths(List<ParameterPath> parameterPaths, UpsertTableRelations insertTableRelations)
+        {
+            var columnParameterNames = insertTableRelations.ColumnParameters
+                .Select(cp => cp.ParameterPath.SqlParameterName).ToList();
+            parameterPaths.RemoveAll(p => columnParameterNames.Contains(p.SqlParameterName));
         }
 
         private static IEnumerable<IColumnDefinition> GetForeignKeyColumns(UpsertTableRelations insertTableRelations)
@@ -866,6 +871,7 @@ namespace SigQL
         private static DeclareStatement BuildDeclareLookupParameterStatement(string lookupParameterTableName,
             UpsertTableRelations insertTableRelations)
         {
+            EnsureDistinctForeignIndexColumns(insertTableRelations);
             List<AstNode> primaryKeyColumns = new List<AstNode>();
             if ((insertTableRelations.TableRelations.TargetTable.PrimaryKey?.Columns.Any()).GetValueOrDefault(false))
             {
@@ -1166,6 +1172,32 @@ namespace SigQL
             return ast;
         }
 
+        /// <summary>
+        /// One value per foreign index column of the lookup table, in the same order the columns
+        /// were declared. A relation the caller left null has no index mapping, so it contributes
+        /// a null literal rather than nothing at all - otherwise the values list would be shorter
+        /// than the column list and produce invalid sql.
+        /// </summary>
+        private static IEnumerable<AstNode> BuildForeignIndexValues(UpsertTableRelations insertTableRelations,
+            IEnumerable<TableIndexReference> parentIndexMappings, int insertedIndex)
+        {
+            var columnCollectionComparer = new FuncEqualityComparer<IEnumerable<IColumnDefinition>>((l1, l2) => Enumerable.SequenceEqual(l1, l2, ColumnEqualityComparer.Default));
+            var values = new List<AstNode>();
+            foreach (var foreignTableColumn in insertTableRelations.ForeignTableColumns)
+            {
+                var foreignColumns = foreignTableColumn.ForeignKey.GetForeignColumns().ToList();
+                var indexReference = parentIndexMappings.FirstOrDefault(pi =>
+                    pi.InsertedIndex == insertedIndex &&
+                    columnCollectionComparer.Equals(pi.ForeignColumns, foreignColumns));
+                var value = indexReference?.PrimaryTableIndex != null
+                    ? indexReference.PrimaryTableIndex.Value.ToString()
+                    : "null";
+                values.AddRange(foreignColumns.Select(c => (AstNode) new Literal() { Value = value }));
+            }
+
+            return values;
+        }
+
         private static IEnumerable<TableIndexReference> OrderIndexReferences(UpsertTableRelations insertTableRelations, IEnumerable<TableIndexReference> parentIndexMappings)
         {
             var columnCollectionComparer = new FuncEqualityComparer<IEnumerable<IColumnDefinition>>((l1, l2) => Enumerable.SequenceEqual(l1, l2, ColumnEqualityComparer.Default));
@@ -1202,6 +1234,28 @@ namespace SigQL
         private static string GetForeignColumnIndexName(string columnName)
         {
             return $"{columnName}_index";
+        }
+
+        /// <summary>
+        /// Two relations that write the same foreign key column would produce a lookup table with
+        /// two identically named index columns - and, more fundamentally, two competing values for
+        /// one column. Say so rather than emitting sql that sql server rejects.
+        /// </summary>
+        private static void EnsureDistinctForeignIndexColumns(UpsertTableRelations insertTableRelations)
+        {
+            var duplicate = insertTableRelations.ForeignTableColumns
+                .SelectMany(fk => fk.ForeignKey.GetForeignColumns().Select(fc => new { fk, fc }))
+                .GroupBy(x => x.fc.Name, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault(g => g.Count() > 1);
+
+            if (duplicate != null)
+            {
+                var tableName = insertTableRelations.TableRelations.TableName;
+                var relatedTables = string.Join(", ",
+                    duplicate.Select(x => x.fk.PrimaryTableRelations.TableName).Distinct());
+                throw new InvalidIdentifierException(
+                    $"Unable to write {tableName}.{duplicate.Key}: it is the foreign key for more than one relation on this values class ({relatedTables}). Reference the related record once, so that the foreign key has a single source.");
+            }
         }
 
         private static IArgument FindRootArgument(IArgument argument)
@@ -1279,6 +1333,13 @@ namespace SigQL
 
         private static void OrderParameterValues(OrderedParameterValueLookup indexLookup, object value, IArgument argument, object parentValue)
         {
+            // a null table argument (the values collection itself, or a null navigation collection) contributes
+            // no rows. null column arguments still flow through as null values below.
+            if (value == null && argument.ClassProperties.Any())
+            {
+                return;
+            }
+
             var distinctValues = value.AsEnumerable().ToList();
             //var currentValuesList = new List<OrderedParameterValue>();
             for (var index = 0; index < distinctValues.Count; index++)

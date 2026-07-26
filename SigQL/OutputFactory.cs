@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using SigQL.Exceptions;
 using SigQL.Extensions;
 using SigQL.Types;
 
@@ -57,25 +58,31 @@ namespace SigQL
                 var collectionType = returnType;
                 if (collectionType.IsGenericType)
                 {
-                    if (collectionType.GetGenericTypeDefinition() == typeof(IReadOnlyCollection<>) ||
-                        collectionType.GetGenericTypeDefinition() == typeof(ReadOnlyCollection<>))
+                    var genericTypeDefinition = collectionType.GetGenericTypeDefinition();
+                    if (genericTypeDefinition == typeof(IReadOnlyCollection<>) ||
+                        genericTypeDefinition == typeof(ReadOnlyCollection<>))
                     {
                         var asReadOnlyMethod =
                             typeof(List<>).MakeGenericType(collectionType.GenericTypeArguments.First()).GetMethod(nameof(List<object>.AsReadOnly), BindingFlags.Instance | BindingFlags.Public);
                         var list = MakeGenericList(rootOutputType, outputInvocations.AsEnumerable());
                         result = asReadOnlyMethod.Invoke(list, null);
                     }
-
-                    if (collectionType.GetGenericTypeDefinition() == typeof(IList<>) ||
-                        collectionType.GetGenericTypeDefinition() == typeof(List<>))
+                    // List<T> satisfies all of these
+                    else if (genericTypeDefinition == typeof(IList<>) ||
+                             genericTypeDefinition == typeof(List<>) ||
+                             genericTypeDefinition == typeof(ICollection<>) ||
+                             genericTypeDefinition == typeof(IReadOnlyList<>))
                     {
                         result = MakeGenericList(rootOutputType, outputInvocations.AsEnumerable());
-
                     }
-
-                    if (collectionType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                    else if (genericTypeDefinition == typeof(IEnumerable<>))
                     {
                         result = CastToGenericEnumerable(rootOutputType, outputInvocations.AsEnumerable());
+                    }
+                    else
+                    {
+                        throw new InvalidTypeException(
+                            $"Unable to materialize collection type {collectionType.Name}. Supported collection types are IEnumerable<>, ICollection<>, IList<>, List<>, IReadOnlyList<>, IReadOnlyCollection<>, ReadOnlyCollection<> and arrays.", null);
                     }
                 }
                 else if (returnType.IsArray)
@@ -89,7 +96,14 @@ namespace SigQL
             }
             else
             {
-                return result.AsEnumerable().SingleOrDefault();
+                var rows = result.AsEnumerable().ToList();
+                if (rows.Count > 1)
+                {
+                    throw new MultipleResultsException(
+                        $"Expected at most one {rootOutputType.Name}, but the query returned {rows.Count} rows. Return a collection of {rootOutputType.Name}, or narrow the query with a filter or [Fetch] parameter.");
+                }
+
+                return rows.SingleOrDefault();
             }
 
             return result;

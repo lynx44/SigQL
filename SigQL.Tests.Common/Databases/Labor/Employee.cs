@@ -22,6 +22,11 @@ namespace SigQL.Tests.Common.Databases.Labor
             public string Name { get; set; }
         }
 
+        public class EmployeeNameIgnorable
+        {
+            [IgnoreIfNull] public string Name { get; set; }
+        }
+
         public class EmployeeNameNotFilter
         {
             [Not] public string Name { get; set; }
@@ -178,6 +183,18 @@ namespace SigQL.Tests.Common.Databases.Labor
         {
             int Id { get; set; }
             Address.IAddressFields[] Addresses { get; set; }
+        }
+
+        public interface IEmployeeWithICollectionAddresses
+        {
+            int Id { get; set; }
+            ICollection<Address.IAddressFields> Addresses { get; set; }
+        }
+
+        public interface IEmployeeWithIReadOnlyListAddresses
+        {
+            int Id { get; set; }
+            IReadOnlyList<Address.IAddressFields> Addresses { get; set; }
         }
 
         public class EmployeeWithAddressesPoco

@@ -88,16 +88,17 @@ namespace SigQL
         {
             Type projectionType;
             var returnType = methodInfo.ReturnType;
+            // Task<ICountResult<T>> and friends: the count wrappers are detected on the awaited type
+            if (returnType.IsTask() && returnType.IsGenericType)
+            {
+                returnType = returnType.GetGenericArguments().First();
+            }
             var isCountResult = returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ICountResult<>);
             var isTotalCount = returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ITotalCount<>);
             var isTotalCountResult = returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ITotalCountResult<>);
-            if (isCountResult || isTotalCount)
+            if (isCountResult || isTotalCount || isTotalCountResult)
             {
-                returnType = methodInfo.ReturnType.GetGenericArguments().First();
-            }
-            else if (isTotalCountResult)
-            {
-                returnType = methodInfo.ReturnType.GetGenericArguments().First();
+                returnType = returnType.GetGenericArguments().First();
             }
 
             projectionType = OutputFactory.UnwrapType(returnType);
@@ -239,6 +240,15 @@ namespace SigQL
                     }
 
                     var primaryKey = primaryTable.PrimaryKey;
+                    // paging a projection that joins relations works by first selecting a page of
+                    // primary key values. without a primary key - a view, or a keyless table - there
+                    // is nothing to identify a parent row by, and the subquery would select nothing.
+                    if (!(primaryKey?.Columns.Any()).GetValueOrDefault(false))
+                    {
+                        throw new InvalidTypeException(
+                            $"Unable to apply OFFSET/FETCH to {primaryTable.Name} on method {methodInfo.DeclaringType?.Name}.{methodInfo.Name}, because {primaryTable.Name} has no primary key and the projection joins related tables. Remove the related tables from the projection, or page a table that has a primary key.", null);
+                    }
+
                     var primaryKeyColumnNodes = primaryKey.Columns.Select(column =>
                         new ColumnIdentifier()
                             .SetArgs(
@@ -585,7 +595,21 @@ namespace SigQL
                 var offsetSqlParameterName = offsetParameter.GenerateSuggestedSqlIdentifierName();
                 offsetParameter.SqlParameterName = offsetSqlParameterName;
                 parameterPaths.Add(offsetParameter);
-                offsetClause.OffsetCount = new NamedParameterIdentifier() {Name = offsetSqlParameterName};
+                var offsetParameterIdentifier = new NamedParameterIdentifier() { Name = offsetSqlParameterName };
+                offsetClause.OffsetCount = offsetParameterIdentifier;
+                // a null offset means "start at the first row". sql server rejects a null OFFSET
+                // count, so swap in a literal 0 for that invocation.
+                tokens.Add(new TokenPath(offsetParameter.Argument)
+                {
+                    SqlParameterName = offsetSqlParameterName,
+                    UpdateNodeFunc = (parameterValue, tokenPath, allParameterArgs) =>
+                    {
+                        offsetClause.OffsetCount = parameterValue == null
+                            ? (AstNode) new Literal() { Value = "0" }
+                            : offsetParameterIdentifier;
+                        return new Dictionary<string, object>();
+                    }
+                });
             }
             else
             {
@@ -597,8 +621,19 @@ namespace SigQL
                 var fetchSqlParameterName = fetchParameter.GenerateSuggestedSqlIdentifierName();
                 fetchParameter.SqlParameterName = fetchSqlParameterName;
                 parameterPaths.Add(fetchParameter);
-                offsetClause.Fetch = new FetchClause()
+                var fetchClause = new FetchClause()
                     {FetchCount = new NamedParameterIdentifier() {Name = fetchSqlParameterName}};
+                offsetClause.Fetch = fetchClause;
+                // a null fetch means "no limit" - drop the FETCH clause entirely for that invocation.
+                tokens.Add(new TokenPath(fetchParameter.Argument)
+                {
+                    SqlParameterName = fetchSqlParameterName,
+                    UpdateNodeFunc = (parameterValue, tokenPath, allParameterArgs) =>
+                    {
+                        offsetClause.Fetch = parameterValue == null ? null : fetchClause;
+                        return new Dictionary<string, object>();
+                    }
+                });
             }
 
             offsetOrderByClause.Offset = offsetClause;
@@ -841,9 +876,21 @@ namespace SigQL
                                     {
                                         UpdateNodeFunc = (parameterValue, parameterArg, allParameterArgs) =>
                                         {
-                                            var collection = parameterValue.AsEnumerable();
+                                            var collection = parameterValue.AsEnumerable().ToList();
 
                                             var newParameters = new Dictionary<string, object>();
+                                            if (!collection.Any())
+                                            {
+                                                // an empty collection of composite keys matches no rows.
+                                                // an empty OrOperator would render nothing at all, leaving
+                                                // a dangling "where".
+                                                placeholder.SetArgs(
+                                                    new EqualsOperator().SetArgs(
+                                                        new Literal() { Value = "0" },
+                                                        new Literal() { Value = "1" }));
+                                                return newParameters;
+                                            }
+
                                             placeholder.SetArgs(new OrOperator().SetArgs(
                                                 collection.Select((c, i) =>
                                                 {
@@ -1212,11 +1259,19 @@ namespace SigQL
             var comparisonSpec = this.databaseResolver.GetColumnSpec(argument);
             var parameterType = comparisonSpec.ComparisonType;
 
-            var placeholder = new Placeholder();
-            if (comparisonSpec.IsAnyLike && parameterType.IsCollectionType())
+            var collectionElementType = GetCollectionElementType(parameterType);
+            if (IsComparisonOperator(comparisonSpec) && parameterType.IsCollectionType())
             {
-                // startswith/contains/endswith applied to a collection parameter.
-                // build a like predicate per element, combined with OR (or AND for NOT):
+                throw new InvalidAttributeException(typeof(GreaterThanAttribute),
+                    Array.Empty<MemberInfo>(),
+                    $"Comparison attributes ([GreaterThan], [GreaterThanOrEqual], [LessThan], [LessThanOrEqual]) cannot be applied to collection parameter {argument.FullyQualifiedName()}, since a range comparison requires a single value.");
+            }
+
+            var placeholder = new Placeholder();
+            if ((comparisonSpec.IsAnyLike || typeof(Like).IsAssignableFrom(collectionElementType)) && parameterType.IsCollectionType())
+            {
+                // startswith/contains/endswith (or a collection of Like values) applied to a collection
+                // parameter. build a like predicate per element, combined with OR (or AND for NOT):
                 //   (col like @p0 or col like @p1 or ...)
                 var likeContainer = comparisonSpec.Not ? (AstNode) new AndOperator() : new OrOperator();
                 placeholder.SetArgs(likeContainer);
@@ -1530,6 +1585,22 @@ namespace SigQL
             return placeholder;
         }
 
+        private static bool IsComparisonOperator(ColumnSpec comparisonSpec)
+        {
+            return comparisonSpec.GreaterThan || comparisonSpec.GreaterThanOrEqual ||
+                   comparisonSpec.LessThan || comparisonSpec.LessThanOrEqual;
+        }
+
+        private static Type GetCollectionElementType(Type parameterType)
+        {
+            if (!parameterType.IsCollectionType())
+                return null;
+
+            return parameterType.IsArray
+                ? parameterType.GetElementType()
+                : parameterType.GetGenericArguments().FirstOrDefault();
+        }
+
         private static object ConvertToLikeValue(object item, ColumnSpec comparisonSpec)
         {
             switch (item)
@@ -1712,7 +1783,12 @@ namespace SigQL
                     }
 
                     var tableRelations = primaryTableRelations.Find(orderBy.Table);
-                    
+                    if (tableRelations == null)
+                    {
+                        throw new InvalidOrderByException(
+                            $"Unable to order by {tableIdentifier.Name}.{orderBy.Column} for order by parameter {p.ParameterPath.GenerateClassQualifiedName()}. Table {tableIdentifier.Name} is not referenced by this query. Use {nameof(OrderByRelation)} to sort by a table that is not part of the projection.");
+                    }
+
                     var relations = primaryTableRelations.PickBranch(tableRelations);
                     tableName = p.ResolveTableAlias(tableIdentifier.Name);
                     orderByResult.TableRelations = relations;

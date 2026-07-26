@@ -324,6 +324,13 @@ namespace SigQL
             {
                 foreach (var propertyInfo in propertyPaths)
                 {
+                    // a null anywhere along the path (an omitted navigation filter class, for
+                    // example) resolves the whole path to null rather than throwing
+                    if (value == null)
+                    {
+                        return null;
+                    }
+
                     value = propertyInfo.GetMethod.Invoke(value, null);
                 }
             }

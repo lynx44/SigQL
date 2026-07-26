@@ -69,6 +69,15 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Employee.IEmployeeWithReadOnlyCollectionAddresses> GetEmployeesWithReadOnlyCollectionAddresses();
         IEnumerable<Employee.IEmployeeWithIReadOnlyCollectionAddresses> GetEmployeesWithIReadOnlyCollectionAddresses();
         IEnumerable<Employee.IEmployeeWithArrayAddresses> GetEmployeesWithArrayAddresses();
+        IEnumerable<Employee.IEmployeeWithICollectionAddresses> GetEmployeesWithICollectionAddresses();
+        IEnumerable<Employee.IEmployeeWithIReadOnlyListAddresses> GetEmployeesWithIReadOnlyListAddresses();
+        // return collection types other than IEnumerable<>
+        List<Employee.IEmployeeFields> GetAllEmployeeFieldsAsList();
+        IList<Employee.IEmployeeFields> GetAllEmployeeFieldsAsIList();
+        ICollection<Employee.IEmployeeFields> GetAllEmployeeFieldsAsICollection();
+        IReadOnlyList<Employee.IEmployeeFields> GetAllEmployeeFieldsAsIReadOnlyList();
+        IReadOnlyCollection<Employee.IEmployeeFields> GetAllEmployeeFieldsAsIReadOnlyCollection();
+        Employee.IEmployeeFields[] GetAllEmployeeFieldsAsArray();
         IEnumerable<Address.IStreetAddressCoordinates> GetAddressWithStreetAddress();
         IEnumerable<Address.IStreetAddressCoordinates> GetAddressWithStreetAddressFetch([Fetch] int limit);
 
@@ -100,6 +109,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IAddresses> GetJoinAttributeWithMultiTableRelationalPath();
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithLike(Like name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithNotLike([Not] Like name);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNamesWithLike([Column(nameof(Employee.Name))] IEnumerable<Like> names);
+        IEnumerable<Employee.IEmployeeId> GetEmployeesByNamesWithNotLike([Not, Column(nameof(Employee.Name))] IEnumerable<Like> names);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithStartsWith([StartsWith] string name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithContains([Contains] string name);
         IEnumerable<Employee.IEmployeeId> GetEmployeesByNameWithEndsWith([EndsWith] string name);
@@ -296,6 +307,11 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogId> INVALID_NonExistingPropertyColumnNameWithAlias(WorkLog.IInvalidColumnWithAlias args);
         IEnumerable<WorkLog.IWorkLogId> INVALID_NonExistingPropertyTableName(WorkLog.IInvalidNestedColumn args);
         IEnumerable<WorkLog.IWorkLogId> INVALID_NonExistingPropertyForeignKey(WorkLog.IInvalidAddressRelation args);
+        IEnumerable<WorkLog.IWorkLogId> INVALID_GreaterThanCollection([GreaterThan] IEnumerable<DateTime> startDate);
+        // a view has no primary key, so a page of parent rows cannot be selected before joining relations
+        IEnumerable<WorkLogEmployeeView.IDataFieldsWithWorkLogs> INVALID_ViewWithJoinRelationOffsetFetch([Offset] int skip, [Fetch] int take);
+        [UpdateByKey(TableName = nameof(CompositeKeyTable))]
+        void INVALID_UpdateByKeyWithOnlyKeyColumns(IEnumerable<CompositeKeyTable.Fields> values);
         IEnumerable<Employee.IEmployeeId> INVALID_NonExistingViaRelationColumnName([ViaRelation(nameof(Employee) + "->" + nameof(WorkLog), "NonExistent")] int locationId);
         IEnumerable<Employee.IEmployeeId> INVALID_NonExistingViaRelationTableName([ViaRelation(nameof(Employee) + "->NonExistent", "Id")] int locationId);
         IEnumerable<Employee.IEmployeeId> INVALID_NonExistingViaRelationForeignKey([ViaRelation(nameof(Employee) + "->" + nameof(Location), nameof(Location.Id))] int locationId);
@@ -332,6 +348,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> GetNextWorkLogsWithNavigationTableFilter([Offset] int skip, WorkLog.GetByEmployeeNameFilter filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> TakeWorkLogs([Fetch] int take);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> SkipTakeWorkLogs([Offset] int skip, [Fetch] int take);
+        // nullable offset/fetch - null means "from the beginning" / "no limit"
+        IEnumerable<WorkLog.IWorkLogId> SkipTakeWorkLogsNullable([Offset] int? skip, [Fetch] int? take);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> TakeWorkLogsViaClassFilter(WorkLog.FilterWithFetch filter);
         IEnumerable<WorkLog.IWorkLogWithEmployeeNames> SkipTakeWorkLogsViaClassFilter(WorkLog.FilterWithOffsetFetch filter);
         IEnumerable<WorkLog.IWorkLogId> TakeWorkLogsOnlyViaClassFilter(WorkLog.FilterWithFetch filter);
@@ -341,6 +359,9 @@ namespace SigQL.Tests.Common.Databases.Labor
         IEnumerable<Labor.WorkLog.IWorkLogId> SkipTakeWorkLogsByStartDateAndEmployeeName(
             WorkLog.GetByStartDateAndEmployeeNameFilterWithOffsetFetch filter);
         ICountResult<WorkLog.IWorkLogId> CountWorkLogs();
+        Task<ICountResult<WorkLog.IWorkLogId>> CountWorkLogsAsync();
+        Task<ITotalCount<WorkLog.IWorkLogId>> TotalCountWorkLogsAsync();
+        Task<ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>>> TotalCountWithResultWorkLogsAsync([Fetch] int fetch, [Offset] int offset);
         ITotalCount<WorkLog.IWorkLogId> TotalCountWorkLogs();
         ITotalCount<WorkLog.IWorkLogId> TotalCountWorkLogsWithOffsetFetch([Fetch] int fetch, [Offset] int offset);
         ITotalCountResult<IEnumerable<WorkLog.IWorkLogId>> TotalCountWithResultWorkLogs();
@@ -368,6 +389,7 @@ namespace SigQL.Tests.Common.Databases.Labor
 
         // view
         IEnumerable<WorkLogEmployeeView.IFields> GetWorkLogEmployeeView();
+        IEnumerable<WorkLogEmployeeView.IFields> GetWorkLogEmployeeViewPaged([Offset] int skip, [Fetch] int take);
 
         // functions
         IEnumerable<itvf_GetWorkLogsByEmployeeId.IId> itvf_GetWorkLogsByEmployeeId([Parameter] int empId);
@@ -533,6 +555,8 @@ namespace SigQL.Tests.Common.Databases.Labor
         // delete
         [Delete(TableName = nameof(Employee))]
         void DeleteEmployeeWithAttributeTableNameWithValuesByParams(string name);
+        [Delete(TableName = nameof(WorkLog))]
+        void DeleteWorkLogsByEmployeeName(WorkLog.GetByEmployeeNameFilter filter);
         // delete filtered by a collection of non-int (uniqueidentifier) keys - an empty collection
         // must still produce type-compatible sql
         [Delete(TableName = nameof(CategoryItem))]

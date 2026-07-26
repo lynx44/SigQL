@@ -311,6 +311,26 @@ IN clauses can be specified by passing a collection:
 
 *Note that the parameter is called names, even though the column identifier in the database is name (non-plural). Basic pluralization is supported, but the most reliable and unambiguous naming scheme would use the exact column identifier*
 
+A collection of `Like` values produces a `LIKE` predicate per element, combined with `OR`
+(or `AND` when combined with `[Not]`), rather than an `IN` clause:
+
+    IEnumerable<Employee.IEmployeeId> GetByNamePatterns([Column("Name")] IEnumerable<Like> names);
+
+    // where (Name like 'Ja_' or Name like 'K%')
+    repository.GetByNamePatterns(new [] { Like.FromUnsafeRawValue("Ja_"), Like.FromUnsafeRawValue("K%") });
+
+The range comparison attributes (`[GreaterThan]`, `[GreaterThanOrEqual]`, `[LessThan]`,
+`[LessThanOrEqual]`) cannot be applied to a collection parameter, since a range comparison
+requires a single value. Doing so throws `InvalidAttributeException`.
+
+A collection of a multi-column class matches on all of its columns together:
+
+    IEnumerable<Address.IAddressFields> GetByCityAndState(IEnumerable<Address.CityAndState> values);
+
+    // where ((City = @City0 and State = @State0) or (City = @City1 and State = @State1))
+
+An empty collection matches no rows, the same as an empty single-column `IN`.
+
 ###### Large collections
 
 SQL Server caps a single command at 2100 parameters. When a SigQL query — or a bulk `Insert`/`Upsert`/`Sync`/`UpdateByKey` — would exceed that limit, SigQL automatically serializes the offending collection to a single JSON parameter and reads it back on the server using `OPENJSON`. The behavior is transparent: the method signature and caller code are unchanged, and small inputs continue to use ordinary parameters. This means you can pass thousands of IDs to an `IN` query, or upsert thousands of rows in one call, without manually chunking the input.
@@ -462,6 +482,21 @@ Offset and Fetch are also supported, which is often used for paging:
 	    [IgnoreIfNull, StartsWith] string name, 
 	    [Offset] int offset, 
 	    [Fetch] int);
+
+Offset and Fetch parameters may be nullable. A null offset starts at the first row, and a
+null fetch returns every remaining row - so paging can be made optional without a second
+method:
+
+    IEnumerable<Employee.IName> Search([Offset] int? offset, [Fetch] int? fetch);
+    ...
+    repository.Search(10, 25); // rows 11-35
+    repository.Search(null, null); // all rows
+
+When the projection joins related tables, SigQL pages the primary table first (by selecting
+a page of its primary key values) so that a one-to-many relation does not multiply the rows
+being counted. That requires the primary table to have a primary key - paging a view or a
+keyless table together with joined relations throws `InvalidTypeException`. Paging such a
+projection *without* related tables works normally.
 
 #### Order By
 
@@ -615,16 +650,25 @@ Offset does not need to be specified to use Fetch. The following example is the 
 
 *Note that passing a value greater than the non-default value for fetch (1) will throw an exception, since the return type is not a collection*
 
+When a single-result method matches more than one row, SigQL throws
+`SigQL.Exceptions.MultipleResultsException` (an `InvalidOperationException`) naming the
+projection and the row count. No rows returns null.
+
 #### Collection Results
 
 The following collection return types are supported:
 
  - IEnumerable\<T\>
+ - ICollection\<T\>
  - IList\<T\>
  - List\<T\>
  - T[]
  - IReadOnlyCollection\<T\>
+ - IReadOnlyList\<T\>
  - ReadOnlyCollection\<T\>
+
+The same list applies to navigation collection properties on a projection. Any other
+collection type throws `InvalidTypeException`.
 
 #### Filtering by related tables
 
@@ -680,6 +724,10 @@ Relational filters can also be defined by inner classes:
 This is functionally equivalent to the less verbose signature above, but has some advantages if many relational parameters or an object instance is preferred.
 
 *Note that the nesting of properties is important, and must match the relationship of the tables in the database.*
+
+A nested filter class the caller leaves null behaves the same as one whose properties are all
+null — the columns it contributes are compared against null. Use `[IgnoreIfNull]` on those
+properties if the filter should be dropped from the WHERE clause instead.
 
 #### Returning Relations
 
@@ -859,6 +907,13 @@ When paging a result set, you usually need both the current page of data and the
 	IEnumerable<Employee> page = result.Result; // just the requested page (up to 25 rows)
 
 The `TotalCount` always reflects the full number of rows matching the filter and ignores the `[Offset]`/`[Fetch]` paging, while `Result` contains only the requested page.
+
+All three count return types can be wrapped in a `Task<>` for an async call:
+
+    Task<ICountResult<WorkLog.IWorkLogId>> CountWorkLogsAsync(int employeeId);
+    Task<ITotalCount<WorkLog.IWorkLogId>> TotalCountWorkLogsAsync();
+    Task<ITotalCountResult<IEnumerable<Employee>>> GetEmployeesAsync(
+        EmployeeFilter filter, [Offset] int offset, [Fetch] int fetch);
 
 #### Views
 
@@ -1055,6 +1110,13 @@ Insert with relations:
 
 *Note that all relations will be inserted. If updating existing relations is desired, use the [Upsert] attribute*
 
+A null or empty values collection is a no-op: the statement still runs, but inserts no
+rows, and a method that returns the inserted values returns an empty collection. The same
+applies to `Upsert`, `UpdateByKey`, and `Sync`, and to a null or empty navigation
+collection on an individual record (the parent is written, the relation contributes no
+rows). This means a filtered list that happens to come back empty does not need to be
+guarded at the call site.
+
 ##### Referencing an existing related record by key
 
 Sometimes a record should point at a related row that already exists, without inserting or
@@ -1086,6 +1148,14 @@ Here each WorkLog is inserted with its `EmployeeId` set to the referenced `Emplo
 `Employee` row itself is left untouched. This works identically under `[Upsert]` and `[Sync]`, and
 supports non-identity keys such as a client-supplied `uniqueidentifier` (GUID) primary key. If the
 navigation property supplies columns beyond the key, the related row is inserted/updated as usual.
+
+A null navigation — whether it is a key-only reference or a full related record — writes a null
+foreign key and touches nothing on the related table, so an optional relation can simply be left
+unset.
+
+A single foreign key column can only have one source. If two navigations on the same values class
+map to the same foreign key column, SigQL throws `InvalidIdentifierException` rather than
+generating an ambiguous statement.
 
 For a many-to-many relationship, the same idea can be expressed against the join table with
 `[ViaRelation]`, supplying the far-side key directly as a flat collection of primitives:
@@ -1126,6 +1196,9 @@ Update by one or multiple classes and relations:
     void UpdateEmployees(IEnumerable<Employee.UpdateWithWorkLogs> employeesWithWorkLogs);
 
 *Note that all relations will be updated. If inserting new relations is desired, use the [Upsert] attribute*
+
+The values class must contain at least one column that is not part of the key — a class made
+up only of key columns has nothing to assign, and throws `InvalidAttributeException`.
 
 ##### Alternate Keys on UpdateByKey
 

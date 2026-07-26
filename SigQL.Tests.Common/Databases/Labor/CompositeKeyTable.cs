@@ -16,6 +16,12 @@ namespace SigQL.Tests.Common.Databases.Labor
             string LastName { get; }
         }
 
+        public class Fields
+        {
+            public string FirstName { get; set; }
+            public string LastName { get; set; }
+        }
+
         public interface IFieldsWithChildren
         {
             string FirstName { get; }
